@@ -1,0 +1,17 @@
+name: pdf_engine
+description: "PDF rendering engine for Lira using pdfrx"
+version: 0.0.2
+homepage:
+
+environment:
+  sdk: ^3.9.4
+  flutter: ">=3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  pdfrx: ^1.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
