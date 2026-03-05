@@ -22,7 +22,12 @@ class SearchNotifier extends StateNotifier<SearchState> {
     state = const SearchState.loading();
 
     try {
-      final results = await _api.find(anna.SearchRequest(query: query));
+      final results = await _api.find(
+        anna.SearchRequest(
+          query: query,
+          formats: [anna.Format.epub, anna.Format.pdf],
+        ),
+      );
       state = SearchState.loaded(results.books);
     } catch (e) {
       state = SearchState.error(e.toString());

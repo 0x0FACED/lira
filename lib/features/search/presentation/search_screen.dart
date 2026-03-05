@@ -26,6 +26,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   void _performSearch() {
     final query = _searchController.text;
+    if (query.trim().isEmpty) {
+      return;
+    }
     ref.read(searchProvider.notifier).search(query);
     _focusNode.unfocus();
   }
@@ -38,31 +41,35 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: TextField(
-          controller: _searchController,
-          focusNode: _focusNode,
-          decoration: InputDecoration(
-            hintText: l10n.searchBooks,
-            border: InputBorder.none,
-          ),
-          textInputAction: TextInputAction.search,
-          onSubmitted: (_) => _performSearch(),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () => _performSearch(),
-          ),
-          if (_searchController.text.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.clear),
-              onPressed: () {
-                _searchController.clear();
-                ref.read(searchProvider.notifier).clear();
-                setState(() {}); // refresh cross icon visibility
-              },
+        title: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _searchController,
+                focusNode: _focusNode,
+                decoration: InputDecoration(
+                  hintText: l10n.searchBooks,
+                  border: InputBorder.none,
+                ),
+                textInputAction: TextInputAction.search,
+                onSubmitted: (_) => _performSearch(),
+              ),
             ),
-        ],
+            IconButton(
+              icon: const Icon(Icons.search),
+              onPressed: () => _performSearch(),
+            ),
+            if (_searchController.text.isNotEmpty)
+              IconButton(
+                icon: const Icon(Icons.clear),
+                onPressed: () {
+                  _searchController.clear();
+                  ref.read(searchProvider.notifier).clear();
+                  setState(() {}); // refresh cross icon visibility
+                },
+              ),
+          ],
+        ),
       ),
       body: searchState.map(
         initial: (_) => _buildInitialState(theme, l10n),

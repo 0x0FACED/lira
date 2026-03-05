@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:annas_archive_api/annas_archive_api.dart';
+import 'package:annas_archive_api/annas_archive_api.dart' as anna;
 
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/providers/download_provider.dart';
 import '../../../books/domain/providers/books_provider.dart';
 
 class SearchBookCard extends ConsumerWidget {
-  final Book book;
+  final anna.Book book;
 
   const SearchBookCard({super.key, required this.book});
 
@@ -80,7 +80,7 @@ class SearchBookCard extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      book.author ?? l10n.unknown,
+                      book.author,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: Colors.grey,
                       ),
@@ -94,7 +94,7 @@ class SearchBookCard extends ConsumerWidget {
                           context,
                           book.format.extension.toUpperCase(),
                         ),
-                        if (book.size != null) ...[
+                        if (book.size.isNotEmpty) ...[
                           const SizedBox(width: 8),
                           Text(
                             book.size,

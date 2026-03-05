@@ -155,7 +155,7 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
     final isDuplicate = currentBooks.any(
       (b) =>
           b.title.toLowerCase() == book.title.toLowerCase() &&
-          b.author.toLowerCase() == (book.author ?? '').toLowerCase(),
+          b.author.toLowerCase() == book.author.toLowerCase(),
     );
 
     if (isDuplicate) {
@@ -223,7 +223,7 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
       try {
         final bytes = await File(newFilePath).readAsBytes();
         final parsed = await EpubParser.parse(bytes);
-        if (author == 'Unknown Author') {
+        if (author.isEmpty) {
           author = parsed.author;
         }
         pageCount = parsed.chapters.length;
@@ -235,7 +235,7 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
           }
           coverPath = p.join(coversDir.path, '$bookId.jpg');
           await File(coverPath).writeAsBytes(parsed.coverImage!);
-        } else if (book.imgUrl != null) {
+        } else if (book.imgUrl.isNotEmpty) {
           // Using cover from API if EPUB has no cover
           final coversDir = Directory(p.join(appDocDir.path, 'covers'));
           if (!await coversDir.exists())
