@@ -53,11 +53,40 @@ class EpubParser {
 
     // Extract cover image
     Uint8List? coverImage;
+
+    // Method 1: CoverImage property
     if (book.CoverImage != null) {
       try {
-        coverImage = Uint8List.fromList(book.CoverImage!.getBytes());
-      } catch (_) {
-        // Some EPUBs may have invalid cover images
+        final bytes = book.CoverImage!.getBytes();
+        if (bytes.isNotEmpty) {
+          coverImage = Uint8List.fromList(bytes);
+        }
+      } catch (_) {}
+    }
+
+    // Method 2: look for image with 'cover' in name
+    if (coverImage == null && book.Content?.Images != null) {
+      for (final entry in book.Content!.Images!.entries) {
+        final key = entry.key.toLowerCase();
+        if ((key.contains('cover') || key.contains('jacket')) &&
+            entry.value.Content != null &&
+            entry.value.Content!.isNotEmpty) {
+          coverImage = Uint8List.fromList(entry.value.Content!);
+          break;
+        }
+      }
+    }
+
+    // Method 3: take the first image as fallback
+    if (coverImage == null && book.Content?.Images != null) {
+      for (final entry in book.Content!.Images!.entries) {
+        if (entry.value.Content != null &&
+            entry.value.Content!.isNotEmpty &&
+            entry.value.Content!.length > 1000) {
+          // Skip tiny images
+          coverImage = Uint8List.fromList(entry.value.Content!);
+          break;
+        }
       }
     }
 

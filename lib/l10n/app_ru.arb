@@ -1,4 +1,105 @@
 {
     "@@locale": "ru",
-    "appTitle": "Lira"
+    "appTitle": "Lira",
+    "signIn": "Войти",
+    "register": "Регистрация",
+    "username": "Имя пользователя",
+    "password": "Пароль",
+    "continueAsGuest": "Продолжить как гость",
+    "guestLocalOnly": "Книги и прогресс будут храниться только локально",
+    "noAccountRegister": "Нет аккаунта? Зарегистрируйтесь",
+    "haveAccountSignIn": "Уже есть аккаунт? Войти",
+    "yourLibrary": "Ваша персональная библиотека",
+    "fillAllFields": "Пожалуйста, заполните все поля",
+
+    "library": "Библиотека",
+    "search": "Поиск",
+    "settings": "Настройки",
+
+    "noBooks": "В библиотеке нет книг",
+    "noBooksHint": "Нажмите + чтобы добавить первую книгу",
+    "importBook": "Импорт книги",
+    "deleteBook": "Удалить книгу",
+    "deleteBookConfirm": "Вы уверены, что хотите удалить {title}?",
+    "@deleteBookConfirm": { "placeholders": { "title": { "type": "String" } } },
+    "cancel": "Отмена",
+    "delete": "Удалить",
+    "readBook": "Читать",
+    "openBook": "Открыть",
+    "duplicateBookError": "Эта книга уже есть в вашей библиотеке.",
+
+    "searchBooks": "Поиск книг",
+    "searchBooksHint": "Поиск книг онлайн будет доступен в следующем обновлении.\nВы сможете искать в z-library и скачивать книги прямо в приложение.",
+
+    "profile": "Профиль",
+    "signedIn": "Авторизован",
+    "about": "О приложении",
+    "version": "Версия",
+    "@syncingToCloud": {
+    "description": "Сообщение во время синхронизации с облаком"
+  },
+  "editBook": "Редактировать",
+  "@editBook": {
+    "description": "Edit book action"
+  },
+  "editBookTitle": "Название",
+  "@editBookTitle": {
+    "description": "Book title edit field"
+  },
+  "editBookAuthor": "Автор",
+  "@editBookAuthor": {
+    "description": "Book author edit field"
+  },
+  "save": "Сохранить",
+  "@save": {
+    "description": "Save action"
+  },
+  "details": "Информация",
+  "@details": {
+    "description": "Details section header"
+  },
+  "size": "Размер",
+  "@size": {
+    "description": "File size label"
+  },
+  "pages": "Страниц",
+  "@pages": {
+    "description": "Page count label"
+  },
+  "added": "Добавлена",
+  "@added": {
+    "description": "Date added label"
+  },
+  "unknown": "Неизвестно",
+  "@unknown": {
+    "description": "Unknown value placeholder"
+  },
+    "guest": "Гость",
+    "guestSyncHint": "Только локально — войдите для синхронизации",
+    "notSignedIn": "Не авторизован",
+    "account": "Аккаунт",
+    "logout": "Выйти",
+    "signInComingSoon": "Вход скоро будет доступен",
+    "registrationComingSoon": "Регистрация скоро будет доступна",
+    "appearance": "Внешний вид",
+    "theme": "Тема",
+    "themeDark": "Тёмная",
+    "language": "Язык",
+    "languageEn": "Русский",
+    "themeComingSoon": "Переключение темы скоро будет доступно",
+    "languageComingSoon": "Выбор языка скоро будет доступен",
+    "about": "О приложении",
+    "version": "Версия",
+
+    "tableOfContents": "Оглавление",
+    "tocComingSoon": "Оглавление будет доступно в следующем обновлении.",
+    "readerSettings": "Настройки чтения",
+    "readerSettingsHint": "Размер шрифта, тема и другие настройки будут доступны в следующем обновлении.",
+    "highlightSaved": "Выделение сохранено",
+    "errorLoadingBook": "Ошибка загрузки книги",
+    "errorLoadingProgress": "Ошибка загрузки прогресса",
+    "failedToInitReader": "Не удалось инициализировать движок чтения.",
+    "noChapters": "В этом EPUB нет доступных глав.",
+
+    "searchLibrary": "Поиск по библиотеке..."
 }

@@ -1,5 +1,5 @@
-// coverage:ignore-file
 // GENERATED CODE - DO NOT MODIFY BY HAND
+// coverage:ignore-file
 // ignore_for_file: type=lint
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
@@ -9,163 +9,271 @@ part of 'book_location.dart';
 // FreezedGenerator
 // **************************************************************************
 
+// dart format off
 T _$identity<T>(T value) => value;
-
-final _privateConstructorUsedError = UnsupportedError(
-  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
-);
-
-BookLocation _$BookLocationFromJson(Map<String, dynamic> json) {
-  return _BookLocation.fromJson(json);
-}
 
 /// @nodoc
 mixin _$BookLocation {
-  /// An opaque string location identifier (e.g. CFI for EPUB, page number for PDF)
-  String get locator => throw _privateConstructorUsedError;
+
+/// An opaque string location identifier (e.g. CFI for EPUB, page number for PDF)
+ String get locator;
+/// Create a copy of BookLocation
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$BookLocationCopyWith<BookLocation> get copyWith => _$BookLocationCopyWithImpl<BookLocation>(this as BookLocation, _$identity);
 
   /// Serializes this BookLocation to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+  Map<String, dynamic> toJson();
 
-  /// Create a copy of BookLocation
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $BookLocationCopyWith<BookLocation> get copyWith =>
-      throw _privateConstructorUsedError;
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is BookLocation&&(identical(other.locator, locator) || other.locator == locator));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,locator);
+
+@override
+String toString() {
+  return 'BookLocation(locator: $locator)';
+}
+
+
 }
 
 /// @nodoc
-abstract class $BookLocationCopyWith<$Res> {
-  factory $BookLocationCopyWith(
-    BookLocation value,
-    $Res Function(BookLocation) then,
-  ) = _$BookLocationCopyWithImpl<$Res, BookLocation>;
-  @useResult
-  $Res call({String locator});
-}
+abstract mixin class $BookLocationCopyWith<$Res>  {
+  factory $BookLocationCopyWith(BookLocation value, $Res Function(BookLocation) _then) = _$BookLocationCopyWithImpl;
+@useResult
+$Res call({
+ String locator
+});
 
+
+
+
+}
 /// @nodoc
-class _$BookLocationCopyWithImpl<$Res, $Val extends BookLocation>
+class _$BookLocationCopyWithImpl<$Res>
     implements $BookLocationCopyWith<$Res> {
-  _$BookLocationCopyWithImpl(this._value, this._then);
+  _$BookLocationCopyWithImpl(this._self, this._then);
 
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
+  final BookLocation _self;
+  final $Res Function(BookLocation) _then;
 
-  /// Create a copy of BookLocation
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({Object? locator = null}) {
-    return _then(
-      _value.copyWith(
-            locator: null == locator
-                ? _value.locator
-                : locator // ignore: cast_nullable_to_non_nullable
-                      as String,
-          )
-          as $Val,
-    );
-  }
+/// Create a copy of BookLocation
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? locator = null,}) {
+  return _then(_self.copyWith(
+locator: null == locator ? _self.locator : locator // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
 }
 
-/// @nodoc
-abstract class _$$BookLocationImplCopyWith<$Res>
-    implements $BookLocationCopyWith<$Res> {
-  factory _$$BookLocationImplCopyWith(
-    _$BookLocationImpl value,
-    $Res Function(_$BookLocationImpl) then,
-  ) = __$$BookLocationImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({String locator});
 }
 
-/// @nodoc
-class __$$BookLocationImplCopyWithImpl<$Res>
-    extends _$BookLocationCopyWithImpl<$Res, _$BookLocationImpl>
-    implements _$$BookLocationImplCopyWith<$Res> {
-  __$$BookLocationImplCopyWithImpl(
-    _$BookLocationImpl _value,
-    $Res Function(_$BookLocationImpl) _then,
-  ) : super(_value, _then);
 
-  /// Create a copy of BookLocation
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({Object? locator = null}) {
-    return _then(
-      _$BookLocationImpl(
-        locator: null == locator
-            ? _value.locator
-            : locator // ignore: cast_nullable_to_non_nullable
-                  as String,
-      ),
-    );
-  }
+/// Adds pattern-matching-related methods to [BookLocation].
+extension BookLocationPatterns on BookLocation {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _BookLocation value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _BookLocation() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _BookLocation value)  $default,){
+final _that = this;
+switch (_that) {
+case _BookLocation():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _BookLocation value)?  $default,){
+final _that = this;
+switch (_that) {
+case _BookLocation() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String locator)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _BookLocation() when $default != null:
+return $default(_that.locator);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String locator)  $default,) {final _that = this;
+switch (_that) {
+case _BookLocation():
+return $default(_that.locator);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String locator)?  $default,) {final _that = this;
+switch (_that) {
+case _BookLocation() when $default != null:
+return $default(_that.locator);case _:
+  return null;
+
+}
+}
+
 }
 
 /// @nodoc
 @JsonSerializable()
-class _$BookLocationImpl implements _BookLocation {
-  const _$BookLocationImpl({required this.locator});
 
-  factory _$BookLocationImpl.fromJson(Map<String, dynamic> json) =>
-      _$$BookLocationImplFromJson(json);
+class _BookLocation implements BookLocation {
+  const _BookLocation({required this.locator});
+  factory _BookLocation.fromJson(Map<String, dynamic> json) => _$BookLocationFromJson(json);
 
-  /// An opaque string location identifier (e.g. CFI for EPUB, page number for PDF)
-  @override
-  final String locator;
+/// An opaque string location identifier (e.g. CFI for EPUB, page number for PDF)
+@override final  String locator;
 
-  @override
-  String toString() {
-    return 'BookLocation(locator: $locator)';
-  }
+/// Create a copy of BookLocation
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$BookLocationCopyWith<_BookLocation> get copyWith => __$BookLocationCopyWithImpl<_BookLocation>(this, _$identity);
 
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$BookLocationImpl &&
-            (identical(other.locator, locator) || other.locator == locator));
-  }
-
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode => Object.hash(runtimeType, locator);
-
-  /// Create a copy of BookLocation
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$BookLocationImplCopyWith<_$BookLocationImpl> get copyWith =>
-      __$$BookLocationImplCopyWithImpl<_$BookLocationImpl>(this, _$identity);
-
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$BookLocationImplToJson(this);
-  }
+@override
+Map<String, dynamic> toJson() {
+  return _$BookLocationToJson(this, );
 }
 
-abstract class _BookLocation implements BookLocation {
-  const factory _BookLocation({required final String locator}) =
-      _$BookLocationImpl;
-
-  factory _BookLocation.fromJson(Map<String, dynamic> json) =
-      _$BookLocationImpl.fromJson;
-
-  /// An opaque string location identifier (e.g. CFI for EPUB, page number for PDF)
-  @override
-  String get locator;
-
-  /// Create a copy of BookLocation
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$BookLocationImplCopyWith<_$BookLocationImpl> get copyWith =>
-      throw _privateConstructorUsedError;
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _BookLocation&&(identical(other.locator, locator) || other.locator == locator));
 }
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,locator);
+
+@override
+String toString() {
+  return 'BookLocation(locator: $locator)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$BookLocationCopyWith<$Res> implements $BookLocationCopyWith<$Res> {
+  factory _$BookLocationCopyWith(_BookLocation value, $Res Function(_BookLocation) _then) = __$BookLocationCopyWithImpl;
+@override @useResult
+$Res call({
+ String locator
+});
+
+
+
+
+}
+/// @nodoc
+class __$BookLocationCopyWithImpl<$Res>
+    implements _$BookLocationCopyWith<$Res> {
+  __$BookLocationCopyWithImpl(this._self, this._then);
+
+  final _BookLocation _self;
+  final $Res Function(_BookLocation) _then;
+
+/// Create a copy of BookLocation
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? locator = null,}) {
+  return _then(_BookLocation(
+locator: null == locator ? _self.locator : locator // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+
+}
+
+// dart format on

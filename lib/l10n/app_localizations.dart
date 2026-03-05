@@ -103,6 +103,378 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Lira'**
   String get appTitle;
+
+  /// No description provided for @signIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign In'**
+  String get signIn;
+
+  /// No description provided for @register.
+  ///
+  /// In en, this message translates to:
+  /// **'Register'**
+  String get register;
+
+  /// No description provided for @username.
+  ///
+  /// In en, this message translates to:
+  /// **'Username'**
+  String get username;
+
+  /// No description provided for @password.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get password;
+
+  /// No description provided for @continueAsGuest.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue as Guest'**
+  String get continueAsGuest;
+
+  /// No description provided for @guestLocalOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Books and progress will be stored locally only'**
+  String get guestLocalOnly;
+
+  /// No description provided for @noAccountRegister.
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t have an account? Register'**
+  String get noAccountRegister;
+
+  /// No description provided for @haveAccountSignIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Already have an account? Sign In'**
+  String get haveAccountSignIn;
+
+  /// No description provided for @yourLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Your personal library reader'**
+  String get yourLibrary;
+
+  /// No description provided for @fillAllFields.
+  ///
+  /// In en, this message translates to:
+  /// **'Please fill in all fields'**
+  String get fillAllFields;
+
+  /// No description provided for @library.
+  ///
+  /// In en, this message translates to:
+  /// **'Library'**
+  String get library;
+
+  /// No description provided for @search.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get search;
+
+  /// No description provided for @settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settings;
+
+  /// No description provided for @noBooks.
+  ///
+  /// In en, this message translates to:
+  /// **'No books in library'**
+  String get noBooks;
+
+  /// No description provided for @noBooksHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap + to add your first book'**
+  String get noBooksHint;
+
+  /// No description provided for @importBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Import Book'**
+  String get importBook;
+
+  /// No description provided for @deleteBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Book'**
+  String get deleteBook;
+
+  /// No description provided for @deleteBookConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete {title}?'**
+  String deleteBookConfirm(String title);
+
+  /// No description provided for @cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get cancel;
+
+  /// No description provided for @delete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get delete;
+
+  /// No description provided for @readBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Read'**
+  String get readBook;
+
+  /// No description provided for @openBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get openBook;
+
+  /// No description provided for @duplicateBookError.
+  ///
+  /// In en, this message translates to:
+  /// **'This book already exists in your library.'**
+  String get duplicateBookError;
+
+  /// No description provided for @searchBooks.
+  ///
+  /// In en, this message translates to:
+  /// **'Search Books'**
+  String get searchBooks;
+
+  /// No description provided for @searchBooksHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search for books online will be available in a future update.\nYou\'ll be able to search z-library and download books directly.'**
+  String get searchBooksHint;
+
+  /// No description provided for @profile.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get profile;
+
+  /// No description provided for @signedIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in'**
+  String get signedIn;
+
+  /// No description provided for @guest.
+  ///
+  /// In en, this message translates to:
+  /// **'Guest'**
+  String get guest;
+
+  /// No description provided for @guestSyncHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Local only — sign in to sync'**
+  String get guestSyncHint;
+
+  /// No description provided for @notSignedIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Not signed in'**
+  String get notSignedIn;
+
+  /// No description provided for @account.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get account;
+
+  /// No description provided for @logout.
+  ///
+  /// In en, this message translates to:
+  /// **'Logout'**
+  String get logout;
+
+  /// No description provided for @signInComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in coming soon'**
+  String get signInComingSoon;
+
+  /// No description provided for @registrationComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Registration coming soon'**
+  String get registrationComingSoon;
+
+  /// No description provided for @appearance.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get appearance;
+
+  /// No description provided for @theme.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme'**
+  String get theme;
+
+  /// No description provided for @themeDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get themeDark;
+
+  /// No description provided for @language.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get language;
+
+  /// No description provided for @languageEn.
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get languageEn;
+
+  /// No description provided for @themeComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme toggle coming soon'**
+  String get themeComingSoon;
+
+  /// No description provided for @languageComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Language selector coming soon'**
+  String get languageComingSoon;
+
+  /// No description provided for @about.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get about;
+
+  /// No description provided for @version.
+  ///
+  /// In en, this message translates to:
+  /// **'Version'**
+  String get version;
+
+  /// Edit book action
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Book'**
+  String get editBook;
+
+  /// Book title edit field
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get editBookTitle;
+
+  /// Book author edit field
+  ///
+  /// In en, this message translates to:
+  /// **'Author'**
+  String get editBookAuthor;
+
+  /// Save action
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get save;
+
+  /// Details section header
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get details;
+
+  /// File size label
+  ///
+  /// In en, this message translates to:
+  /// **'Size'**
+  String get size;
+
+  /// Page count label
+  ///
+  /// In en, this message translates to:
+  /// **'Pages'**
+  String get pages;
+
+  /// Date added label
+  ///
+  /// In en, this message translates to:
+  /// **'Added'**
+  String get added;
+
+  /// Unknown value placeholder
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get unknown;
+
+  /// No description provided for @tableOfContents.
+  ///
+  /// In en, this message translates to:
+  /// **'Table of Contents'**
+  String get tableOfContents;
+
+  /// No description provided for @tocComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'TOC will be available in a future update.'**
+  String get tocComingSoon;
+
+  /// No description provided for @readerSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Reader Settings'**
+  String get readerSettings;
+
+  /// No description provided for @readerSettingsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Font size, theme, and other settings will be available in a future update.'**
+  String get readerSettingsHint;
+
+  /// No description provided for @highlightSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlight saved'**
+  String get highlightSaved;
+
+  /// No description provided for @errorLoadingBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading book'**
+  String get errorLoadingBook;
+
+  /// No description provided for @errorLoadingProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading progress'**
+  String get errorLoadingProgress;
+
+  /// No description provided for @failedToInitReader.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to initialize reader engine.'**
+  String get failedToInitReader;
+
+  /// No description provided for @noChapters.
+  ///
+  /// In en, this message translates to:
+  /// **'This EPUB has no readable chapters.'**
+  String get noChapters;
+
+  /// No description provided for @searchLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Search library...'**
+  String get searchLibrary;
 }
 
 class _AppLocalizationsDelegate

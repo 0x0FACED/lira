@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../l10n/app_localizations.dart';
 import '../domain/providers/auth_provider.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
@@ -25,13 +26,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   }
 
   Future<void> _handleAuth() async {
+    final l10n = AppLocalizations.of(context)!;
     final username = _usernameController.text.trim();
     final password = _passwordController.text.trim();
 
     if (username.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all fields')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.fillAllFields)));
       return;
     }
 
@@ -67,6 +69,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       body: SafeArea(
@@ -78,7 +81,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Logo
                   Icon(
                     Icons.auto_stories,
                     size: 72,
@@ -86,7 +88,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Lira',
+                    l10n.appTitle,
                     style: theme.textTheme.headlineLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: theme.colorScheme.primary,
@@ -94,18 +96,17 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Your personal library reader',
+                    l10n.yourLibrary,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: Colors.grey,
                     ),
                   ),
                   const SizedBox(height: 48),
 
-                  // Username
                   TextField(
                     controller: _usernameController,
                     decoration: InputDecoration(
-                      labelText: 'Username',
+                      labelText: l10n.username,
                       prefixIcon: const Icon(Icons.person_outline),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -114,12 +115,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Password
                   TextField(
                     controller: _passwordController,
                     obscureText: true,
                     decoration: InputDecoration(
-                      labelText: 'Password',
+                      labelText: l10n.password,
                       prefixIcon: const Icon(Icons.lock_outline),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -129,7 +129,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Login / Register button
                   SizedBox(
                     width: double.infinity,
                     height: 48,
@@ -141,18 +140,17 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                               height: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : Text(_isLogin ? 'Sign In' : 'Register'),
+                          : Text(_isLogin ? l10n.signIn : l10n.register),
                     ),
                   ),
                   const SizedBox(height: 12),
 
-                  // Toggle login/register
                   TextButton(
                     onPressed: () => setState(() => _isLogin = !_isLogin),
                     child: Text(
                       _isLogin
-                          ? "Don't have an account? Register"
-                          : 'Already have an account? Sign In',
+                          ? l10n.noAccountRegister
+                          : l10n.haveAccountSignIn,
                     ),
                   ),
 
@@ -160,19 +158,18 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   const Divider(),
                   const SizedBox(height: 16),
 
-                  // Guest button
                   SizedBox(
                     width: double.infinity,
                     height: 48,
                     child: OutlinedButton.icon(
                       onPressed: _handleGuest,
                       icon: const Icon(Icons.visibility_off_outlined),
-                      label: const Text('Continue as Guest'),
+                      label: Text(l10n.continueAsGuest),
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Books and progress will be stored locally only',
+                    l10n.guestLocalOnly,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: Colors.grey,
                     ),

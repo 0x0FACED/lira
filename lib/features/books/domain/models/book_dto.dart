@@ -4,7 +4,7 @@ part 'book_dto.freezed.dart';
 part 'book_dto.g.dart';
 
 @freezed
-class BookDto with _$BookDto {
+abstract class BookDto with _$BookDto {
   const factory BookDto({
     required String id,
     required String title,
@@ -13,6 +13,8 @@ class BookDto with _$BookDto {
     String? coverUrl,
     String? fileUrl,
     required DateTime createdAt,
+    @Default(0) int pageCount,
+    @Default(0) int fileSizeBytes,
   }) = _BookDto;
 
   factory BookDto.fromJson(Map<String, dynamic> json) =>

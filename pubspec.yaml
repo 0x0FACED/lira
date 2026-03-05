@@ -21,10 +21,10 @@ dependencies:
   flutter_riverpod: ^2.6.1 
   riverpod_annotation: ^2.3.6
   injectable: ^2.7.1
-  dio: ^5.7.0
-  retrofit: '>=4.6.0 <4.9.0'
+  dio: ^5.9.2
+  retrofit: 4.9.2
   intl: ^0.20.2 # Стабильная версия для текущих SDK
-  freezed_annotation: ^2.4.4
+  freezed_annotation: ^3.1.0
   json_annotation: ^4.9.0
   
   epub_engine:
@@ -43,18 +43,20 @@ dependencies:
   file_selector_macos: ^0.9.5
   file_selector_windows: ^0.9.3+5
   shared_preferences: ^2.3.4
+  annas_archive_api: ^1.1.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   
+  source_gen: 4.2.0
   # Генераторы (оставляем стабильные)
   build_runner: ^2.4.13
   drift_dev: ^2.20.0
-  freezed: ^2.5.7
+  freezed: ^3.2.5
   json_serializable: ^6.9.0
   injectable_generator: ^2.6.1
-  retrofit_generator: 9.7.0
+  retrofit_generator: 10.2.3
   # Линтеры временно удалены из-за конфликта (analyzer_plugin)
 
 flutter:

@@ -2,56 +2,110 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../l10n/app_localizations.dart';
+import '../../../l10n/app_localizations.dart';
 import '../domain/providers/books_provider.dart';
 import 'widgets/book_card.dart';
 
-class LibraryScreen extends ConsumerWidget {
+class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LibraryScreen> createState() => _LibraryScreenState();
+}
+
+class _LibraryScreenState extends ConsumerState<LibraryScreen> {
+  bool _isSearching = false;
+  String _searchQuery = '';
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final booksAsyncValue = ref.watch(booksControllerProvider);
     final controller = ref.read(booksControllerProvider.notifier);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.appTitle),
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: l10n.searchLibrary,
+                  border: InputBorder.none,
+                ),
+                onChanged: (value) {
+                  setState(() => _searchQuery = value.toLowerCase());
+                },
+              )
+            : Text(l10n.library),
         actions: [
           IconButton(
-            icon: const Icon(Icons.file_download),
-            onPressed: () async {
-              try {
-                await controller.importBook();
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text('$e')));
+            icon: Icon(_isSearching ? Icons.close : Icons.search),
+            onPressed: () {
+              setState(() {
+                _isSearching = !_isSearching;
+                if (!_isSearching) {
+                  _searchQuery = '';
+                  _searchController.clear();
                 }
-              }
+              });
             },
-            tooltip: 'Import Book',
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          try {
+            await controller.importBook();
+          } catch (e) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text('$e')));
+            }
+          }
+        },
+        tooltip: l10n.importBook,
+        child: const Icon(Icons.add),
+      ),
       body: booksAsyncValue.when(
         data: (books) {
+          // Filter books by search query
+          final filteredBooks = _searchQuery.isEmpty
+              ? books
+              : books
+                    .where(
+                      (b) =>
+                          b.title.toLowerCase().contains(_searchQuery) ||
+                          b.author.toLowerCase().contains(_searchQuery),
+                    )
+                    .toList();
+
           if (books.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.library_books, size: 64, color: Colors.grey),
+                  Icon(
+                    Icons.library_books,
+                    size: 64,
+                    color: Colors.grey.withAlpha(120),
+                  ),
                   const SizedBox(height: 16),
                   Text(
-                    'No books in library',
+                    l10n.noBooks,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Tap the import button in the top right corner',
+                    l10n.noBooksHint,
                     style: Theme.of(
                       context,
                     ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
@@ -61,21 +115,32 @@ class LibraryScreen extends ConsumerWidget {
             );
           }
 
+          if (filteredBooks.isEmpty) {
+            return Center(
+              child: Text(
+                l10n.noBooks,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(color: Colors.grey),
+              ),
+            );
+          }
+
           return GridView.builder(
             padding: const EdgeInsets.all(16),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 0.65,
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 180,
+              childAspectRatio: 0.55,
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
             ),
-            itemCount: books.length,
+            itemCount: filteredBooks.length,
             itemBuilder: (context, index) {
-              final book = books[index];
+              final book = filteredBooks[index];
               return BookCard(
                 book: book,
                 onTap: () {
-                  context.push('/reader', extra: book);
+                  context.push('/book-detail', extra: book);
                 },
                 onDelete: () => controller.removeBook(book.id),
               );

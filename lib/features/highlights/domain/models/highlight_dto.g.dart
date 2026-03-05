@@ -6,8 +6,8 @@ part of 'highlight_dto.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$HighlightDtoImpl _$$HighlightDtoImplFromJson(Map<String, dynamic> json) =>
-    _$HighlightDtoImpl(
+_HighlightDto _$HighlightDtoFromJson(Map<String, dynamic> json) =>
+    _HighlightDto(
       id: json['id'] as String,
       bookId: json['bookId'] as String,
       text: json['text'] as String,
@@ -17,7 +17,7 @@ _$HighlightDtoImpl _$$HighlightDtoImplFromJson(Map<String, dynamic> json) =>
       createdAt: DateTime.parse(json['createdAt'] as String),
     );
 
-Map<String, dynamic> _$$HighlightDtoImplToJson(_$HighlightDtoImpl instance) =>
+Map<String, dynamic> _$HighlightDtoToJson(_HighlightDto instance) =>
     <String, dynamic>{
       'id': instance.id,
       'bookId': instance.bookId,

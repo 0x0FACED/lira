@@ -10,6 +10,9 @@ class Books extends Table {
   TextColumn get coverUrl => text().nullable()();
   TextColumn get fileUrl => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
+  IntColumn get pageCount => integer().withDefault(const Constant(0))();
+  IntColumn get fileSizeBytes => integer().withDefault(const Constant(0))();
+  TextColumn get contentHash => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};

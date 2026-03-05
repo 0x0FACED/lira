@@ -21,9 +21,17 @@ class BooksLocalRepository {
             coverUrl: Value(book.coverUrl),
             fileUrl: Value(book.fileUrl),
             createdAt: book.createdAt,
+            pageCount: Value(book.pageCount),
+            fileSizeBytes: Value(book.fileSizeBytes),
           ),
           mode: InsertMode.replace,
         );
+  }
+
+  Future<void> updateBook(BookDto book) async {
+    await (_db.update(_db.books)..where((t) => t.id.equals(book.id))).write(
+      BooksCompanion(title: Value(book.title), author: Value(book.author)),
+    );
   }
 
   Future<List<BookDto>> getAllBooks() async {
@@ -38,6 +46,8 @@ class BooksLocalRepository {
             coverUrl: e.coverUrl,
             fileUrl: e.fileUrl,
             createdAt: e.createdAt,
+            pageCount: e.pageCount,
+            fileSizeBytes: e.fileSizeBytes,
           ),
         )
         .toList();
@@ -56,6 +66,8 @@ class BooksLocalRepository {
       coverUrl: entry.coverUrl,
       fileUrl: entry.fileUrl,
       createdAt: entry.createdAt,
+      pageCount: entry.pageCount,
+      fileSizeBytes: entry.fileSizeBytes,
     );
   }
 

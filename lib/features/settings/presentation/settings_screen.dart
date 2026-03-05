@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../l10n/app_localizations.dart';
+import '../../../core/providers/preferences_provider.dart';
 import '../../auth/domain/providers/auth_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -10,15 +13,17 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authProvider);
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    final themeMode = ref.watch(themeModeProvider);
+    final locale = ref.watch(localeProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings'), centerTitle: true),
+      appBar: AppBar(title: Text(l10n.settings), centerTitle: true),
       body: ListView(
         children: [
-          // Profile section
           _buildSection(
             context,
-            title: 'Profile',
+            title: l10n.profile,
             children: [
               if (auth.isLoggedIn)
                 ListTile(
@@ -30,7 +35,7 @@ class SettingsScreen extends ConsumerWidget {
                     ),
                   ),
                   title: Text(auth.username ?? 'User'),
-                  subtitle: const Text('Signed in'),
+                  subtitle: Text(l10n.signedIn),
                 )
               else if (auth.isGuest)
                 ListTile(
@@ -41,8 +46,8 @@ class SettingsScreen extends ConsumerWidget {
                       color: Colors.white,
                     ),
                   ),
-                  title: const Text('Guest'),
-                  subtitle: const Text('Local only — sign in to sync'),
+                  title: Text(l10n.guest),
+                  subtitle: Text(l10n.guestSyncHint),
                 )
               else
                 ListTile(
@@ -53,45 +58,27 @@ class SettingsScreen extends ConsumerWidget {
                       color: Colors.white,
                     ),
                   ),
-                  title: const Text('Not signed in'),
+                  title: Text(l10n.notSignedIn),
                 ),
             ],
           ),
 
-          // Account actions
           _buildSection(
             context,
-            title: 'Account',
+            title: l10n.account,
             children: [
-              if (!auth.isLoggedIn) ...[
-                // TODO: Navigate to login screen
+              if (!auth.isLoggedIn)
                 ListTile(
                   leading: const Icon(Icons.login),
-                  title: const Text('Sign In'),
-                  onTap: () {
-                    // TODO: Navigate to auth screen
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Sign in coming soon')),
-                    );
-                  },
+                  title: Text(l10n.signIn),
+                  onTap: () => context.push('/login'),
                 ),
-                ListTile(
-                  leading: const Icon(Icons.person_add_outlined),
-                  title: const Text('Register'),
-                  onTap: () {
-                    // TODO: Navigate to auth screen with register mode
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Registration coming soon')),
-                    );
-                  },
-                ),
-              ],
-              if (auth.isAuthenticated)
+              if (auth.isLoggedIn)
                 ListTile(
                   leading: const Icon(Icons.logout, color: Colors.red),
-                  title: const Text(
-                    'Logout',
-                    style: TextStyle(color: Colors.red),
+                  title: Text(
+                    l10n.logout,
+                    style: const TextStyle(color: Colors.red),
                   ),
                   onTap: () async {
                     await ref.read(authProvider.notifier).logout();
@@ -100,33 +87,65 @@ class SettingsScreen extends ConsumerWidget {
             ],
           ),
 
-          // App settings
           _buildSection(
             context,
-            title: 'Appearance',
+            title: l10n.appearance,
             children: [
-              // TODO: Implement theme toggle with Riverpod provider
               ListTile(
-                leading: const Icon(Icons.dark_mode),
-                title: const Text('Theme'),
-                subtitle: const Text('Dark'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Theme toggle coming soon')),
-                  );
-                },
+                leading: Icon(
+                  themeMode == ThemeMode.dark
+                      ? Icons.dark_mode
+                      : Icons.light_mode,
+                ),
+                title: Text(l10n.theme),
+                subtitle: Text(
+                  themeMode == ThemeMode.dark ? l10n.themeDark : 'Light',
+                ),
+                trailing: Switch(
+                  value: themeMode == ThemeMode.dark,
+                  onChanged: (_) {
+                    ref.read(themeModeProvider.notifier).toggle();
+                  },
+                ),
               ),
-              // TODO: Implement language selector
               ListTile(
                 leading: const Icon(Icons.language),
-                title: const Text('Language'),
-                subtitle: const Text('English'),
+                title: Text(l10n.language),
+                subtitle: Text(
+                  locale.languageCode == 'ru' ? 'Русский' : 'English',
+                ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Language selector coming soon'),
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => SimpleDialog(
+                      title: Text(l10n.language),
+                      children: [
+                        ListTile(
+                          leading: Icon(
+                            locale.languageCode == 'en'
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_unchecked,
+                          ),
+                          title: const Text('English'),
+                          onTap: () {
+                            ref.read(localeProvider.notifier).setLocale('en');
+                            Navigator.pop(ctx);
+                          },
+                        ),
+                        ListTile(
+                          leading: Icon(
+                            locale.languageCode == 'ru'
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_unchecked,
+                          ),
+                          title: const Text('Русский'),
+                          onTap: () {
+                            ref.read(localeProvider.notifier).setLocale('ru');
+                            Navigator.pop(ctx);
+                          },
+                        ),
+                      ],
                     ),
                   );
                 },
@@ -134,15 +153,14 @@ class SettingsScreen extends ConsumerWidget {
             ],
           ),
 
-          // About
           _buildSection(
             context,
-            title: 'About',
+            title: l10n.about,
             children: [
-              const ListTile(
-                leading: Icon(Icons.info_outline),
-                title: Text('Version'),
-                subtitle: Text('1.0.0'),
+              ListTile(
+                leading: const Icon(Icons.info_outline),
+                title: Text(l10n.version),
+                subtitle: const Text('1.0.0'),
               ),
             ],
           ),

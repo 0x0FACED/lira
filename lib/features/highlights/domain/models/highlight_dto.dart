@@ -4,7 +4,7 @@ part 'highlight_dto.freezed.dart';
 part 'highlight_dto.g.dart';
 
 @freezed
-class HighlightDto with _$HighlightDto {
+abstract class HighlightDto with _$HighlightDto {
   const factory HighlightDto({
     required String id,
     required String bookId,

@@ -6,8 +6,8 @@ part of 'book_location.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$BookLocationImpl _$$BookLocationImplFromJson(Map<String, dynamic> json) =>
-    _$BookLocationImpl(locator: json['locator'] as String);
+_BookLocation _$BookLocationFromJson(Map<String, dynamic> json) =>
+    _BookLocation(locator: json['locator'] as String);
 
-Map<String, dynamic> _$$BookLocationImplToJson(_$BookLocationImpl instance) =>
+Map<String, dynamic> _$BookLocationToJson(_BookLocation instance) =>
     <String, dynamic>{'locator': instance.locator};

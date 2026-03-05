@@ -4,7 +4,7 @@ part 'reading_progress_dto.freezed.dart';
 part 'reading_progress_dto.g.dart';
 
 @freezed
-class ReadingProgressDto with _$ReadingProgressDto {
+abstract class ReadingProgressDto with _$ReadingProgressDto {
   const factory ReadingProgressDto({
     required String bookId,
     required double percentage,

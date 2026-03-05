@@ -1,4 +1,102 @@
 {
     "@@locale": "en",
-    "appTitle": "Lira"
+    "appTitle": "Lira",
+    "signIn": "Sign In",
+    "register": "Register",
+    "username": "Username",
+    "password": "Password",
+    "continueAsGuest": "Continue as Guest",
+    "guestLocalOnly": "Books and progress will be stored locally only",
+    "noAccountRegister": "Don't have an account? Register",
+    "haveAccountSignIn": "Already have an account? Sign In",
+    "yourLibrary": "Your personal library reader",
+    "fillAllFields": "Please fill in all fields",
+
+    "library": "Library",
+    "search": "Search",
+    "settings": "Settings",
+
+    "noBooks": "No books in library",
+    "noBooksHint": "Tap + to add your first book",
+    "importBook": "Import Book",
+    "deleteBook": "Delete Book",
+    "deleteBookConfirm": "Are you sure you want to delete {title}?",
+    "@deleteBookConfirm": { "placeholders": { "title": { "type": "String" } } },
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "readBook": "Read",
+    "openBook": "Open",
+    "duplicateBookError": "This book already exists in your library.",
+
+    "searchBooks": "Search Books",
+    "searchBooksHint": "Search for books online will be available in a future update.\nYou'll be able to search z-library and download books directly.",
+
+    "profile": "Profile",
+    "signedIn": "Signed in",
+    "guest": "Guest",
+    "guestSyncHint": "Local only — sign in to sync",
+    "notSignedIn": "Not signed in",
+    "account": "Account",
+    "logout": "Logout",
+    "signInComingSoon": "Sign in coming soon",
+    "registrationComingSoon": "Registration coming soon",
+    "appearance": "Appearance",
+    "theme": "Theme",
+    "themeDark": "Dark",
+    "language": "Language",
+    "languageEn": "English",
+    "themeComingSoon": "Theme toggle coming soon",
+    "languageComingSoon": "Language selector coming soon",
+    "about": "About",
+    "version": "Version",
+    "@syncingToCloud": {
+    "description": "Message during cloud sync"
+  },
+  "editBook": "Edit Book",
+  "@editBook": {
+    "description": "Edit book action"
+  },
+  "editBookTitle": "Title",
+  "@editBookTitle": {
+    "description": "Book title edit field"
+  },
+  "editBookAuthor": "Author",
+  "@editBookAuthor": {
+    "description": "Book author edit field"
+  },
+  "save": "Save",
+  "@save": {
+    "description": "Save action"
+  },
+  "details": "Details",
+  "@details": {
+    "description": "Details section header"
+  },
+  "size": "Size",
+  "@size": {
+    "description": "File size label"
+  },
+  "pages": "Pages",
+  "@pages": {
+    "description": "Page count label"
+  },
+  "added": "Added",
+  "@added": {
+    "description": "Date added label"
+  },
+  "unknown": "Unknown",
+  "@unknown": {
+    "description": "Unknown value placeholder"
+  },
+    "tableOfContents": "Table of Contents",
+    "tocComingSoon": "TOC will be available in a future update.",
+    "readerSettings": "Reader Settings",
+    "readerSettingsHint": "Font size, theme, and other settings will be available in a future update.",
+    "highlightSaved": "Highlight saved",
+    "errorLoadingBook": "Error loading book",
+    "errorLoadingProgress": "Error loading progress",
+    "failedToInitReader": "Failed to initialize reader engine.",
+    "noChapters": "This EPUB has no readable chapters.",
+
+    "searchLibrary": "Search library..."
 }

@@ -78,6 +78,41 @@ class $BooksTable extends Books with TableInfo<$BooksTable, BookEntity> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _pageCountMeta = const VerificationMeta(
+    'pageCount',
+  );
+  @override
+  late final GeneratedColumn<int> pageCount = GeneratedColumn<int>(
+    'page_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _fileSizeBytesMeta = const VerificationMeta(
+    'fileSizeBytes',
+  );
+  @override
+  late final GeneratedColumn<int> fileSizeBytes = GeneratedColumn<int>(
+    'file_size_bytes',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _contentHashMeta = const VerificationMeta(
+    'contentHash',
+  );
+  @override
+  late final GeneratedColumn<String> contentHash = GeneratedColumn<String>(
+    'content_hash',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -87,6 +122,9 @@ class $BooksTable extends Books with TableInfo<$BooksTable, BookEntity> {
     coverUrl,
     fileUrl,
     createdAt,
+    pageCount,
+    fileSizeBytes,
+    contentHash,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -147,6 +185,30 @@ class $BooksTable extends Books with TableInfo<$BooksTable, BookEntity> {
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('page_count')) {
+      context.handle(
+        _pageCountMeta,
+        pageCount.isAcceptableOrUnknown(data['page_count']!, _pageCountMeta),
+      );
+    }
+    if (data.containsKey('file_size_bytes')) {
+      context.handle(
+        _fileSizeBytesMeta,
+        fileSizeBytes.isAcceptableOrUnknown(
+          data['file_size_bytes']!,
+          _fileSizeBytesMeta,
+        ),
+      );
+    }
+    if (data.containsKey('content_hash')) {
+      context.handle(
+        _contentHashMeta,
+        contentHash.isAcceptableOrUnknown(
+          data['content_hash']!,
+          _contentHashMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -184,6 +246,18 @@ class $BooksTable extends Books with TableInfo<$BooksTable, BookEntity> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      pageCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}page_count'],
+      )!,
+      fileSizeBytes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}file_size_bytes'],
+      )!,
+      contentHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content_hash'],
+      ),
     );
   }
 
@@ -201,6 +275,9 @@ class BookEntity extends DataClass implements Insertable<BookEntity> {
   final String? coverUrl;
   final String? fileUrl;
   final DateTime createdAt;
+  final int pageCount;
+  final int fileSizeBytes;
+  final String? contentHash;
   const BookEntity({
     required this.id,
     required this.title,
@@ -209,6 +286,9 @@ class BookEntity extends DataClass implements Insertable<BookEntity> {
     this.coverUrl,
     this.fileUrl,
     required this.createdAt,
+    required this.pageCount,
+    required this.fileSizeBytes,
+    this.contentHash,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -224,6 +304,11 @@ class BookEntity extends DataClass implements Insertable<BookEntity> {
       map['file_url'] = Variable<String>(fileUrl);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
+    map['page_count'] = Variable<int>(pageCount);
+    map['file_size_bytes'] = Variable<int>(fileSizeBytes);
+    if (!nullToAbsent || contentHash != null) {
+      map['content_hash'] = Variable<String>(contentHash);
+    }
     return map;
   }
 
@@ -240,6 +325,11 @@ class BookEntity extends DataClass implements Insertable<BookEntity> {
           ? const Value.absent()
           : Value(fileUrl),
       createdAt: Value(createdAt),
+      pageCount: Value(pageCount),
+      fileSizeBytes: Value(fileSizeBytes),
+      contentHash: contentHash == null && nullToAbsent
+          ? const Value.absent()
+          : Value(contentHash),
     );
   }
 
@@ -256,6 +346,9 @@ class BookEntity extends DataClass implements Insertable<BookEntity> {
       coverUrl: serializer.fromJson<String?>(json['coverUrl']),
       fileUrl: serializer.fromJson<String?>(json['fileUrl']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      pageCount: serializer.fromJson<int>(json['pageCount']),
+      fileSizeBytes: serializer.fromJson<int>(json['fileSizeBytes']),
+      contentHash: serializer.fromJson<String?>(json['contentHash']),
     );
   }
   @override
@@ -269,6 +362,9 @@ class BookEntity extends DataClass implements Insertable<BookEntity> {
       'coverUrl': serializer.toJson<String?>(coverUrl),
       'fileUrl': serializer.toJson<String?>(fileUrl),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'pageCount': serializer.toJson<int>(pageCount),
+      'fileSizeBytes': serializer.toJson<int>(fileSizeBytes),
+      'contentHash': serializer.toJson<String?>(contentHash),
     };
   }
 
@@ -280,6 +376,9 @@ class BookEntity extends DataClass implements Insertable<BookEntity> {
     Value<String?> coverUrl = const Value.absent(),
     Value<String?> fileUrl = const Value.absent(),
     DateTime? createdAt,
+    int? pageCount,
+    int? fileSizeBytes,
+    Value<String?> contentHash = const Value.absent(),
   }) => BookEntity(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -288,6 +387,9 @@ class BookEntity extends DataClass implements Insertable<BookEntity> {
     coverUrl: coverUrl.present ? coverUrl.value : this.coverUrl,
     fileUrl: fileUrl.present ? fileUrl.value : this.fileUrl,
     createdAt: createdAt ?? this.createdAt,
+    pageCount: pageCount ?? this.pageCount,
+    fileSizeBytes: fileSizeBytes ?? this.fileSizeBytes,
+    contentHash: contentHash.present ? contentHash.value : this.contentHash,
   );
   BookEntity copyWithCompanion(BooksCompanion data) {
     return BookEntity(
@@ -298,6 +400,13 @@ class BookEntity extends DataClass implements Insertable<BookEntity> {
       coverUrl: data.coverUrl.present ? data.coverUrl.value : this.coverUrl,
       fileUrl: data.fileUrl.present ? data.fileUrl.value : this.fileUrl,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      pageCount: data.pageCount.present ? data.pageCount.value : this.pageCount,
+      fileSizeBytes: data.fileSizeBytes.present
+          ? data.fileSizeBytes.value
+          : this.fileSizeBytes,
+      contentHash: data.contentHash.present
+          ? data.contentHash.value
+          : this.contentHash,
     );
   }
 
@@ -310,14 +419,27 @@ class BookEntity extends DataClass implements Insertable<BookEntity> {
           ..write('format: $format, ')
           ..write('coverUrl: $coverUrl, ')
           ..write('fileUrl: $fileUrl, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('pageCount: $pageCount, ')
+          ..write('fileSizeBytes: $fileSizeBytes, ')
+          ..write('contentHash: $contentHash')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, title, author, format, coverUrl, fileUrl, createdAt);
+  int get hashCode => Object.hash(
+    id,
+    title,
+    author,
+    format,
+    coverUrl,
+    fileUrl,
+    createdAt,
+    pageCount,
+    fileSizeBytes,
+    contentHash,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -328,7 +450,10 @@ class BookEntity extends DataClass implements Insertable<BookEntity> {
           other.format == this.format &&
           other.coverUrl == this.coverUrl &&
           other.fileUrl == this.fileUrl &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.pageCount == this.pageCount &&
+          other.fileSizeBytes == this.fileSizeBytes &&
+          other.contentHash == this.contentHash);
 }
 
 class BooksCompanion extends UpdateCompanion<BookEntity> {
@@ -339,6 +464,9 @@ class BooksCompanion extends UpdateCompanion<BookEntity> {
   final Value<String?> coverUrl;
   final Value<String?> fileUrl;
   final Value<DateTime> createdAt;
+  final Value<int> pageCount;
+  final Value<int> fileSizeBytes;
+  final Value<String?> contentHash;
   final Value<int> rowid;
   const BooksCompanion({
     this.id = const Value.absent(),
@@ -348,6 +476,9 @@ class BooksCompanion extends UpdateCompanion<BookEntity> {
     this.coverUrl = const Value.absent(),
     this.fileUrl = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.pageCount = const Value.absent(),
+    this.fileSizeBytes = const Value.absent(),
+    this.contentHash = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   BooksCompanion.insert({
@@ -358,6 +489,9 @@ class BooksCompanion extends UpdateCompanion<BookEntity> {
     this.coverUrl = const Value.absent(),
     this.fileUrl = const Value.absent(),
     required DateTime createdAt,
+    this.pageCount = const Value.absent(),
+    this.fileSizeBytes = const Value.absent(),
+    this.contentHash = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title),
@@ -371,6 +505,9 @@ class BooksCompanion extends UpdateCompanion<BookEntity> {
     Expression<String>? coverUrl,
     Expression<String>? fileUrl,
     Expression<DateTime>? createdAt,
+    Expression<int>? pageCount,
+    Expression<int>? fileSizeBytes,
+    Expression<String>? contentHash,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -381,6 +518,9 @@ class BooksCompanion extends UpdateCompanion<BookEntity> {
       if (coverUrl != null) 'cover_url': coverUrl,
       if (fileUrl != null) 'file_url': fileUrl,
       if (createdAt != null) 'created_at': createdAt,
+      if (pageCount != null) 'page_count': pageCount,
+      if (fileSizeBytes != null) 'file_size_bytes': fileSizeBytes,
+      if (contentHash != null) 'content_hash': contentHash,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -393,6 +533,9 @@ class BooksCompanion extends UpdateCompanion<BookEntity> {
     Value<String?>? coverUrl,
     Value<String?>? fileUrl,
     Value<DateTime>? createdAt,
+    Value<int>? pageCount,
+    Value<int>? fileSizeBytes,
+    Value<String?>? contentHash,
     Value<int>? rowid,
   }) {
     return BooksCompanion(
@@ -403,6 +546,9 @@ class BooksCompanion extends UpdateCompanion<BookEntity> {
       coverUrl: coverUrl ?? this.coverUrl,
       fileUrl: fileUrl ?? this.fileUrl,
       createdAt: createdAt ?? this.createdAt,
+      pageCount: pageCount ?? this.pageCount,
+      fileSizeBytes: fileSizeBytes ?? this.fileSizeBytes,
+      contentHash: contentHash ?? this.contentHash,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -431,6 +577,15 @@ class BooksCompanion extends UpdateCompanion<BookEntity> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (pageCount.present) {
+      map['page_count'] = Variable<int>(pageCount.value);
+    }
+    if (fileSizeBytes.present) {
+      map['file_size_bytes'] = Variable<int>(fileSizeBytes.value);
+    }
+    if (contentHash.present) {
+      map['content_hash'] = Variable<String>(contentHash.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -447,6 +602,9 @@ class BooksCompanion extends UpdateCompanion<BookEntity> {
           ..write('coverUrl: $coverUrl, ')
           ..write('fileUrl: $fileUrl, ')
           ..write('createdAt: $createdAt, ')
+          ..write('pageCount: $pageCount, ')
+          ..write('fileSizeBytes: $fileSizeBytes, ')
+          ..write('contentHash: $contentHash, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1261,6 +1419,9 @@ typedef $$BooksTableCreateCompanionBuilder =
       Value<String?> coverUrl,
       Value<String?> fileUrl,
       required DateTime createdAt,
+      Value<int> pageCount,
+      Value<int> fileSizeBytes,
+      Value<String?> contentHash,
       Value<int> rowid,
     });
 typedef $$BooksTableUpdateCompanionBuilder =
@@ -1272,6 +1433,9 @@ typedef $$BooksTableUpdateCompanionBuilder =
       Value<String?> coverUrl,
       Value<String?> fileUrl,
       Value<DateTime> createdAt,
+      Value<int> pageCount,
+      Value<int> fileSizeBytes,
+      Value<String?> contentHash,
       Value<int> rowid,
     });
 
@@ -1365,6 +1529,21 @@ class $$BooksTableFilterComposer extends Composer<_$AppDatabase, $BooksTable> {
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get pageCount => $composableBuilder(
+    column: $table.pageCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get fileSizeBytes => $composableBuilder(
+    column: $table.fileSizeBytes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get contentHash => $composableBuilder(
+    column: $table.contentHash,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1462,6 +1641,21 @@ class $$BooksTableOrderingComposer
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get pageCount => $composableBuilder(
+    column: $table.pageCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get fileSizeBytes => $composableBuilder(
+    column: $table.fileSizeBytes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get contentHash => $composableBuilder(
+    column: $table.contentHash,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$BooksTableAnnotationComposer
@@ -1493,6 +1687,19 @@ class $$BooksTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<int> get pageCount =>
+      $composableBuilder(column: $table.pageCount, builder: (column) => column);
+
+  GeneratedColumn<int> get fileSizeBytes => $composableBuilder(
+    column: $table.fileSizeBytes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get contentHash => $composableBuilder(
+    column: $table.contentHash,
+    builder: (column) => column,
+  );
 
   Expression<T> readingProgressesRefs<T extends Object>(
     Expression<T> Function($$ReadingProgressesTableAnnotationComposer a) f,
@@ -1584,6 +1791,9 @@ class $$BooksTableTableManager
                 Value<String?> coverUrl = const Value.absent(),
                 Value<String?> fileUrl = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<int> pageCount = const Value.absent(),
+                Value<int> fileSizeBytes = const Value.absent(),
+                Value<String?> contentHash = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BooksCompanion(
                 id: id,
@@ -1593,6 +1803,9 @@ class $$BooksTableTableManager
                 coverUrl: coverUrl,
                 fileUrl: fileUrl,
                 createdAt: createdAt,
+                pageCount: pageCount,
+                fileSizeBytes: fileSizeBytes,
+                contentHash: contentHash,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -1604,6 +1817,9 @@ class $$BooksTableTableManager
                 Value<String?> coverUrl = const Value.absent(),
                 Value<String?> fileUrl = const Value.absent(),
                 required DateTime createdAt,
+                Value<int> pageCount = const Value.absent(),
+                Value<int> fileSizeBytes = const Value.absent(),
+                Value<String?> contentHash = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BooksCompanion.insert(
                 id: id,
@@ -1613,6 +1829,9 @@ class $$BooksTableTableManager
                 coverUrl: coverUrl,
                 fileUrl: fileUrl,
                 createdAt: createdAt,
+                pageCount: pageCount,
+                fileSizeBytes: fileSizeBytes,
+                contentHash: contentHash,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

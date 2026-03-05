@@ -1,5 +1,5 @@
-// dart format width=80
 // GENERATED CODE - DO NOT MODIFY BY HAND
+// dart format width=80
 
 // **************************************************************************
 // InjectableConfigGenerator
@@ -37,11 +37,11 @@ extension GetItInjectableX on _i174.GetIt {
     gh.factory<_i12.BooksLocalRepository>(
       () => _i12.BooksLocalRepository(gh<_i982.AppDatabase>()),
     );
-    gh.factory<_i59.ReadingProgressLocalRepository>(
-      () => _i59.ReadingProgressLocalRepository(gh<_i982.AppDatabase>()),
-    );
     gh.factory<_i1036.HighlightsLocalRepository>(
       () => _i1036.HighlightsLocalRepository(gh<_i982.AppDatabase>()),
+    );
+    gh.factory<_i59.ReadingProgressLocalRepository>(
+      () => _i59.ReadingProgressLocalRepository(gh<_i982.AppDatabase>()),
     );
     return this;
   }
