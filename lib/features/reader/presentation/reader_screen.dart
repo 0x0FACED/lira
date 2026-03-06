@@ -1,5 +1,5 @@
 import 'dart:io';
-
+import 'package:epub_engine/epub_engine.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,6 +10,8 @@ import '../domain/engine/pdf_book_reader_engine.dart';
 import '../domain/models/book_location.dart';
 import '../../progress/domain/providers/reading_progress_provider.dart';
 import '../../highlights/domain/providers/highlights_provider.dart';
+import '../../settings/data/settings_provider.dart';
+import '../../settings/presentation/settings_panel.dart';
 
 class ReaderScreen extends ConsumerStatefulWidget {
   final BookDto book;
@@ -26,6 +28,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   bool _showUi = false;
   double _readingProgress = 0.0;
   String _progressLabel = '';
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   // Tap detection
   Offset? _pointerDownPos;
@@ -73,6 +76,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final progressAsyncValue = ref.watch(
       readingProgressControllerProvider(widget.book.id),
     );
+    final settings = ref.watch(readerSettingsProvider);
 
     return FutureBuilder<BookReaderEngine>(
       future: _engineFuture,
@@ -98,74 +102,81 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         }
 
         return Scaffold(
+          key: _scaffoldKey,
+          drawer: _buildTocDrawer(engine),
           body: Stack(
             children: [
               // Reader content — full screen
               Positioned.fill(
-                child: Listener(
-                  onPointerDown: (e) {
-                    _pointerDownPos = e.position;
-                    _pointerDownTime = DateTime.now();
-                  },
-                  onPointerUp: (e) {
-                    if (_pointerDownPos != null && _pointerDownTime != null) {
-                      final dist = (e.position - _pointerDownPos!).distance;
-                      final dur = DateTime.now().difference(_pointerDownTime!);
-                      if (dist < 20 && dur.inMilliseconds < 300) {
-                        _toggleUi();
-                      }
-                    }
-                    _pointerDownPos = null;
-                    _pointerDownTime = null;
-                  },
-                  child: progressAsyncValue.when(
-                    data: (progress) {
-                      return engine.buildReaderWidget(
-                        context: context,
-                        initialLocation: progress != null
-                            ? BookLocation(locator: progress.location)
-                            : const BookLocation(locator: ''),
-                        onProgressChanged: (location, percentage) {
-                          setState(() {
-                            _readingProgress = percentage.clamp(0, 100) / 100;
-                            _progressLabel =
-                                '${percentage.toStringAsFixed(1)}%';
-                          });
-                          ref
-                              .read(
-                                readingProgressControllerProvider(
-                                  widget.book.id,
-                                ).notifier,
-                              )
-                              .saveProgress(
-                                location: location.locator,
-                                percentage: percentage,
-                              );
-                        },
-                        onTextSelected: (text, location) {
-                          ref
-                              .read(
-                                highlightsControllerProvider(
-                                  widget.book.id,
-                                ).notifier,
-                              )
-                              .addHighlight(
-                                text: text,
-                                location: location.locator,
-                              );
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Highlight saved'),
-                              duration: Duration(seconds: 1),
-                            ),
-                          );
-                        },
-                      );
+                child: Container(
+                  color: Color(settings.backgroundColor),
+                  child: Listener(
+                    onPointerDown: (e) {
+                      _pointerDownPos = e.position;
+                      _pointerDownTime = DateTime.now();
                     },
-                    loading: () =>
-                        const Center(child: CircularProgressIndicator()),
-                    error: (e, st) =>
-                        Center(child: Text('Error loading progress')),
+                    onPointerUp: (e) {
+                      if (_pointerDownPos != null && _pointerDownTime != null) {
+                        final dist = (e.position - _pointerDownPos!).distance;
+                        final dur = DateTime.now().difference(_pointerDownTime!);
+                        if (dist < 20 && dur.inMilliseconds < 300) {
+                          _toggleUi();
+                        }
+                      }
+                      _pointerDownPos = null;
+                      _pointerDownTime = null;
+                    },
+                    child: progressAsyncValue.when(
+                      data: (progress) {
+                        return engine.buildReaderWidget(
+                          context: context,
+                          settings: settings,
+                          theme: Theme.of(context),
+                          initialLocation: progress != null
+                              ? BookLocation(locator: progress.location)
+                              : const BookLocation(locator: ''),
+                          onProgressChanged: (location, percentage) {
+                            setState(() {
+                              _readingProgress = percentage.clamp(0, 100) / 100;
+                              _progressLabel =
+                                  '${percentage.toStringAsFixed(1)}%';
+                            });
+                            ref
+                                .read(
+                                  readingProgressControllerProvider(
+                                    widget.book.id,
+                                  ).notifier,
+                                )
+                                .saveProgress(
+                                  location: location.locator,
+                                  percentage: percentage,
+                                );
+                          },
+                          onTextSelected: (text, location) {
+                            ref
+                                .read(
+                                  highlightsControllerProvider(
+                                    widget.book.id,
+                                  ).notifier,
+                                )
+                                .addHighlight(
+                                  text: text,
+                                  location: location.locator,
+                                );
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Highlight saved'),
+                                duration: Duration(seconds: 1),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                      loading: () =>
+                          const Center(child: CircularProgressIndicator()),
+                      error: (e, st) =>
+                          Center(child: Text('Error loading progress')),
+                    ),
                   ),
                 ),
               ),
@@ -269,7 +280,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                                   size: 22,
                                 ),
                                 tooltip: 'Table of Contents',
-                                onPressed: () => _showToc(context),
+                                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
                               ),
                               IconButton(
                                 icon: const Icon(
@@ -295,55 +306,76 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     );
   }
 
-  void _showToc(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(16),
+  Drawer _buildTocDrawer(BookReaderEngine engine) {
+    final toc = engine.getToc();
+
+    if (toc.isEmpty) {
+      return Drawer(
+        child: Center(
+          child: Text(
+            'Table of Contents is not available.',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ),
+      );
+    }
+
+    return Drawer(
+      child: SafeArea(
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Table of Contents',
-              style: Theme.of(context).textTheme.titleLarge,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text(
+                'Contents',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
             ),
-            const SizedBox(height: 16),
-            const Text(
-              'TOC will be available in a future update.',
-              style: TextStyle(color: Colors.grey),
+            const Divider(),
+            Expanded(
+              child: ListView.builder(
+                itemCount: toc.length,
+                itemBuilder: (context, index) {
+                  return _buildTocItem(toc[index]);
+                },
+              ),
             ),
-            const SizedBox(height: 16),
           ],
         ),
       ),
     );
   }
 
+  Widget _buildTocItem(TOCItem item, {int depth = 0}) {
+    final padding = 16.0 + (depth * 16.0);
+
+    if (item.subItems.isEmpty) {
+      return ListTile(
+        contentPadding: EdgeInsets.only(left: padding),
+        title: Text(item.title),
+        onTap: () {
+          _engine?.goToLocation(BookLocation(locator: item.fileName));
+          Navigator.pop(context); // Close the drawer
+          if (_showUi) _toggleUi(); // Hide UI after navigation
+        },
+      );
+    }
+
+    return ExpansionTile(
+      tilePadding: EdgeInsets.only(left: padding),
+      title: Text(item.title),
+      children: item.subItems.map((subItem) => _buildTocItem(subItem, depth: depth + 1)).toList(),
+    );
+  }
+
+
   void _showSettings(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Reader Settings',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Font size, theme, and other settings will be available in a future update.',
-              style: TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const SettingsPanel(),
     );
   }
 }

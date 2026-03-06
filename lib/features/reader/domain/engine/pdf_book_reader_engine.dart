@@ -1,7 +1,8 @@
 import 'dart:typed_data';
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:pdf_engine/pdf_engine.dart';
+import 'package:epub_engine/epub_engine.dart';
 
 import 'book_reader_engine.dart';
 import '../models/book_location.dart';
@@ -21,6 +22,8 @@ class PdfBookReaderEngine implements BookReaderEngine {
   Widget buildReaderWidget({
     required BuildContext context,
     required BookLocation initialLocation,
+    required ReaderSettings settings,
+    required ThemeData theme,
     required void Function(BookLocation location, double percentage)
     onProgressChanged,
     required void Function(String text, BookLocation location) onTextSelected,
@@ -43,6 +46,11 @@ class PdfBookReaderEngine implements BookReaderEngine {
   @override
   Future<void> goToLocation(BookLocation location) async {
     // The pdfrx controller handles this internally
+  }
+
+  @override
+  List<TOCItem> getToc() {
+    return [];
   }
 
   @override

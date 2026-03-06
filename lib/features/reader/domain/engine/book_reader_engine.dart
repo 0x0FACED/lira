@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
+import 'package:epub_engine/epub_engine.dart';
 
 import '../models/book_location.dart';
 
@@ -16,6 +17,8 @@ abstract class BookReaderEngine {
   Widget buildReaderWidget({
     required BuildContext context,
     required BookLocation initialLocation,
+    required ReaderSettings settings,
+    required ThemeData theme,
     required void Function(BookLocation location, double percentage)
     onProgressChanged,
     required void Function(String text, BookLocation location) onTextSelected,
@@ -23,6 +26,9 @@ abstract class BookReaderEngine {
 
   /// Navigates to a specific location in the book
   Future<void> goToLocation(BookLocation location);
+
+  /// Returns the hierarchical Table of Contents
+  List<TOCItem> getToc();
 
   /// Cleans up resources
   void dispose();

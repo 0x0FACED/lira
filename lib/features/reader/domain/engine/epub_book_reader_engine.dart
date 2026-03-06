@@ -1,13 +1,14 @@
 import 'dart:typed_data';
 
 import 'package:epub_engine/epub_engine.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 
 import 'book_reader_engine.dart';
 import '../models/book_location.dart';
 
 class EpubBookReaderEngine implements BookReaderEngine {
   ParsedEpub? _epub;
+  final GlobalKey<EpubReaderViewState> _readerKey = GlobalKey<EpubReaderViewState>();
 
   @override
   String get supportedFormat => 'epub';
@@ -27,6 +28,7 @@ class EpubBookReaderEngine implements BookReaderEngine {
             fileName: 'error',
           ),
         ],
+        toc: [],
         images: {},
       );
     }
@@ -36,30 +38,45 @@ class EpubBookReaderEngine implements BookReaderEngine {
   Widget buildReaderWidget({
     required BuildContext context,
     required BookLocation initialLocation,
+    required ReaderSettings settings,
+    required ThemeData theme,
     required void Function(BookLocation location, double percentage)
     onProgressChanged,
     required void Function(String text, BookLocation location) onTextSelected,
   }) {
-    // Locator stores scroll offset as a double string
+    // Restore numeric offset logic
     double initialOffset = 0.0;
     if (initialLocation.locator.isNotEmpty) {
       initialOffset = double.tryParse(initialLocation.locator) ?? 0.0;
     }
 
     return EpubReaderView(
+      key: _readerKey,
       epub: _epub!,
       initialScrollOffset: initialOffset,
+      settings: settings,
+      theme: theme,
       onScrollProgress: (scrollOffset, percentage) {
         onProgressChanged(
-          BookLocation(locator: scrollOffset.toStringAsFixed(1)),
+          BookLocation(locator: scrollOffset.toStringAsFixed(2)),
           percentage,
         );
+      },
+      onTextSelected: (text, locator) {
+        onTextSelected(text, BookLocation(locator: locator));
       },
     );
   }
 
   @override
-  Future<void> goToLocation(BookLocation location) async {}
+  Future<void> goToLocation(BookLocation location) async {
+    _readerKey.currentState?.scrollToChapter(location.locator);
+  }
+
+  @override
+  List<TOCItem> getToc() {
+    return _epub?.toc ?? [];
+  }
 
   @override
   void dispose() {}
