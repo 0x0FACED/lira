@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
@@ -170,10 +171,45 @@ class BookCard extends StatelessWidget {
     if (book.coverUrl != null &&
         book.coverUrl!.isNotEmpty &&
         File(book.coverUrl!).existsSync()) {
-      // Show entire cover inside the area — no cropping
-      return Container(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        child: Image.file(File(book.coverUrl!), fit: BoxFit.contain),
+      // Fill the entire area with the cover, using a blurred background
+      // to hide cropped edges gracefully
+      final image = Image.file(
+        File(book.coverUrl!),
+        fit: BoxFit.cover,
+        alignment: Alignment.center,
+      );
+
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          // Blurred background — creates a nice glow effect
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            child: ImageFiltered(
+              imageFilter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+              child: image,
+            ),
+          ),
+          // Main image with subtle shadow for depth
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(60),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: image,
+              ),
+            ),
+          ),
+        ],
       );
     }
 

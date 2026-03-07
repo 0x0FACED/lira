@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/settings_provider.dart';
-import 'package:epub_engine/epub_engine.dart';
 
 class SettingsPanel extends ConsumerWidget {
   const SettingsPanel({super.key});

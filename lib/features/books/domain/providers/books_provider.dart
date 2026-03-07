@@ -313,12 +313,27 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
     state = await AsyncValue.guard(() => _repository.getAllBooks());
   }
 
-  /// Encode raw RGBA pixels to PNG using dart:ui
+  /// Encode raw BGRA pixels (from pdfrx) to PNG
+  /// pdfrx returns BGRA order, but dart:ui expects RGBA
   Future<Uint8List?> _encodePng(Uint8List pixels, int width, int height) async {
     try {
+      // Convert BGRA to RGBA by swapping R and B channels
+      final rgbaPixels = Uint8List(pixels.length);
+      for (int i = 0; i < pixels.length; i += 4) {
+        final b = pixels[i];
+        final g = pixels[i + 1];
+        final r = pixels[i + 2];
+        final a = pixels[i + 3];
+        // Write as RGBA
+        rgbaPixels[i] = r;
+        rgbaPixels[i + 1] = g;
+        rgbaPixels[i + 2] = b;
+        rgbaPixels[i + 3] = a;
+      }
+
       final completer = Completer<ui.Image>();
       ui.decodeImageFromPixels(
-        pixels,
+        rgbaPixels,
         width,
         height,
         ui.PixelFormat.rgba8888,
@@ -327,7 +342,9 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
       final image = await completer.future;
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       return byteData?.buffer.asUint8List();
-    } catch (_) {
+    } catch (e) {
+      // ignore: avoid_print
+      print('Error encoding PNG: $e');
       return null;
     }
   }

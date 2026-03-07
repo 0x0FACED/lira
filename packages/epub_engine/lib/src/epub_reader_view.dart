@@ -32,6 +32,7 @@ class EpubReaderView extends StatefulWidget {
 class EpubReaderViewState extends State<EpubReaderView> {
   late ScrollController _scrollController;
   bool _isRestoringPosition = false;
+  bool _isJumpingToChapter = false; // Controls loading overlay during fast TOC scan
   Timer? _progressDebounce;
   
   final Map<int, GlobalKey> _chapterKeys = {};
@@ -69,7 +70,7 @@ class EpubReaderViewState extends State<EpubReaderView> {
   }
 
   void _onScroll() {
-    if (_isRestoringPosition) return;
+    if (_isRestoringPosition || _isJumpingToChapter) return;
     if (!_scrollController.hasClients) return;
 
     _progressDebounce?.cancel();
@@ -90,6 +91,7 @@ class EpubReaderViewState extends State<EpubReaderView> {
     widget.onScrollProgress?.call(current, percentage);
   }
 
+  /// 100% Accurate TOC navigation for lazy ListView.
   void scrollToChapter(String fileName) async {
     if (!_scrollController.hasClients) return;
 
@@ -106,26 +108,70 @@ class EpubReaderViewState extends State<EpubReaderView> {
         curve: Curves.easeInOut,
         alignment: 0.0,
       );
-    } else {
-      // 2. If not built (lazy list), jump to an estimated position.
-      // Removed the chaotic scanning loop. This provides a clean jump.
-      double estimatedOffset = index * 3000.0; // Rough guess per chapter
-      if (estimatedOffset > _scrollController.position.maxScrollExtent) {
-        estimatedOffset = _scrollController.position.maxScrollExtent;
-      }
-      _scrollController.jumpTo(estimatedOffset);
-      
-      // Wait a frame for builder to trigger, then try to lock precisely if available
-      await Future.delayed(const Duration(milliseconds: 100));
-      if (mounted && _chapterKeys[index]?.currentContext != null) {
-        Scrollable.ensureVisible(
-          _chapterKeys[index]!.currentContext!,
-          duration: const Duration(milliseconds: 200),
-          alignment: 0.0,
-        );
+      _finishTOCJump();
+      return;
+    }
+
+    // 2. Not built. We need to force Flutter to lay out the chapters sequentially 
+    // until we reach the target index. To hide the wild flashing, we show a loader.
+    setState(() {
+      _isJumpingToChapter = true;
+    });
+
+    // Determine if the target is above or below currently built items
+    int minBuiltIndex = widget.epub.chapters.length;
+    for (var k in _chapterKeys.keys) {
+      if (_chapterKeys[k]?.currentContext != null) {
+        if (k < minBuiltIndex) minBuiltIndex = k;
       }
     }
 
+    // If the target is ABOVE everything built, jump to 0 to build index 0, then scan down.
+    if (index < minBuiltIndex) {
+      _scrollController.jumpTo(0.0);
+      await Future.delayed(const Duration(milliseconds: 50));
+    }
+
+    // Scan down by repeatedly jumping to the max extent until our target builds
+    int failsafe = 0;
+    while (_chapterKeys[index]?.currentContext == null && mounted && failsafe < 200) {
+      failsafe++;
+      double currentMax = _scrollController.position.maxScrollExtent;
+      
+      _scrollController.jumpTo(currentMax);
+      await Future.delayed(const Duration(milliseconds: 40)); // wait for HTML layout
+      
+      double newMax = _scrollController.position.maxScrollExtent;
+      if (newMax == currentMax) {
+        // Try one more frame
+        await Future.delayed(const Duration(milliseconds: 40));
+        newMax = _scrollController.position.maxScrollExtent;
+        if (newMax == currentMax) break; // Reached absolute end of list
+      }
+    }
+
+    // 3. Exact alignment once found
+    if (mounted && _chapterKeys[index]?.currentContext != null) {
+      // Stop momentum
+      _scrollController.jumpTo(_scrollController.offset); 
+      
+      await Scrollable.ensureVisible(
+        _chapterKeys[index]!.currentContext!,
+        duration: const Duration(milliseconds: 100),
+        alignment: 0.0,
+      );
+    }
+
+    if (mounted) {
+      setState(() {
+        _isJumpingToChapter = false;
+      });
+    }
+
+    _finishTOCJump();
+  }
+
+  void _finishTOCJump() {
     if (!mounted) return;
     Future.delayed(const Duration(milliseconds: 200), () {
       if (mounted) {
@@ -154,32 +200,47 @@ class EpubReaderViewState extends State<EpubReaderView> {
       );
     }
 
-    return Container(
-      color: Color(widget.settings.backgroundColor),
-      child: SelectionArea(
-        child: ListView.builder(
-          controller: _scrollController,
-          padding: EdgeInsets.symmetric(
-            horizontal: widget.settings.horizontalPadding,
-            vertical: 16,
+    return Stack(
+      children: [
+        Container(
+          color: Color(widget.settings.backgroundColor),
+          child: SelectionArea(
+            child: ListView.builder(
+              controller: _scrollController,
+              padding: EdgeInsets.symmetric(
+                horizontal: widget.settings.horizontalPadding,
+                vertical: 16,
+              ),
+              itemCount: widget.epub.chapters.length,
+              itemBuilder: (context, index) {
+                _chapterKeys[index] ??= GlobalKey(debugLabel: 'chapter_$index');
+                // Use our stateful KeepAlive wrapper to lock in sizes
+                return _ChapterItem(
+                  key: _chapterKeys[index],
+                  chapter: widget.epub.chapters[index],
+                  index: index,
+                  isLast: index == widget.epub.chapters.length - 1,
+                  settings: widget.settings,
+                  theme: widget.theme,
+                  onAnchorTap: scrollToChapter,
+                  resolveImage: _resolveImage,
+                );
+              },
+            ),
           ),
-          itemCount: widget.epub.chapters.length,
-          itemBuilder: (context, index) {
-            _chapterKeys[index] ??= GlobalKey(debugLabel: 'chapter_$index');
-            // Use our stateful KeepAlive wrapper
-            return _ChapterItem(
-              key: _chapterKeys[index],
-              chapter: widget.epub.chapters[index],
-              index: index,
-              isLast: index == widget.epub.chapters.length - 1,
-              settings: widget.settings,
-              theme: widget.theme,
-              onAnchorTap: scrollToChapter,
-              resolveImage: _resolveImage,
-            );
-          },
         ),
-      ),
+        
+        // TOC Scan Loading Overlay
+        if (_isJumpingToChapter)
+          Positioned.fill(
+            child: Container(
+              color: Color(widget.settings.backgroundColor),
+              child: const Center(
+                child: CircularProgressIndicator(),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -240,13 +301,12 @@ class _ChapterItem extends StatefulWidget {
 
 class _ChapterItemState extends State<_ChapterItem> with AutomaticKeepAliveClientMixin {
   
-  // This is the magic that fixes the scroll-up jump issue.
   @override
   bool get wantKeepAlive => true;
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    super.build(context); 
     
     return Center(
       child: ConstrainedBox(
