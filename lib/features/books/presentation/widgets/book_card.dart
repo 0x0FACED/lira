@@ -78,90 +78,88 @@ class BookCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Cover — fixed 3:4 aspect ratio, entire cover visible
+                // Cover — fixed 3:4 aspect ratio
                 AspectRatio(aspectRatio: 3 / 4, child: _buildCover(context)),
-                // Info — takes exactly the remaining space
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 6,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Title - explicitly 1 line with ellipsis
-                        Flexible(
-                          child: Text(
-                            book.title.trim(),
-                            style: Theme.of(context).textTheme.titleSmall
-                                ?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 12,
-                                  height: 1.2,
-                                ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        // Author - explicitly 1 line with ellipsis
-                        Text(
-                          book.author.trim(),
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: Colors.grey, fontSize: 11),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const Spacer(),
-                        // Format badge & extra info — aligned right
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            // Left side: Page count if available
-                            if (book.pageCount > 0)
-                              Text(
-                                '${book.pageCount} p.',
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  color: Colors.grey[600],
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              )
-                            else
-                              const SizedBox.shrink(),
+                // Info section
+                _buildInfoSection(context),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
-                            // Right side: Format badge
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.primary.withAlpha(30),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                book.format.toUpperCase(),
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  color: Theme.of(context).colorScheme.primary,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+  Widget _buildInfoSection(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      child: DefaultTextStyle(
+        style: DefaultTextStyle.of(context).style,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Title - 1 line with ellipsis
+            Text(
+              book.title.trim(),
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    height: 1.2,
+                  ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            // Author - 1 line with ellipsis
+            Text(
+              book.author.trim(),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: Colors.grey, fontSize: 11),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            // Bottom row: page count (left) and format badge (right)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                // Left side: Page count if available
+                if (book.pageCount > 0)
+                  Text(
+                    '${book.pageCount} p.',
+                    style: const TextStyle(
+                      fontSize: 9,
+                      color: Colors.grey,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  )
+                else
+                  const SizedBox.shrink(),
+
+                // Right side: Format badge
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary.withAlpha(30),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    book.format.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 9,
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
               ],
             ),
-          ),
+          ],
         ),
       ),
     );

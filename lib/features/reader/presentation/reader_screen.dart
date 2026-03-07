@@ -356,19 +356,24 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         title: Text(item.title),
         onTap: () {
           _engine?.goToLocation(BookLocation(locator: item.fileName));
-          Navigator.pop(context); // Close the drawer
-          if (_showUi) _toggleUi(); // Hide UI after navigation
+          Navigator.pop(context);
+          if (_showUi) _toggleUi();
         },
       );
     }
 
-    return ExpansionTile(
-      tilePadding: EdgeInsets.only(left: padding),
-      title: Text(item.title),
-      children: item.subItems.map((subItem) => _buildTocItem(subItem, depth: depth + 1)).toList(),
+    // Parent item with separate expand arrow
+    return _ExpandableTocItem(
+      item: item,
+      padding: padding,
+      depth: depth,
+      onNavigate: (fileName) {
+        _engine?.goToLocation(BookLocation(locator: fileName));
+        Navigator.pop(context);
+        if (_showUi) _toggleUi();
+      },
     );
   }
-
 
   void _showSettings(BuildContext context) {
     showModalBottomSheet(
@@ -377,5 +382,76 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) => const SettingsPanel(),
     );
+  }
+}
+
+/// Expandable TOC item with separate navigate/expand controls
+class _ExpandableTocItem extends StatefulWidget {
+  final TOCItem item;
+  final double padding;
+  final int depth;
+  final void Function(String fileName) onNavigate;
+
+  const _ExpandableTocItem({
+    required this.item,
+    required this.padding,
+    required this.depth,
+    required this.onNavigate,
+  });
+
+  @override
+  State<_ExpandableTocItem> createState() => _ExpandableTocItemState();
+}
+
+class _ExpandableTocItemState extends State<_ExpandableTocItem> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ListTile(
+          contentPadding: EdgeInsets.only(left: widget.padding),
+          leading: IconButton(
+            icon: Icon(
+              _expanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_right,
+              size: 20,
+            ),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            onPressed: () {
+              setState(() {
+                _expanded = !_expanded;
+              });
+            },
+          ),
+          title: Text(widget.item.title),
+          onTap: () => widget.onNavigate(widget.item.fileName),
+        ),
+        if (_expanded)
+          ..._buildSubItems(widget.item.subItems),
+      ],
+    );
+  }
+
+  List<Widget> _buildSubItems(List<TOCItem> items) {
+    return items.map((item) {
+      if (item.subItems.isEmpty) {
+        return ListTile(
+          contentPadding: EdgeInsets.only(left: widget.padding + 16),
+          title: Text(item.title),
+          onTap: () => widget.onNavigate(item.fileName),
+        );
+      }
+
+      // Nested expandable
+      return _ExpandableTocItem(
+        item: item,
+        padding: widget.padding + 16,
+        depth: widget.depth + 1,
+        onNavigate: widget.onNavigate,
+      );
+    }).toList();
   }
 }

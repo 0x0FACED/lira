@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../l10n/app_localizations.dart';
 import '../domain/providers/books_provider.dart';
 import 'widgets/book_card.dart';
+import 'widgets/responsive_grid_delegate.dart';
 
 class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({super.key});
@@ -128,11 +129,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
           return GridView.builder(
             padding: const EdgeInsets.all(16),
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 180,
-              childAspectRatio: 0.55,
+            gridDelegate: const ResponsiveGridDelegate(
+              minCrossAxisExtent: 160,
+              maxCrossAxisExtent: 220,
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
+              childAspectRatio: 0.55,
             ),
             itemCount: filteredBooks.length,
             itemBuilder: (context, index) {

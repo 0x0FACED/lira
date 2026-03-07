@@ -44,21 +44,21 @@ class EpubBookReaderEngine implements BookReaderEngine {
     onProgressChanged,
     required void Function(String text, BookLocation location) onTextSelected,
   }) {
-    // Restore numeric offset logic
-    double initialOffset = 0.0;
+    // Parse location from string to EpubLocation
+    EpubLocation? parsedLocation;
     if (initialLocation.locator.isNotEmpty) {
-      initialOffset = double.tryParse(initialLocation.locator) ?? 0.0;
+      parsedLocation = EpubLocation.fromJson(initialLocation.locator);
     }
 
     return EpubReaderView(
       key: _readerKey,
       epub: _epub!,
-      initialScrollOffset: initialOffset,
+      initialLocation: parsedLocation,
       settings: settings,
       theme: theme,
-      onScrollProgress: (scrollOffset, percentage) {
+      onLocationChanged: (epubLocation, percentage) {
         onProgressChanged(
-          BookLocation(locator: scrollOffset.toStringAsFixed(2)),
+          BookLocation(locator: epubLocation.toJson()),
           percentage,
         );
       },
