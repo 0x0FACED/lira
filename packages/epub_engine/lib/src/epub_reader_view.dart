@@ -10,7 +10,7 @@ import 'models/epub_location.dart';
 /// EPUB reader using WebView for perfect CSS text rendering.
 ///
 /// Solves HTML parsing issues and text cut-offs in horizontal pagination
-/// by using the browser's native `column-width` property.
+/// by using the browser's native `column-width` property and loading all chapters into a single DOM.
 class EpubReaderView extends StatefulWidget {
   final ParsedEpub epub;
   final EpubLocation? initialLocation;
@@ -37,15 +37,9 @@ class EpubReaderView extends StatefulWidget {
 class EpubReaderViewState extends State<EpubReaderView> {
   late final WebViewController _controller;
 
-  int _currentChapterIndex = 0;
   bool _isLoading = true;
   double _webviewOpacity = 0.0;
   double _pageHeight = 0;
-
-  // Pending navigations
-  double? _pendingFraction;
-  String? _pendingAnchor;
-  bool _pendingScrollToEnd = false;
 
   // Text weights for accurate book-wide progress
   late final List<int> _chapterWeights;
@@ -60,14 +54,6 @@ class EpubReaderViewState extends State<EpubReaderView> {
         .toList();
     _totalWeight = _chapterWeights.fold(0, (s, w) => s + w);
 
-    if (widget.initialLocation != null) {
-      _currentChapterIndex = widget.initialLocation!.chapterIndex.clamp(
-        0,
-        widget.epub.chapters.length - 1,
-      );
-      _pendingFraction = widget.initialLocation!.scrollFraction;
-    }
-
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Color(widget.settings.backgroundColor))
@@ -78,7 +64,7 @@ class EpubReaderViewState extends State<EpubReaderView> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageFinished: (String url) {
-            _onChapterLoaded();
+            _onBookLoaded();
           },
           onNavigationRequest: (NavigationRequest request) {
             if (request.url.startsWith('http')) {
@@ -113,22 +99,10 @@ class EpubReaderViewState extends State<EpubReaderView> {
     final index = _findChapterIndex(baseFile);
     if (index == null) return;
 
-    if (index == _currentChapterIndex) {
-      // Same chapter, just tell JS to scroll to anchor
-      if (anchor != null && anchor.isNotEmpty) {
-        _controller.runJavaScript("scrollToAnchor('$anchor')");
-      }
+    if (anchor != null && anchor.isNotEmpty) {
+      _controller.runJavaScript("scrollToAnchor('$anchor', $index)");
     } else {
-      // Different chapter, load it
-      setState(() {
-        _currentChapterIndex = index;
-        _isLoading = true;
-        _webviewOpacity = 0.0;
-        _pendingAnchor = anchor;
-        _pendingFraction = null;
-        _pendingScrollToEnd = false;
-      });
-      _loadCurrentChapter();
+      _controller.runJavaScript("scrollToChapter($index)");
     }
   }
 
@@ -163,36 +137,32 @@ class EpubReaderViewState extends State<EpubReaderView> {
       final String type = data['type'];
 
       switch (type) {
-        case 'next_chapter':
-          if (_currentChapterIndex < widget.epub.chapters.length - 1) {
-            setState(() {
-              _currentChapterIndex++;
-              _isLoading = true;
-              _webviewOpacity = 0.0;
-              _pendingScrollToEnd = false;
-              _pendingFraction = null;
-              _pendingAnchor = null;
-            });
-            _loadCurrentChapter();
-          }
-          break;
-        case 'prev_chapter':
-          if (_currentChapterIndex > 0) {
-            setState(() {
-              _currentChapterIndex--;
-              _isLoading = true;
-              _webviewOpacity = 0.0;
-              _pendingScrollToEnd =
-                  true; // when going back, go to end of prev chapter
-              _pendingFraction = null;
-              _pendingAnchor = null;
-            });
-            _loadCurrentChapter();
-          }
-          break;
         case 'progress':
-          final double fraction = (data['fraction'] as num).toDouble();
-          _reportProgress(fraction);
+          final int activeChapterIndex = data['chapterIndex'] as int;
+          final double chapterFraction = (data['chapterFraction'] as num)
+              .toDouble();
+
+          if (!mounted || _totalWeight == 0) return;
+
+          int prevWeight = 0;
+          for (int i = 0; i < activeChapterIndex; i++) {
+            prevWeight += _chapterWeights[i];
+          }
+          final curWeight =
+              _chapterWeights[activeChapterIndex] * chapterFraction;
+          final percentage = ((prevWeight + curWeight) / _totalWeight * 100)
+              .clamp(0.0, 100.0);
+
+          final charOffset =
+              (widget.epub.chapters[activeChapterIndex].htmlContent.length *
+                      chapterFraction)
+                  .round();
+          final location = EpubLocation.fromPosition(
+            chapterIndex: activeChapterIndex,
+            charOffset: charOffset,
+            scrollFraction: chapterFraction,
+          );
+          widget.onLocationChanged?.call(location, percentage);
           break;
         case 'link':
           final String href = data['href'];
@@ -204,50 +174,19 @@ class EpubReaderViewState extends State<EpubReaderView> {
     }
   }
 
-  void _reportProgress(double localFraction) {
-    if (!mounted || _totalWeight == 0) return;
-
-    int prevWeight = 0;
-    for (int i = 0; i < _currentChapterIndex; i++) {
-      prevWeight += _chapterWeights[i];
-    }
-    final curWeight = _chapterWeights[_currentChapterIndex] * localFraction;
-    final percentage = ((prevWeight + curWeight) / _totalWeight * 100).clamp(
-      0.0,
-      100.0,
-    );
-
-    final charOffset =
-        (widget.epub.chapters[_currentChapterIndex].htmlContent.length *
-                localFraction)
-            .round();
-    final location = EpubLocation.fromPosition(
-      chapterIndex: _currentChapterIndex,
-      charOffset: charOffset,
-      scrollFraction: localFraction,
-    );
-    widget.onLocationChanged?.call(location, percentage);
-  }
-
   // ---------------------------------------------------------------------------
   // HTML / CSS Generation & Injection
   // ---------------------------------------------------------------------------
 
-  void _onChapterLoaded() {
+  void _onBookLoaded() {
     if (!mounted) return;
 
-    // Apply pending navigations
-    if (_pendingAnchor != null && _pendingAnchor!.isNotEmpty) {
-      _controller.runJavaScript("scrollToAnchor('$_pendingAnchor')");
-    } else if (_pendingScrollToEnd) {
-      _controller.runJavaScript("scrollToEnd()");
-    } else if (_pendingFraction != null && _pendingFraction! > 0) {
-      _controller.runJavaScript("scrollToFraction(${_pendingFraction!})");
+    // Attempt to restore location
+    if (widget.initialLocation != null) {
+      final idx = widget.initialLocation!.chapterIndex;
+      final frac = widget.initialLocation!.scrollFraction;
+      _controller.runJavaScript("scrollToChapterFraction($idx, $frac)");
     }
-
-    _pendingAnchor = null;
-    _pendingScrollToEnd = false;
-    _pendingFraction = null;
 
     // Slight delay to allow CSS columns to render before fading in
     Future.delayed(const Duration(milliseconds: 50), () {
@@ -260,53 +199,10 @@ class EpubReaderViewState extends State<EpubReaderView> {
     });
   }
 
-  void _loadCurrentChapter() {
+  void _loadFullBook() {
     if (_pageHeight <= 0) return; // Wait for layout
 
-    final chapter = widget.epub.chapters[_currentChapterIndex];
     final isHorizontal = widget.settings.readingMode == ReadingMode.horizontal;
-
-    // Base64 encode images to embed them directly in HTML
-    var htmlContent = chapter.htmlContent;
-
-    // Inject images directly
-    if (widget.epub.images.isNotEmpty) {
-      // Find all <img> tags and replace src
-      final imgRegex = RegExp(
-        r'<img[^>]+src=["' + "'" + r']([^"' + "'" + r']+)["' + "'" + r'][^>]*>',
-        caseSensitive: false,
-      );
-      htmlContent = htmlContent.replaceAllMapped(imgRegex, (match) {
-        final src = match.group(1);
-        if (src == null) return match.group(0)!;
-
-        final filename = src.split('/').last;
-        Uint8List? imgBytes;
-
-        // Match filename to epub images map
-        for (final entry in widget.epub.images.entries) {
-          if (entry.key.endsWith(filename)) {
-            imgBytes = entry.value;
-            break;
-          }
-        }
-
-        if (imgBytes != null) {
-          try {
-            // Very basic mime type inference
-            String mime = 'image/jpeg';
-            if (filename.toLowerCase().endsWith('.png')) mime = 'image/png';
-            if (filename.toLowerCase().endsWith('.gif')) mime = 'image/gif';
-            if (filename.toLowerCase().endsWith('.svg')) mime = 'image/svg+xml';
-
-            final b64 = base64Encode(imgBytes);
-            final dataUri = 'data:$mime;base64,$b64';
-            return match.group(0)!.replaceFirst(src, dataUri);
-          } catch (_) {}
-        }
-        return match.group(0)!;
-      });
-    }
 
     // Color conversion
     final bgColorStr =
@@ -321,11 +217,23 @@ class EpubReaderViewState extends State<EpubReaderView> {
             .toRadixString(16)
             .padLeft(8, '0')
             .substring(2);
+    final divColorStr =
+        '#' +
+        widget.theme.dividerColor.value
+            .toRadixString(16)
+            .padLeft(8, '0')
+            .substring(2);
     final paddingH = widget.settings.horizontalPadding.toInt();
 
+    // Define the img replacement regex
+    final imgRegex = RegExp(
+      r'<img[^>]+src=["' + "'" + r']([^"' + "'" + r']+)["' + "'" + r'][^>]*>',
+      caseSensitive: false,
+    );
+
     // Build the complete HTML shell
-    String fullHtml =
-        '''
+    final buffer = StringBuffer();
+    buffer.write('''
 <!DOCTYPE html>
 <html>
 <head>
@@ -350,7 +258,7 @@ class EpubReaderViewState extends State<EpubReaderView> {
   }
   
   a {
-    color: ${textColorStr};
+    color: $textColorStr;
     text-decoration: underline;
   }
   
@@ -361,12 +269,19 @@ class EpubReaderViewState extends State<EpubReaderView> {
     font-size: 1.5em;
     font-weight: bold;
   }
-''';
+  
+  .chapter-divider {
+    border: none;
+    border-top: 1px solid $divColorStr;
+    margin: 3em auto;
+    width: 60%;
+    opacity: 0.3;
+  }
+''');
 
     // Add layout-specific CSS
     if (isHorizontal) {
-      fullHtml +=
-          '''
+      buffer.write('''
   /* HORIZONTAL PAGINATION CSS */
   html, body {
     height: ${_pageHeight}px; 
@@ -398,10 +313,9 @@ class EpubReaderViewState extends State<EpubReaderView> {
   p, div, blockquote {
     max-width: 100%;
   }
-''';
+''');
     } else {
-      fullHtml +=
-          '''
+      buffer.write('''
   /* VERTICAL SCROLL CSS */
   html, body {
     overflow-y: auto;
@@ -416,18 +330,17 @@ class EpubReaderViewState extends State<EpubReaderView> {
     word-wrap: break-word;
     overflow-wrap: break-word;
   }
-''';
+''');
     }
 
     // Add Javascript
-    fullHtml +=
-        '''
+    buffer.write('''
 </style>
 <script>
   let isHorizontal = ${isHorizontal ? 'true' : 'false'};
   let currentPage = 0;
   let totalPages = 1;
-  
+
   function throttle(func, limit) {
     let inThrottle;
     return function() {
@@ -448,14 +361,45 @@ class EpubReaderViewState extends State<EpubReaderView> {
   }
 
   function reportProgress() {
-    let fraction = 0;
+    let activeChapterIndex = 0;
+    let chapterFraction = 0;
+
     if (isHorizontal) {
-      fraction = totalPages > 1 ? currentPage / (totalPages - 1) : 0;
+      const viewportCenter = (currentPage * window.innerWidth) + (window.innerWidth / 2);
+      
+      const chapters = document.querySelectorAll('.chapter-block');
+      for(let i = 0; i < chapters.length; i++) {
+         const ch = chapters[i];
+         const left = ch.offsetLeft;
+         const width = ch.getBoundingClientRect().width;
+         if (viewportCenter >= left && viewportCenter <= left + width) {
+            activeChapterIndex = parseInt(ch.getAttribute('data-index'));
+            chapterFraction = width > 0 ? (viewportCenter - left) / width : 0;
+            break;
+         }
+      }
     } else {
-      const maxScroll = Math.max(0, document.body.scrollHeight - window.innerHeight);
-      fraction = maxScroll > 0 ? (window.scrollY / maxScroll) : 0;
+      const viewportCenter = window.scrollY + (window.innerHeight / 2);
+      
+      const chapters = document.querySelectorAll('.chapter-block');
+      for(let i = 0; i < chapters.length; i++) {
+         const ch = chapters[i];
+         const top = ch.offsetTop;
+         const height = ch.offsetHeight;
+         if (viewportCenter >= top && viewportCenter <= top + height) {
+            activeChapterIndex = parseInt(ch.getAttribute('data-index'));
+            chapterFraction = height > 0 ? (viewportCenter - top) / height : 0;
+            break;
+         }
+      }
     }
-    sendMessage('progress', { fraction: fraction });
+    
+    chapterFraction = Math.max(0, Math.min(1, chapterFraction));
+    
+    sendMessage('progress', { 
+        chapterIndex: activeChapterIndex, 
+        chapterFraction: chapterFraction 
+    });
   }
 
   const throttledProgress = throttle(reportProgress, 200);
@@ -480,10 +424,18 @@ class EpubReaderViewState extends State<EpubReaderView> {
 
   // --- External API called by Dart ---
   
-  function scrollToEnd() {
+  function scrollToChapterFraction(index, fraction) {
+    const ch = document.getElementById('chapter-' + index);
+    if (!ch) return;
+
     if (isHorizontal) {
       recalcHorizontalPages();
-      currentPage = Math.max(0, totalPages - 1);
+      const left = ch.offsetLeft;
+      const width = ch.getBoundingClientRect().width;
+      const targetX = left + (width * fraction);
+      
+      currentPage = Math.floor(targetX / window.innerWidth);
+      currentPage = Math.max(0, Math.min(currentPage, totalPages - 1));
       
       const content = document.getElementById('content');
       if(content) {
@@ -493,31 +445,25 @@ class EpubReaderViewState extends State<EpubReaderView> {
         content.style.transition = '';
       }
     } else {
-      window.scrollTo(0, document.body.scrollHeight);
+      const top = ch.offsetTop;
+      const height = ch.offsetHeight;
+      const targetY = top + (height * fraction);
+      window.scrollTo(0, targetY);
     }
   }
   
-  function scrollToFraction(fraction) {
-    if (isHorizontal) {
-      recalcHorizontalPages();
-      currentPage = Math.floor(fraction * (totalPages - 1));
-      currentPage = Math.max(0, Math.min(currentPage, totalPages - 1));
-      
-      const content = document.getElementById('content');
-      if(content) {
-        content.style.transition = 'none';
-        applyHorizontalTransform();
-        content.offsetHeight;
-        content.style.transition = '';
-      }
-    } else {
-      const maxScroll = Math.max(0, document.body.scrollHeight - window.innerHeight);
-      window.scrollTo(0, maxScroll * fraction);
-    }
+  function scrollToChapter(index) {
+     scrollToChapterFraction(index, 0);
   }
 
-  function scrollToAnchor(id) {
-    const el = document.getElementById(id) || document.querySelector(`[name="\${id}"]`);
+  function scrollToAnchor(id, index) {
+    // some anchors might be 'chapter_1.xhtml#id', so try exact id or name
+    let el = document.getElementById(id) || document.querySelector(`[name="\${id}"]`);
+    if (!el && id.includes('#')) {
+       const subId = id.split('#').pop();
+       el = document.getElementById(subId) || document.querySelector(`[name="\${subId}"]`);
+    }
+    
     if (el) {
       if (isHorizontal) {
         recalcHorizontalPages();
@@ -528,6 +474,9 @@ class EpubReaderViewState extends State<EpubReaderView> {
       } else {
         el.scrollIntoView();
       }
+    } else {
+      // Fallback
+      scrollToChapterFraction(index, 0);
     }
   }
 
@@ -567,16 +516,12 @@ class EpubReaderViewState extends State<EpubReaderView> {
       if (currentPage < totalPages - 1) {
         currentPage++;
         applyHorizontalTransform();
-      } else {
-        sendMessage('next_chapter', {});
       }
     } else if (touchEndX > touchStartX + SWIPE_THRESHOLD) {
       // Swipe Right (Prev)
       if (currentPage > 0) {
         currentPage--;
         applyHorizontalTransform();
-      } else {
-        sendMessage('prev_chapter', {});
       }
     }
   }
@@ -619,47 +564,73 @@ class EpubReaderViewState extends State<EpubReaderView> {
   });
   
   // Vertical handling
-  let isScrolling = false;
   window.addEventListener('scroll', () => {
-    if (isHorizontal) return;
-    throttledProgress();
-    
-    if(isScrolling) return;
-    isScrolling = true;
-    setTimeout(() => {
-      const st = Math.ceil(window.scrollY);
-      const ch = document.body.offsetHeight;
-      const wh = window.innerHeight;
-      
-      // Prevent bouncing false triggers
-      if (st <= 0) {
-        // Send previous chapter request
-        // Since scroll can bounce, only send if user tries to scroll up AT top
-        sendMessage('prev_chapter', {});
-        // Prevent immediate re-triggering
-        window.scrollTo(0, 10);
-      } else if (st + wh >= ch) {
-        sendMessage('next_chapter', {});
-        window.scrollTo(0, st - 10);
-      }
-      isScrolling = false;
-    }, 150);
+    if (!isHorizontal) throttledProgress();
   }, {passive: true});
 </script>
 </head>
 <body>
-''';
+<div id="content-container">
+<div id="content">
+''');
 
-    // Setup the DOM structure
-    fullHtml += '<div id="content-container"><div id="content">';
-    if (chapter.title.isNotEmpty) {
-      fullHtml += '<div class="chapter-title">${chapter.title}</div>';
+    // Inject all chapters sequentially
+    for (int i = 0; i < widget.epub.chapters.length; i++) {
+      final chapter = widget.epub.chapters[i];
+      var htmlContent = chapter.htmlContent;
+
+      // Inject images directly
+      if (widget.epub.images.isNotEmpty) {
+        htmlContent = htmlContent.replaceAllMapped(imgRegex, (match) {
+          final src = match.group(1);
+          if (src == null) return match.group(0)!;
+
+          final filename = src.split('/').last;
+          Uint8List? imgBytes;
+
+          for (final entry in widget.epub.images.entries) {
+            if (entry.key.endsWith(filename)) {
+              imgBytes = entry.value;
+              break;
+            }
+          }
+
+          if (imgBytes != null) {
+            try {
+              String mime = 'image/jpeg';
+              if (filename.toLowerCase().endsWith('.png')) mime = 'image/png';
+              if (filename.toLowerCase().endsWith('.gif')) mime = 'image/gif';
+              if (filename.toLowerCase().endsWith('.svg'))
+                mime = 'image/svg+xml';
+
+              final b64 = base64Encode(imgBytes);
+              final dataUri = 'data:$mime;base64,$b64';
+              return match.group(0)!.replaceFirst(src, dataUri);
+            } catch (_) {}
+          }
+          return match.group(0)!;
+        });
+      }
+
+      buffer.write(
+        '<div id="chapter-$i" class="chapter-block" data-index="$i">',
+      );
+      if (chapter.title.isNotEmpty) {
+        buffer.write('<div class="chapter-title">${chapter.title}</div>');
+      }
+      buffer.write(htmlContent);
+      buffer.write('</div>');
+
+      // Add visual divider between chapters
+      if (i < widget.epub.chapters.length - 1) {
+        buffer.write('<hr class="chapter-divider" />');
+      }
     }
-    fullHtml += htmlContent;
-    fullHtml += '</div></div></body></html>';
+
+    buffer.write('</div></div></body></html>');
 
     // Load into WebView base utf-8
-    _controller.loadHtmlString(fullHtml);
+    _controller.loadHtmlString(buffer.toString());
   }
 
   @override
@@ -667,9 +638,12 @@ class EpubReaderViewState extends State<EpubReaderView> {
     super.didUpdateWidget(oldWidget);
     // User changed settings (mode, font size, etc.)
     if (widget.settings != oldWidget.settings) {
-      // For WebView, we must reload the HTML to inject new CSS and scripts
+      setState(() {
+        _isLoading = true;
+        _webviewOpacity = 0.0;
+      });
       _controller.setBackgroundColor(Color(widget.settings.backgroundColor));
-      _loadCurrentChapter();
+      _loadFullBook();
     }
   }
 
@@ -691,9 +665,9 @@ class EpubReaderViewState extends State<EpubReaderView> {
 
         if (_pageHeight != newHeight) {
           _pageHeight = newHeight;
-          // First frame: load chapter
+          // First frame: load full book
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            _loadCurrentChapter();
+            _loadFullBook();
           });
         }
 
@@ -716,7 +690,9 @@ class EpubReaderViewState extends State<EpubReaderView> {
                   Positioned.fill(
                     child: Container(
                       color: Color(widget.settings.backgroundColor),
-                      child: const Center(child: CircularProgressIndicator()),
+                      child: const Center(
+                        child: CircularProgressIndicator(color: Colors.grey),
+                      ),
                     ),
                   ),
               ],
