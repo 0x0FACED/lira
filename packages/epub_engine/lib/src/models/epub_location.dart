@@ -1,55 +1,45 @@
-import 'dart:convert';
+import 'epub_cfi.dart';
 
-/// Represents a precise reading location in an EPUB
-/// 
-/// Position is stored as:
-/// - chapterIndex: which chapter we're in
-/// - pixelOffset: absolute pixel offset from top of document (most accurate)
-/// - offsetInChapter: relative position within chapter (0.0 to 1.0)
-/// - textAnchor: first ~100 chars of visible text (for fuzzy matching)
+/// Represents a reading location in an EPUB book.
+///
+/// Uses [EpubCfi] internally for standards-based positioning.
 class EpubLocation {
-  final int chapterIndex;
-  final double offsetInChapter; // 0.0 to 1.0 within the chapter
-  final double? pixelOffset; // Absolute pixel offset from document start
-  final String? textAnchor; // Optional text anchor for fuzzy matching
-  final String? anchorId; // Optional anchor ID within chapter
+  final EpubCfi cfi;
 
-  const EpubLocation({
-    required this.chapterIndex,
-    this.offsetInChapter = 0.0,
-    this.pixelOffset,
-    this.textAnchor,
-    this.anchorId,
-  });
+  const EpubLocation({required this.cfi});
 
-  /// Serialize to string for storage
-  String toJson() {
-    return jsonEncode({
-      'chapter': chapterIndex,
-      'offset': offsetInChapter,
-      'pixel': pixelOffset,
-      'anchor': textAnchor,
-      'anchorId': anchorId,
-    });
+  /// Create a location from individual parameters
+  factory EpubLocation.fromPosition({
+    required int chapterIndex,
+    String? anchor,
+    int charOffset = 0,
+    double scrollFraction = 0.0,
+  }) {
+    return EpubLocation(
+      cfi: EpubCfi(
+        spineIndex: chapterIndex,
+        anchor: anchor,
+        charOffset: charOffset,
+        scrollFraction: scrollFraction,
+      ),
+    );
   }
 
-  /// Deserialize from string
+  int get chapterIndex => cfi.spineIndex;
+  String? get anchor => cfi.anchor;
+  int get charOffset => cfi.charOffset;
+  double get scrollFraction => cfi.scrollFraction;
+
+  /// Serialize for storage
+  String toJson() => cfi.toJson();
+
+  /// Deserialize from stored string
   static EpubLocation? fromJson(String? data) {
-    if (data == null || data.isEmpty) return null;
-    try {
-      final map = jsonDecode(data) as Map<String, dynamic>;
-      return EpubLocation(
-        chapterIndex: map['chapter'] as int? ?? 0,
-        offsetInChapter: (map['offset'] as num?)?.toDouble() ?? 0.0,
-        pixelOffset: (map['pixel'] as num?)?.toDouble(),
-        textAnchor: map['anchor'] as String?,
-        anchorId: map['anchorId'] as String?,
-      );
-    } catch (_) {
-      return null;
-    }
+    final cfi = EpubCfi.fromJson(data);
+    if (cfi == null) return null;
+    return EpubLocation(cfi: cfi);
   }
 
   @override
-  String toString() => toJson();
+  String toString() => 'EpubLocation(${cfi.toString()})';
 }

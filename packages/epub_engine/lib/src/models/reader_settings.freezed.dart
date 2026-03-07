@@ -26,6 +26,7 @@ mixin _$ReaderSettings {
   int get backgroundColor => throw _privateConstructorUsedError;
   double get lineHeight => throw _privateConstructorUsedError;
   double get horizontalPadding => throw _privateConstructorUsedError;
+  ReadingMode get readingMode => throw _privateConstructorUsedError;
 
   /// Serializes this ReaderSettings to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -50,6 +51,7 @@ abstract class $ReaderSettingsCopyWith<$Res> {
     int backgroundColor,
     double lineHeight,
     double horizontalPadding,
+    ReadingMode readingMode,
   });
 }
 
@@ -73,6 +75,7 @@ class _$ReaderSettingsCopyWithImpl<$Res, $Val extends ReaderSettings>
     Object? backgroundColor = null,
     Object? lineHeight = null,
     Object? horizontalPadding = null,
+    Object? readingMode = null,
   }) {
     return _then(
       _value.copyWith(
@@ -96,6 +99,10 @@ class _$ReaderSettingsCopyWithImpl<$Res, $Val extends ReaderSettings>
                 ? _value.horizontalPadding
                 : horizontalPadding // ignore: cast_nullable_to_non_nullable
                       as double,
+            readingMode: null == readingMode
+                ? _value.readingMode
+                : readingMode // ignore: cast_nullable_to_non_nullable
+                      as ReadingMode,
           )
           as $Val,
     );
@@ -117,6 +124,7 @@ abstract class _$$ReaderSettingsImplCopyWith<$Res>
     int backgroundColor,
     double lineHeight,
     double horizontalPadding,
+    ReadingMode readingMode,
   });
 }
 
@@ -139,6 +147,7 @@ class __$$ReaderSettingsImplCopyWithImpl<$Res>
     Object? backgroundColor = null,
     Object? lineHeight = null,
     Object? horizontalPadding = null,
+    Object? readingMode = null,
   }) {
     return _then(
       _$ReaderSettingsImpl(
@@ -162,6 +171,10 @@ class __$$ReaderSettingsImplCopyWithImpl<$Res>
             ? _value.horizontalPadding
             : horizontalPadding // ignore: cast_nullable_to_non_nullable
                   as double,
+        readingMode: null == readingMode
+            ? _value.readingMode
+            : readingMode // ignore: cast_nullable_to_non_nullable
+                  as ReadingMode,
       ),
     );
   }
@@ -176,6 +189,7 @@ class _$ReaderSettingsImpl implements _ReaderSettings {
     this.backgroundColor = 0xFF121212,
     this.lineHeight = 1.5,
     this.horizontalPadding = 20.0,
+    this.readingMode = ReadingMode.vertical,
   });
 
   factory _$ReaderSettingsImpl.fromJson(Map<String, dynamic> json) =>
@@ -196,10 +210,13 @@ class _$ReaderSettingsImpl implements _ReaderSettings {
   @override
   @JsonKey()
   final double horizontalPadding;
+  @override
+  @JsonKey()
+  final ReadingMode readingMode;
 
   @override
   String toString() {
-    return 'ReaderSettings(fontFamily: $fontFamily, fontSize: $fontSize, backgroundColor: $backgroundColor, lineHeight: $lineHeight, horizontalPadding: $horizontalPadding)';
+    return 'ReaderSettings(fontFamily: $fontFamily, fontSize: $fontSize, backgroundColor: $backgroundColor, lineHeight: $lineHeight, horizontalPadding: $horizontalPadding, readingMode: $readingMode)';
   }
 
   @override
@@ -216,7 +233,9 @@ class _$ReaderSettingsImpl implements _ReaderSettings {
             (identical(other.lineHeight, lineHeight) ||
                 other.lineHeight == lineHeight) &&
             (identical(other.horizontalPadding, horizontalPadding) ||
-                other.horizontalPadding == horizontalPadding));
+                other.horizontalPadding == horizontalPadding) &&
+            (identical(other.readingMode, readingMode) ||
+                other.readingMode == readingMode));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -228,6 +247,7 @@ class _$ReaderSettingsImpl implements _ReaderSettings {
     backgroundColor,
     lineHeight,
     horizontalPadding,
+    readingMode,
   );
 
   /// Create a copy of ReaderSettings
@@ -254,6 +274,7 @@ abstract class _ReaderSettings implements ReaderSettings {
     final int backgroundColor,
     final double lineHeight,
     final double horizontalPadding,
+    final ReadingMode readingMode,
   }) = _$ReaderSettingsImpl;
 
   factory _ReaderSettings.fromJson(Map<String, dynamic> json) =
@@ -269,6 +290,8 @@ abstract class _ReaderSettings implements ReaderSettings {
   double get lineHeight;
   @override
   double get horizontalPadding;
+  @override
+  ReadingMode get readingMode;
 
   /// Create a copy of ReaderSettings
   /// with the given fields replaced by the non-null parameter values.

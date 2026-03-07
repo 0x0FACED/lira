@@ -1,25 +1,23 @@
-import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 import 'epub_parser.dart';
 import 'models/reader_settings.dart';
 import 'models/epub_location.dart';
 
-/// High-performance EPUB reader with precise positioning
-/// 
-/// Architecture:
-/// 1. Pre-calculate chapter heights on load (in isolate if needed)
-/// 2. Store position as absolute pixel offset + chapter index
-/// 3. Use SliverList for exact control over layout
-/// 4. TOC navigation uses pre-calculated positions (no sequential rendering)
+/// EPUB reader using WebView for perfect CSS text rendering.
+///
+/// Solves HTML parsing issues and text cut-offs in horizontal pagination
+/// by using the browser's native `column-width` property.
 class EpubReaderView extends StatefulWidget {
   final ParsedEpub epub;
   final EpubLocation? initialLocation;
   final ReaderSettings settings;
   final ThemeData theme;
-  final void Function(EpubLocation location, double percentage)? onLocationChanged;
+  final void Function(EpubLocation location, double percentage)?
+  onLocationChanged;
   final void Function(String text, String location)? onTextSelected;
 
   const EpubReaderView({
@@ -37,499 +35,695 @@ class EpubReaderView extends StatefulWidget {
 }
 
 class EpubReaderViewState extends State<EpubReaderView> {
-  late ScrollController _scrollController;
-  bool _isRestoringPosition = false;
-  bool _isJumpingToChapter = false;
-  Timer? _progressDebounce;
+  late final WebViewController _controller;
 
-  final Map<int, GlobalKey> _chapterKeys = {};
-  
-  // Pre-calculated chapter heights and cumulative offsets
-  final List<double> _chapterHeights = [];
-  final List<double> _chapterOffsets = []; // Cumulative offset before each chapter
-  
-  // Text anchors for precise restoration (first 100 chars of each chapter)
-  final List<String> _chapterAnchors = [];
-  
-  // For stable progress calculation
-  double _lastKnownMaxScroll = 0;
-  int _stableProgressCount = 0;
+  int _currentChapterIndex = 0;
+  bool _isLoading = true;
+  double _webviewOpacity = 0.0;
+  double _pageHeight = 0;
+
+  // Pending navigations
+  double? _pendingFraction;
+  String? _pendingAnchor;
+  bool _pendingScrollToEnd = false;
+
+  // Text weights for accurate book-wide progress
+  late final List<int> _chapterWeights;
+  late final int _totalWeight;
 
   @override
   void initState() {
     super.initState();
-    _scrollController = ScrollController();
-    _scrollController.addListener(_onScroll);
-    
-    // Pre-calculate chapter heights
-    _calculateChapterMetrics();
+
+    _chapterWeights = widget.epub.chapters
+        .map((c) => c.htmlContent.length)
+        .toList();
+    _totalWeight = _chapterWeights.fold(0, (s, w) => s + w);
 
     if (widget.initialLocation != null) {
-      _isRestoringPosition = true;
-      // Wait for first frame + metrics calculation
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Future.delayed(const Duration(milliseconds: 100), () {
-          _restorePosition();
-        });
-      });
-    }
-  }
-
-  void _calculateChapterMetrics() {
-    // Initialize with estimates - will be refined as chapters render
-    _chapterHeights.clear();
-    _chapterOffsets.clear();
-    _chapterAnchors.clear();
-    
-    double cumulativeOffset = 0.0;
-    // Use larger estimate - chapters are typically 2-3x viewport height
-    final estimatedChapterHeight = _scrollController.hasClients 
-        ? _scrollController.position.viewportDimension * 2.5
-        : 1500.0;
-    
-    for (int i = 0; i < widget.epub.chapters.length; i++) {
-      _chapterHeights.add(estimatedChapterHeight);
-      _chapterOffsets.add(cumulativeOffset);
-      cumulativeOffset += estimatedChapterHeight;
-      
-      // Extract text anchor from chapter content
-      final html = widget.epub.chapters[i].htmlContent;
-      final textAnchor = _extractTextAnchor(html);
-      _chapterAnchors.add(textAnchor);
-    }
-  }
-
-  String _extractTextAnchor(String html) {
-    // Strip HTML tags and get first ~100 characters
-    final stripped = html.replaceAll(RegExp(r'<[^>]*>'), ' ').trim();
-    return stripped.length > 100 ? stripped.substring(0, 100) : stripped;
-  }
-
-  void _restorePosition() {
-    final location = widget.initialLocation;
-    if (location == null || !_scrollController.hasClients) return;
-
-    final targetIndex = location.chapterIndex.clamp(0, widget.epub.chapters.length - 1);
-    
-    // Use pixel offset if available and accurate
-    if (location.pixelOffset != null && _chapterOffsets.isNotEmpty) {
-      final maxScroll = _scrollController.position.maxScrollExtent;
-      final targetOffset = location.pixelOffset!.clamp(0.0, maxScroll);
-      _scrollController.jumpTo(targetOffset);
-      
-      Future.delayed(const Duration(milliseconds: 50), () {
-        _isRestoringPosition = false;
-        _reportProgress();
-      });
-      return;
-    }
-    
-    // Fallback: estimate position based on chapter index
-    if (_chapterOffsets.isNotEmpty && targetIndex < _chapterOffsets.length) {
-      final estimatedOffset = _chapterOffsets[targetIndex];
-      final maxScroll = _scrollController.position.maxScrollExtent;
-      _scrollController.jumpTo(estimatedOffset.clamp(0, maxScroll));
+      _currentChapterIndex = widget.initialLocation!.chapterIndex.clamp(
+        0,
+        widget.epub.chapters.length - 1,
+      );
+      _pendingFraction = widget.initialLocation!.scrollFraction;
     }
 
-    Future.delayed(const Duration(milliseconds: 100), () {
-      _isRestoringPosition = false;
-      _reportProgress();
-    });
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Color(widget.settings.backgroundColor))
+      ..addJavaScriptChannel(
+        'LiraApp',
+        onMessageReceived: _handleJavaScriptMessage,
+      )
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageFinished: (String url) {
+            _onChapterLoaded();
+          },
+          onNavigationRequest: (NavigationRequest request) {
+            if (request.url.startsWith('http')) {
+              // External link (can launch in external browser if needed)
+              return NavigationDecision.prevent;
+            } else if (request.url.startsWith('lira://')) {
+              // Internal EPUB TOC link caught by our JS interceptor
+              final target = request.url.replaceFirst('lira://', '');
+              scrollToChapter(target);
+              return NavigationDecision.prevent;
+            }
+            return NavigationDecision.navigate;
+          },
+        ),
+      );
   }
 
-  void _onScroll() {
-    if (_isRestoringPosition || _isJumpingToChapter) return;
-    if (!_scrollController.hasClients) return;
+  // ---------------------------------------------------------------------------
+  // TOC Navigation API
+  // ---------------------------------------------------------------------------
 
-    _progressDebounce?.cancel();
-    _progressDebounce = Timer(const Duration(milliseconds: 100), () {
-      _reportProgress();
-    });
-  }
+  void scrollToChapter(String fileName) {
+    if (fileName.isEmpty) return;
 
-  void _reportProgress() {
-    if (!mounted || !_scrollController.hasClients) return;
+    // Parse anchor
+    final hashIndex = fileName.indexOf('#');
+    final baseFile = hashIndex >= 0
+        ? fileName.substring(0, hashIndex)
+        : fileName;
+    final anchor = hashIndex >= 0 ? fileName.substring(hashIndex + 1) : null;
 
-    final currentOffset = _scrollController.offset;
-    final maxScroll = _scrollController.position.maxScrollExtent;
-    
-    // Smooth progress calculation - use running average to avoid jumps
-    if ((maxScroll - _lastKnownMaxScroll).abs() > 100) {
-      // maxScroll changed significantly, blend with previous value
-      _lastKnownMaxScroll = (_lastKnownMaxScroll * 0.7 + maxScroll * 0.3);
-      _stableProgressCount++;
-    } else {
-      _lastKnownMaxScroll = maxScroll;
-      _stableProgressCount = 0;
-    }
-    
-    // Use smoothed maxScroll for progress, but only after stabilization
-    final effectiveMaxScroll = _stableProgressCount > 3 ? _lastKnownMaxScroll : maxScroll;
-    
-    final location = _findLocationForOffset(currentOffset);
-    final percentage = effectiveMaxScroll > 0 
-        ? (currentOffset / effectiveMaxScroll * 100).clamp(0.0, 100.0) 
-        : 0.0;
-
-    widget.onLocationChanged?.call(location, percentage);
-  }
-
-  EpubLocation _findLocationForOffset(double offset) {
-    int chapterIndex = 0;
-    double chapterStartOffset = 0.0;
-
-    for (int i = 0; i < widget.epub.chapters.length; i++) {
-      final chapterOffset = _chapterOffsets.isNotEmpty && i < _chapterOffsets.length 
-          ? _chapterOffsets[i] 
-          : 0.0;
-      
-      if (offset >= chapterOffset) {
-        chapterIndex = i;
-        chapterStartOffset = chapterOffset;
-      } else {
-        break;
-      }
-    }
-
-    final chapterHeight = _chapterHeights.isNotEmpty && chapterIndex < _chapterHeights.length
-        ? _chapterHeights[chapterIndex]
-        : _scrollController.position.viewportDimension;
-    
-    final offsetInChapter = chapterHeight > 0
-        ? ((offset - chapterStartOffset) / chapterHeight).clamp(0.0, 1.0)
-        : 0.0;
-
-    return EpubLocation(
-      chapterIndex: chapterIndex,
-      offsetInChapter: offsetInChapter,
-      pixelOffset: offset,
-    );
-  }
-
-  /// TOC navigation - sequentially renders chapters until target is reached
-  Future<void> scrollToChapter(String fileName) async {
-    if (!_scrollController.hasClients) return;
-
-    final index = _findChapterIndexByFileName(fileName);
+    final index = _findChapterIndex(baseFile);
     if (index == null) return;
 
-    _isJumpingToChapter = true;
-    setState(() {});
-
-    // If chapter is already rendered, scroll directly
-    if (_chapterKeys[index]?.currentContext != null && mounted) {
-      await Scrollable.ensureVisible(
-        _chapterKeys[index]!.currentContext!,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeInOut,
-        alignment: 0.0,
-      );
-      _finishTOCJump();
-      return;
-    }
-
-    // Target chapter not rendered yet - need to sequentially render chapters
-    // Find the highest rendered chapter index
-    int highestRenderedIndex = -1;
-    for (var k in _chapterKeys.keys) {
-      if (_chapterKeys[k]?.currentContext != null && k > highestRenderedIndex) {
-        highestRenderedIndex = k;
+    if (index == _currentChapterIndex) {
+      // Same chapter, just tell JS to scroll to anchor
+      if (anchor != null && anchor.isNotEmpty) {
+        _controller.runJavaScript("scrollToAnchor('$anchor')");
       }
-    }
-
-    // If target is before highest rendered, jump to estimated position
-    if (index <= highestRenderedIndex) {
-      final estimatedOffset = _chapterOffsets.isNotEmpty && index < _chapterOffsets.length
-          ? _chapterOffsets[index].toDouble()
-          : 0.0;
-      final maxScroll = _scrollController.position.maxScrollExtent;
-      _scrollController.jumpTo(estimatedOffset.clamp(0, maxScroll));
-
-      // Wait for render
-      await _waitForChapterRender(index);
     } else {
-      // Target is after highest rendered - scroll down sequentially
-      // Start from current position and scroll down chapter by chapter
-      int currentIndex = highestRenderedIndex >= 0 ? highestRenderedIndex : 0;
-      
-      while (currentIndex < index && mounted) {
-        // Scroll to reveal next chapter
-        final nextIndex = currentIndex + 1;
-        if (_chapterKeys[nextIndex]?.currentContext != null) {
-          await Scrollable.ensureVisible(
-            _chapterKeys[nextIndex]!.currentContext!,
-            duration: const Duration(milliseconds: 100),
-            alignment: 1.0, // Align to bottom to load more
-          );
-        }
-        currentIndex++;
-        
-        // Small delay for layout
-        await Future.delayed(const Duration(milliseconds: 50));
-      }
-      
-      // Wait for target chapter to render
-      await _waitForChapterRender(index);
+      // Different chapter, load it
+      setState(() {
+        _currentChapterIndex = index;
+        _isLoading = true;
+        _webviewOpacity = 0.0;
+        _pendingAnchor = anchor;
+        _pendingFraction = null;
+        _pendingScrollToEnd = false;
+      });
+      _loadCurrentChapter();
     }
-
-    // Final alignment - ensure chapter title is visible at top
-    if (mounted && _chapterKeys[index]?.currentContext != null) {
-      await Scrollable.ensureVisible(
-        _chapterKeys[index]!.currentContext!,
-        duration: const Duration(milliseconds: 150),
-        alignment: 0.0,
-      );
-    }
-
-    _finishTOCJump();
   }
 
-  /// Wait for a chapter to be rendered (with timeout)
-  Future<bool> _waitForChapterRender(int chapterIndex) async {
-    int retryCount = 0;
-    while (_chapterKeys[chapterIndex]?.currentContext == null && 
-           retryCount < 50 && 
-           mounted) {
-      await Future.delayed(const Duration(milliseconds: 50));
-      retryCount++;
-    }
-    return _chapterKeys[chapterIndex]?.currentContext != null;
-  }
-
-  void _finishTOCJump() {
-    if (!mounted) return;
-    setState(() {
-      _isJumpingToChapter = false;
-    });
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (mounted) {
-        _isRestoringPosition = false;
-        _reportProgress();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _progressDebounce?.cancel();
-    _scrollController.removeListener(_onScroll);
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (widget.epub.chapters.isEmpty) {
-      return const Center(
-        child: Text(
-          'This EPUB has no readable chapters.',
-          style: TextStyle(color: Colors.grey),
-        ),
-      );
-    }
-
-    return Stack(
-      children: [
-        Container(
-          color: Color(widget.settings.backgroundColor),
-          child: SelectionArea(
-            child: CustomScrollView(
-              controller: _scrollController,
-              slivers: [
-                SliverPadding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: widget.settings.horizontalPadding,
-                    vertical: 16,
-                  ),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        _chapterKeys[index] ??= GlobalKey(debugLabel: 'chapter_$index');
-                        return _ChapterItem(
-                          key: _chapterKeys[index],
-                          chapter: widget.epub.chapters[index],
-                          index: index,
-                          isLast: index == widget.epub.chapters.length - 1,
-                          settings: widget.settings,
-                          theme: widget.theme,
-                          onAnchorTap: scrollToChapter,
-                          resolveImage: _resolveImage,
-                          onHeightCalculated: (height) {
-                            if (index < _chapterHeights.length) {
-                              final oldHeight = _chapterHeights[index];
-                              final delta = height - oldHeight;
-                              _chapterHeights[index] = height;
-                              
-                              // Update cumulative offsets for subsequent chapters
-                              if (delta != 0 && oldHeight != 0) {
-                                for (int i = index + 1; i < _chapterOffsets.length; i++) {
-                                  _chapterOffsets[i] += delta;
-                                }
-                              }
-                            }
-                          },
-                        );
-                      },
-                      childCount: widget.epub.chapters.length,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        // TOC Loading Overlay
-        if (_isJumpingToChapter)
-          Positioned.fill(
-            child: Container(
-              color: Color(widget.settings.backgroundColor),
-              child: const Center(
-                child: CircularProgressIndicator(),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  int? _findChapterIndexByFileName(String fileName) {
-    if (fileName.isEmpty) return null;
-    var target = fileName.split('#').first;
-    while(target.startsWith('.') || target.startsWith('/')) {
+  int? _findChapterIndex(String fileName) {
+    var target = fileName;
+    while (target.startsWith('.') || target.startsWith('/')) {
       target = target.substring(1);
     }
+    target = target.split('#').first;
+
     for (int i = 0; i < widget.epub.chapters.length; i++) {
       var current = widget.epub.chapters[i].fileName;
-      while(current.startsWith('.') || current.startsWith('/')) {
+      while (current.startsWith('.') || current.startsWith('/')) {
         current = current.substring(1);
       }
-      if (current == target || current.endsWith(target) || target.endsWith(current)) {
+      if (current == target ||
+          current.endsWith(target) ||
+          target.endsWith(current)) {
         return i;
       }
     }
     return null;
   }
 
-  Uint8List? _resolveImage(String src) {
-    if (widget.epub.images.containsKey(src)) return widget.epub.images[src];
-    final filename = src.split('/').last;
-    for (final entry in widget.epub.images.entries) {
-      if (entry.key.endsWith(filename)) return entry.value;
+  // ---------------------------------------------------------------------------
+  // JavaScript -> Dart callbacks
+  // ---------------------------------------------------------------------------
+
+  void _handleJavaScriptMessage(JavaScriptMessage message) {
+    try {
+      final data = jsonDecode(message.message);
+      final String type = data['type'];
+
+      switch (type) {
+        case 'next_chapter':
+          if (_currentChapterIndex < widget.epub.chapters.length - 1) {
+            setState(() {
+              _currentChapterIndex++;
+              _isLoading = true;
+              _webviewOpacity = 0.0;
+              _pendingScrollToEnd = false;
+              _pendingFraction = null;
+              _pendingAnchor = null;
+            });
+            _loadCurrentChapter();
+          }
+          break;
+        case 'prev_chapter':
+          if (_currentChapterIndex > 0) {
+            setState(() {
+              _currentChapterIndex--;
+              _isLoading = true;
+              _webviewOpacity = 0.0;
+              _pendingScrollToEnd =
+                  true; // when going back, go to end of prev chapter
+              _pendingFraction = null;
+              _pendingAnchor = null;
+            });
+            _loadCurrentChapter();
+          }
+          break;
+        case 'progress':
+          final double fraction = (data['fraction'] as num).toDouble();
+          _reportProgress(fraction);
+          break;
+        case 'link':
+          final String href = data['href'];
+          scrollToChapter(href);
+          break;
+      }
+    } catch (e) {
+      debugPrint("Error parsing JS message: $e\nData: ${message.message}");
     }
-    return null;
   }
-}
 
-/// Chapter item with height reporting
-class _ChapterItem extends StatefulWidget {
-  final EpubChapter chapter;
-  final int index;
-  final bool isLast;
-  final ReaderSettings settings;
-  final ThemeData theme;
-  final Function(String) onAnchorTap;
-  final Uint8List? Function(String) resolveImage;
-  final void Function(double height) onHeightCalculated;
+  void _reportProgress(double localFraction) {
+    if (!mounted || _totalWeight == 0) return;
 
-  const _ChapterItem({
-    super.key,
-    required this.chapter,
-    required this.index,
-    required this.isLast,
-    required this.settings,
-    required this.theme,
-    required this.onAnchorTap,
-    required this.resolveImage,
-    required this.onHeightCalculated,
+    int prevWeight = 0;
+    for (int i = 0; i < _currentChapterIndex; i++) {
+      prevWeight += _chapterWeights[i];
+    }
+    final curWeight = _chapterWeights[_currentChapterIndex] * localFraction;
+    final percentage = ((prevWeight + curWeight) / _totalWeight * 100).clamp(
+      0.0,
+      100.0,
+    );
+
+    final charOffset =
+        (widget.epub.chapters[_currentChapterIndex].htmlContent.length *
+                localFraction)
+            .round();
+    final location = EpubLocation.fromPosition(
+      chapterIndex: _currentChapterIndex,
+      charOffset: charOffset,
+      scrollFraction: localFraction,
+    );
+    widget.onLocationChanged?.call(location, percentage);
+  }
+
+  // ---------------------------------------------------------------------------
+  // HTML / CSS Generation & Injection
+  // ---------------------------------------------------------------------------
+
+  void _onChapterLoaded() {
+    if (!mounted) return;
+
+    // Apply pending navigations
+    if (_pendingAnchor != null && _pendingAnchor!.isNotEmpty) {
+      _controller.runJavaScript("scrollToAnchor('$_pendingAnchor')");
+    } else if (_pendingScrollToEnd) {
+      _controller.runJavaScript("scrollToEnd()");
+    } else if (_pendingFraction != null && _pendingFraction! > 0) {
+      _controller.runJavaScript("scrollToFraction(${_pendingFraction!})");
+    }
+
+    _pendingAnchor = null;
+    _pendingScrollToEnd = false;
+    _pendingFraction = null;
+
+    // Slight delay to allow CSS columns to render before fading in
+    Future.delayed(const Duration(milliseconds: 50), () {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _webviewOpacity = 1.0;
+        });
+      }
+    });
+  }
+
+  void _loadCurrentChapter() {
+    if (_pageHeight <= 0) return; // Wait for layout
+
+    final chapter = widget.epub.chapters[_currentChapterIndex];
+    final isHorizontal = widget.settings.readingMode == ReadingMode.horizontal;
+
+    // Base64 encode images to embed them directly in HTML
+    var htmlContent = chapter.htmlContent;
+
+    // Inject images directly
+    if (widget.epub.images.isNotEmpty) {
+      // Find all <img> tags and replace src
+      final imgRegex = RegExp(
+        r'<img[^>]+src=["' + "'" + r']([^"' + "'" + r']+)["' + "'" + r'][^>]*>',
+        caseSensitive: false,
+      );
+      htmlContent = htmlContent.replaceAllMapped(imgRegex, (match) {
+        final src = match.group(1);
+        if (src == null) return match.group(0)!;
+
+        final filename = src.split('/').last;
+        Uint8List? imgBytes;
+
+        // Match filename to epub images map
+        for (final entry in widget.epub.images.entries) {
+          if (entry.key.endsWith(filename)) {
+            imgBytes = entry.value;
+            break;
+          }
+        }
+
+        if (imgBytes != null) {
+          try {
+            // Very basic mime type inference
+            String mime = 'image/jpeg';
+            if (filename.toLowerCase().endsWith('.png')) mime = 'image/png';
+            if (filename.toLowerCase().endsWith('.gif')) mime = 'image/gif';
+            if (filename.toLowerCase().endsWith('.svg')) mime = 'image/svg+xml';
+
+            final b64 = base64Encode(imgBytes);
+            final dataUri = 'data:$mime;base64,$b64';
+            return match.group(0)!.replaceFirst(src, dataUri);
+          } catch (_) {}
+        }
+        return match.group(0)!;
+      });
+    }
+
+    // Color conversion
+    final bgColorStr =
+        '#' +
+        widget.settings.backgroundColor
+            .toRadixString(16)
+            .padLeft(8, '0')
+            .substring(2);
+    final textColorStr =
+        '#' +
+        widget.theme.colorScheme.onSurface.value
+            .toRadixString(16)
+            .padLeft(8, '0')
+            .substring(2);
+    final paddingH = widget.settings.horizontalPadding.toInt();
+
+    // Build the complete HTML shell
+    String fullHtml =
+        '''
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    background-color: $bgColorStr;
+    color: $textColorStr;
+    font-family: ${widget.settings.fontFamily}, sans-serif;
+    font-size: ${widget.settings.fontSize}px;
+    line-height: ${widget.settings.lineHeight};
+  }
+  
+  img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 1em auto;
+  }
+  
+  a {
+    color: ${textColorStr};
+    text-decoration: underline;
+  }
+  
+  .chapter-title {
+    text-align: center;
+    margin-top: 1em;
+    margin-bottom: 2em;
+    font-size: 1.5em;
+    font-weight: bold;
+  }
+''';
+
+    // Add layout-specific CSS
+    if (isHorizontal) {
+      fullHtml +=
+          '''
+  /* HORIZONTAL PAGINATION CSS */
+  html, body {
+    height: ${_pageHeight}px; 
+    overflow: hidden; /* Prevent vertical scrolling */
+  }
+  
+  #content-container {
+    height: ${_pageHeight}px;
+    padding: 24px 0; /* Add top and bottom margins for text so it breathes */
+    box-sizing: border-box;
+  }
+
+  #content {
+    /* Multi-column layout handles text splitting natively */
+    column-width: calc(100vw - ${paddingH * 2}px);
+    column-gap: ${paddingH * 2}px;
+    column-fill: auto;
+    height: 100%; /* Fill the container minus its padding */
+    padding: 0 ${paddingH}px;
+    box-sizing: border-box;
+    /* Smooth CSS slide animation */
+    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    will-change: transform;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+  
+  /* Prevent large blocks from overflowing columns */
+  p, div, blockquote {
+    max-width: 100%;
+  }
+''';
+    } else {
+      fullHtml +=
+          '''
+  /* VERTICAL SCROLL CSS */
+  html, body {
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  
+  #content-container {
+    padding: 16px ${paddingH}px 64px ${paddingH}px;
+    box-sizing: border-box;
+    max-width: 800px;
+    margin: 0 auto;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+''';
+    }
+
+    // Add Javascript
+    fullHtml +=
+        '''
+</style>
+<script>
+  let isHorizontal = ${isHorizontal ? 'true' : 'false'};
+  let currentPage = 0;
+  let totalPages = 1;
+  
+  function throttle(func, limit) {
+    let inThrottle;
+    return function() {
+      const args = arguments;
+      const context = this;
+      if (!inThrottle) {
+        func.apply(context, args);
+        inThrottle = true;
+        setTimeout(() => inThrottle = false, limit);
+      }
+    }
+  }
+
+  function sendMessage(type, data) {
+    if (window.LiraApp) {
+      window.LiraApp.postMessage(JSON.stringify(Object.assign({ type: type }, data || {})));
+    }
+  }
+
+  function reportProgress() {
+    let fraction = 0;
+    if (isHorizontal) {
+      fraction = totalPages > 1 ? currentPage / (totalPages - 1) : 0;
+    } else {
+      const maxScroll = Math.max(0, document.body.scrollHeight - window.innerHeight);
+      fraction = maxScroll > 0 ? (window.scrollY / maxScroll) : 0;
+    }
+    sendMessage('progress', { fraction: fraction });
+  }
+
+  const throttledProgress = throttle(reportProgress, 200);
+
+  function recalcHorizontalPages() {
+    if (!isHorizontal) return;
+    const content = document.getElementById('content');
+    if (content) {
+      totalPages = Math.ceil(content.scrollWidth / window.innerWidth) || 1;
+    }
+  }
+
+  function applyHorizontalTransform() {
+    if (!isHorizontal) return;
+    const content = document.getElementById('content');
+    if (content) {
+      const xOffset = -(currentPage * window.innerWidth);
+      content.style.transform = `translateX(\${xOffset}px)`;
+      reportProgress();
+    }
+  }
+
+  // --- External API called by Dart ---
+  
+  function scrollToEnd() {
+    if (isHorizontal) {
+      recalcHorizontalPages();
+      currentPage = Math.max(0, totalPages - 1);
+      
+      const content = document.getElementById('content');
+      if(content) {
+        content.style.transition = 'none';
+        applyHorizontalTransform();
+        content.offsetHeight; // force reflow
+        content.style.transition = '';
+      }
+    } else {
+      window.scrollTo(0, document.body.scrollHeight);
+    }
+  }
+  
+  function scrollToFraction(fraction) {
+    if (isHorizontal) {
+      recalcHorizontalPages();
+      currentPage = Math.floor(fraction * (totalPages - 1));
+      currentPage = Math.max(0, Math.min(currentPage, totalPages - 1));
+      
+      const content = document.getElementById('content');
+      if(content) {
+        content.style.transition = 'none';
+        applyHorizontalTransform();
+        content.offsetHeight;
+        content.style.transition = '';
+      }
+    } else {
+      const maxScroll = Math.max(0, document.body.scrollHeight - window.innerHeight);
+      window.scrollTo(0, maxScroll * fraction);
+    }
+  }
+
+  function scrollToAnchor(id) {
+    const el = document.getElementById(id) || document.querySelector(`[name="\${id}"]`);
+    if (el) {
+      if (isHorizontal) {
+        recalcHorizontalPages();
+        const absoluteLeft = el.offsetLeft; 
+        currentPage = Math.floor(absoluteLeft / window.innerWidth);
+        currentPage = Math.max(0, Math.min(currentPage, totalPages - 1));
+        applyHorizontalTransform();
+      } else {
+        el.scrollIntoView();
+      }
+    }
+  }
+
+  // --- Event Listeners ---
+  
+  window.onload = function() {
+    if (isHorizontal) {
+      const imgs = document.querySelectorAll('img');
+      imgs.forEach(img => {
+         img.style.maxHeight = "${_pageHeight * 0.9}px";
+      });
+      recalcHorizontalPages();
+    }
+    
+    document.querySelectorAll("a").forEach(a => {
+      a.addEventListener("click", function(e) {
+        e.preventDefault();
+        const href = this.getAttribute("href");
+        if (href) {
+          sendMessage('link', { href: href });
+        }
+      });
+    });
+    
+    reportProgress();
+  };
+
+  // Swipe handling
+  let touchStartX = 0;
+  let touchEndX = 0;
+  
+  function handleSwipe() {
+    if (!isHorizontal) return;
+    const SWIPE_THRESHOLD = 50;
+    if (touchEndX < touchStartX - SWIPE_THRESHOLD) {
+      // Swipe Left (Next)
+      if (currentPage < totalPages - 1) {
+        currentPage++;
+        applyHorizontalTransform();
+      } else {
+        sendMessage('next_chapter', {});
+      }
+    } else if (touchEndX > touchStartX + SWIPE_THRESHOLD) {
+      // Swipe Right (Prev)
+      if (currentPage > 0) {
+        currentPage--;
+        applyHorizontalTransform();
+      } else {
+        sendMessage('prev_chapter', {});
+      }
+    }
+  }
+
+  window.addEventListener('touchstart', e => {
+    if (!isHorizontal) return;
+    touchStartX = e.changedTouches[0].clientX;
+  }, {passive: true});
+  
+  window.addEventListener('touchend', e => {
+    if (!isHorizontal) return;
+    touchEndX = e.changedTouches[0].clientX;
+    handleSwipe();
+  }, {passive: true});
+  
+  let isMouseDown = false;
+  window.addEventListener('mousedown', e => {
+    if (!isHorizontal) return;
+    isMouseDown = true;
+    touchStartX = e.clientX;
+  }, {passive: true});
+  
+  window.addEventListener('mouseup', e => {
+    if (!isHorizontal) return;
+    if (isMouseDown) {
+      touchEndX = e.clientX;
+      isMouseDown = false;
+      handleSwipe();
+    }
+  }, {passive: true});
+  
+  window.addEventListener('mouseleave', () => { isMouseDown = false; });
+  
+  window.addEventListener('resize', () => {
+    if (isHorizontal) {
+      recalcHorizontalPages();
+      if(currentPage >= totalPages) currentPage = Math.max(0, totalPages - 1);
+      applyHorizontalTransform();
+    }
   });
+  
+  // Vertical handling
+  let isScrolling = false;
+  window.addEventListener('scroll', () => {
+    if (isHorizontal) return;
+    throttledProgress();
+    
+    if(isScrolling) return;
+    isScrolling = true;
+    setTimeout(() => {
+      const st = Math.ceil(window.scrollY);
+      const ch = document.body.offsetHeight;
+      const wh = window.innerHeight;
+      
+      // Prevent bouncing false triggers
+      if (st <= 0) {
+        // Send previous chapter request
+        // Since scroll can bounce, only send if user tries to scroll up AT top
+        sendMessage('prev_chapter', {});
+        // Prevent immediate re-triggering
+        window.scrollTo(0, 10);
+      } else if (st + wh >= ch) {
+        sendMessage('next_chapter', {});
+        window.scrollTo(0, st - 10);
+      }
+      isScrolling = false;
+    }, 150);
+  }, {passive: true});
+</script>
+</head>
+<body>
+''';
+
+    // Setup the DOM structure
+    fullHtml += '<div id="content-container"><div id="content">';
+    if (chapter.title.isNotEmpty) {
+      fullHtml += '<div class="chapter-title">${chapter.title}</div>';
+    }
+    fullHtml += htmlContent;
+    fullHtml += '</div></div></body></html>';
+
+    // Load into WebView base utf-8
+    _controller.loadHtmlString(fullHtml);
+  }
 
   @override
-  State<_ChapterItem> createState() => _ChapterItemState();
-}
-
-class _ChapterItemState extends State<_ChapterItem> with AutomaticKeepAliveClientMixin {
-  bool _heightReported = false;
-
-  @override
-  bool get wantKeepAlive => true;
+  void didUpdateWidget(EpubReaderView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // User changed settings (mode, font size, etc.)
+    if (widget.settings != oldWidget.settings) {
+      // For WebView, we must reload the HTML to inject new CSS and scripts
+      _controller.setBackgroundColor(Color(widget.settings.backgroundColor));
+      _loadCurrentChapter();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
-
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 800),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (widget.chapter.title.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 32, bottom: 16),
-                child: Text(
-                  widget.chapter.title,
-                  style: TextStyle(
-                    fontSize: widget.settings.fontSize * 1.5,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: widget.settings.fontFamily,
-                    color: widget.theme.colorScheme.onSurface,
-                  ),
-                ),
-              ),
-            HtmlWidget(
-              widget.chapter.htmlContent,
-              textStyle: TextStyle(
-                fontSize: widget.settings.fontSize,
-                height: widget.settings.lineHeight,
-                fontFamily: widget.settings.fontFamily,
-                color: widget.theme.colorScheme.onSurface,
-              ),
-              onTapUrl: (url) {
-                widget.onAnchorTap(url);
-                return true;
-              },
-              customWidgetBuilder: (element) {
-                if (element.localName == 'img') {
-                  final src = element.attributes['src'];
-                  if (src != null) {
-                    final imageData = widget.resolveImage(src);
-                    if (imageData != null) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        child: Image.memory(imageData, fit: BoxFit.contain),
-                      );
-                    }
-                  }
-                }
-                return null;
-              },
-            ),
-            if (!widget.isLast)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 48),
-                child: Divider(color: widget.theme.dividerColor.withAlpha(50)),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Report height after first build
-    if (!_heightReported) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          final renderBox = context.findRenderObject() as RenderBox?;
-          if (renderBox != null) {
-            widget.onHeightCalculated(renderBox.size.height);
-            _heightReported = true;
-          }
-        }
-      });
+    if (widget.epub.chapters.isEmpty) {
+      return const Center(child: Text('This EPUB has no readable chapters.'));
     }
+
+    // Capture height for WebView generation, excluding safe areas
+    final safePadding = MediaQuery.of(context).padding;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // In vertical mode, JS manages height automatically.
+        // In horizontal mode, we need the exact inner height to set CSS correctly.
+        final newHeight =
+            constraints.maxHeight - safePadding.top - safePadding.bottom;
+
+        if (_pageHeight != newHeight) {
+          _pageHeight = newHeight;
+          // First frame: load chapter
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _loadCurrentChapter();
+          });
+        }
+
+        return Container(
+          color: Color(widget.settings.backgroundColor),
+          child: Padding(
+            padding: EdgeInsets.only(
+              top: safePadding.top,
+              bottom: safePadding.bottom,
+            ),
+            child: Stack(
+              children: [
+                AnimatedOpacity(
+                  opacity: _webviewOpacity,
+                  duration: const Duration(milliseconds: 300),
+                  child: WebViewWidget(controller: _controller),
+                ),
+
+                if (_isLoading)
+                  Positioned.fill(
+                    child: Container(
+                      color: Color(widget.settings.backgroundColor),
+                      child: const Center(child: CircularProgressIndicator()),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }

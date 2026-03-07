@@ -14,6 +14,9 @@ _$ReaderSettingsImpl _$$ReaderSettingsImplFromJson(Map<String, dynamic> json) =>
       lineHeight: (json['lineHeight'] as num?)?.toDouble() ?? 1.5,
       horizontalPadding:
           (json['horizontalPadding'] as num?)?.toDouble() ?? 20.0,
+      readingMode:
+          $enumDecodeNullable(_$ReadingModeEnumMap, json['readingMode']) ??
+          ReadingMode.vertical,
     );
 
 Map<String, dynamic> _$$ReaderSettingsImplToJson(
@@ -24,4 +27,10 @@ Map<String, dynamic> _$$ReaderSettingsImplToJson(
   'backgroundColor': instance.backgroundColor,
   'lineHeight': instance.lineHeight,
   'horizontalPadding': instance.horizontalPadding,
+  'readingMode': _$ReadingModeEnumMap[instance.readingMode]!,
+};
+
+const _$ReadingModeEnumMap = {
+  ReadingMode.vertical: 'vertical',
+  ReadingMode.horizontal: 'horizontal',
 };

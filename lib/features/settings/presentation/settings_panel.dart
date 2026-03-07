@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:epub_engine/epub_engine.dart';
 import '../data/settings_provider.dart';
 
 class SettingsPanel extends ConsumerWidget {
@@ -35,7 +36,32 @@ class SettingsPanel extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 24),
-          
+
+          // Reading Mode
+          Text('Reading Mode', style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: 8),
+          SegmentedButton<ReadingMode>(
+            segments: const [
+              ButtonSegment<ReadingMode>(
+                value: ReadingMode.vertical,
+                label: Text('Vertical'),
+                icon: Icon(Icons.swap_vert),
+              ),
+              ButtonSegment<ReadingMode>(
+                value: ReadingMode.horizontal,
+                label: Text('Horizontal'),
+                icon: Icon(Icons.swap_horiz),
+              ),
+            ],
+            selected: {settings.readingMode},
+            onSelectionChanged: (Set<ReadingMode> newSelection) {
+              notifier.updateSettings(
+                settings.copyWith(readingMode: newSelection.first),
+              );
+            },
+          ),
+          const SizedBox(height: 24),
+
           // Font Family
           Text('Font Family', style: Theme.of(context).textTheme.labelLarge),
           const SizedBox(height: 8),
@@ -47,26 +73,32 @@ class SettingsPanel extends ConsumerWidget {
                   label: 'Sans Serif',
                   fontFamily: 'sans-serif',
                   isSelected: settings.fontFamily == 'sans-serif',
-                  onTap: () => notifier.updateSettings(settings.copyWith(fontFamily: 'sans-serif')),
+                  onTap: () => notifier.updateSettings(
+                    settings.copyWith(fontFamily: 'sans-serif'),
+                  ),
                 ),
                 _FontChip(
                   label: 'Serif',
                   fontFamily: 'serif',
                   isSelected: settings.fontFamily == 'serif',
-                  onTap: () => notifier.updateSettings(settings.copyWith(fontFamily: 'serif')),
+                  onTap: () => notifier.updateSettings(
+                    settings.copyWith(fontFamily: 'serif'),
+                  ),
                 ),
                 _FontChip(
                   label: 'Monospace',
                   fontFamily: 'monospace',
                   isSelected: settings.fontFamily == 'monospace',
-                  onTap: () => notifier.updateSettings(settings.copyWith(fontFamily: 'monospace')),
+                  onTap: () => notifier.updateSettings(
+                    settings.copyWith(fontFamily: 'monospace'),
+                  ),
                 ),
               ],
             ),
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // Font Size
           Row(
             children: [
@@ -78,13 +110,14 @@ class SettingsPanel extends ConsumerWidget {
                   max: 32,
                   divisions: 10,
                   label: settings.fontSize.round().toString(),
-                  onChanged: (val) => notifier.updateSettings(settings.copyWith(fontSize: val)),
+                  onChanged: (val) =>
+                      notifier.updateSettings(settings.copyWith(fontSize: val)),
                 ),
               ),
               const Icon(Icons.text_fields, size: 24),
             ],
           ),
-          
+
           // Line Height
           Row(
             children: [
@@ -95,7 +128,9 @@ class SettingsPanel extends ConsumerWidget {
                   value: settings.lineHeight,
                   min: 1.0,
                   max: 2.5,
-                  onChanged: (val) => notifier.updateSettings(settings.copyWith(lineHeight: val)),
+                  onChanged: (val) => notifier.updateSettings(
+                    settings.copyWith(lineHeight: val),
+                  ),
                 ),
               ),
             ],
@@ -104,21 +139,26 @@ class SettingsPanel extends ConsumerWidget {
           // Horizontal Padding
           Row(
             children: [
-              const Icon(Icons.unfold_more_rounded, size: 20), // Placeholder for padding icon
+              const Icon(
+                Icons.unfold_more_rounded,
+                size: 20,
+              ), // Placeholder for padding icon
               const SizedBox(width: 16),
               Expanded(
                 child: Slider(
                   value: settings.horizontalPadding,
                   min: 8,
                   max: 64,
-                  onChanged: (val) => notifier.updateSettings(settings.copyWith(horizontalPadding: val)),
+                  onChanged: (val) => notifier.updateSettings(
+                    settings.copyWith(horizontalPadding: val),
+                  ),
                 ),
               ),
             ],
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Background Color
           Text('Background', style: Theme.of(context).textTheme.labelLarge),
           const SizedBox(height: 12),
@@ -128,28 +168,38 @@ class SettingsPanel extends ConsumerWidget {
               _ColorCircle(
                 color: const Color(0xFF121212),
                 isSelected: settings.backgroundColor == 0xFF121212,
-                onTap: () => notifier.updateSettings(settings.copyWith(backgroundColor: 0xFF121212)),
+                onTap: () => notifier.updateSettings(
+                  settings.copyWith(backgroundColor: 0xFF121212),
+                ),
               ),
               _ColorCircle(
                 color: const Color(0xFF1E1E1E),
                 isSelected: settings.backgroundColor == 0xFF1E1E1E,
-                onTap: () => notifier.updateSettings(settings.copyWith(backgroundColor: 0xFF1E1E1E)),
+                onTap: () => notifier.updateSettings(
+                  settings.copyWith(backgroundColor: 0xFF1E1E1E),
+                ),
               ),
               _ColorCircle(
                 color: const Color(0xFF2C2C2C),
                 isSelected: settings.backgroundColor == 0xFF2C2C2C,
-                onTap: () => notifier.updateSettings(settings.copyWith(backgroundColor: 0xFF2C2C2C)),
+                onTap: () => notifier.updateSettings(
+                  settings.copyWith(backgroundColor: 0xFF2C2C2C),
+                ),
               ),
               _ColorCircle(
                 color: const Color(0xFFF5F5F5),
                 isSelected: settings.backgroundColor == 0xFFF5F5F5,
                 borderColor: Colors.grey,
-                onTap: () => notifier.updateSettings(settings.copyWith(backgroundColor: 0xFFF5F5F5)),
+                onTap: () => notifier.updateSettings(
+                  settings.copyWith(backgroundColor: 0xFFF5F5F5),
+                ),
               ),
               _ColorCircle(
                 color: const Color(0xFFFFF8E1),
                 isSelected: settings.backgroundColor == 0xFFFFF8E1,
-                onTap: () => notifier.updateSettings(settings.copyWith(backgroundColor: 0xFFFFF8E1)),
+                onTap: () => notifier.updateSettings(
+                  settings.copyWith(backgroundColor: 0xFFFFF8E1),
+                ),
               ),
             ],
           ),
@@ -210,7 +260,9 @@ class _ColorCircle extends StatelessWidget {
           color: color,
           shape: BoxShape.circle,
           border: Border.all(
-            color: isSelected ? Theme.of(context).colorScheme.primary : (borderColor ?? Colors.transparent),
+            color: isSelected
+                ? Theme.of(context).colorScheme.primary
+                : (borderColor ?? Colors.transparent),
             width: 3,
           ),
           boxShadow: [
@@ -225,7 +277,9 @@ class _ColorCircle extends StatelessWidget {
         child: isSelected
             ? Icon(
                 Icons.check,
-                color: color.computeLuminance() > 0.5 ? Colors.black : Colors.white,
+                color: color.computeLuminance() > 0.5
+                    ? Colors.black
+                    : Colors.white,
                 size: 20,
               )
             : null,

@@ -3,6 +3,9 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'reader_settings.freezed.dart';
 part 'reader_settings.g.dart';
 
+/// Reading mode: vertical scroll or horizontal pagination
+enum ReadingMode { vertical, horizontal }
+
 @freezed
 class ReaderSettings with _$ReaderSettings {
   const factory ReaderSettings({
@@ -11,6 +14,7 @@ class ReaderSettings with _$ReaderSettings {
     @Default(0xFF121212) int backgroundColor,
     @Default(1.5) double lineHeight,
     @Default(20.0) double horizontalPadding,
+    @Default(ReadingMode.vertical) ReadingMode readingMode,
   }) = _ReaderSettings;
 
   factory ReaderSettings.fromJson(Map<String, dynamic> json) =>
