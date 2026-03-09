@@ -2,7 +2,7 @@
 
 > **Purpose:** New developers should read this file and immediately understand where to make changes for any given task.
 > 
-> **Last Updated:** March 9, 2026
+> **Last Updated:** March 9, 2026 (Part 1 implemented)
 
 ---
 
@@ -438,7 +438,7 @@ BooksController.downloadAndImportBook(annaBook, ref)
 | `search_book_card.dart` | Search result item | Change card design, download UI |
 | `search_provider.dart` | Anna's Archive search | Change search params, filters |
 | `search_state.dart` | State union | Add new states |
-| `download_provider.dart` | Download progress tracking | Change progress logic |
+| `download_provider.dart` | Download progress + cancellation | Change progress logic, cancel tokens |
 
 ---
 
@@ -484,11 +484,14 @@ EpubParser.parse()
     ├─ Parse chapters (skip nav, toc, ncx)
     └─ Build TOC hierarchy
     ↓
-EpubReaderView (WebView)
-    ├─ Convert chapters to single HTML
-    ├─ Embed images as base64
-    ├─ Apply CSS (font, size, colors, columns)
-    └─ JavaScript ↔ Dart communication
+#### **How it works:**
+1. Loads EPUB file into memory via `EpubReader` (xml parsing).
+2. Generates a single massive HTML file containing all chapters & CSS.
+3. Injects all images as Base64 data URIs.
+4. **Temporary File**: To avoid `OutOfMemoryError` caused by passing a 150MB+ string via platform channels (`loadHtmlString`), Lira writes the entire generated HTML string to a temporary file on disk using `path_provider`.
+5. The `WebViewController` loads the file directly via `loadFile()` (`file://...`).
+
+#### **JavaScript Bridge:**↔ Dart communication
 ```
 
 #### **Key Files:**
@@ -512,7 +515,7 @@ body {
 }
 ```
 
-Navigation: Swipe left/right → scroll by `columnWidth`
+Navigation: Swipe left/right → scroll by `columnWidth` (snapped to nearest page via `Math.round`)
 
 #### **Progress Calculation:**
 
@@ -535,8 +538,10 @@ Where `scrollFraction` = vertical scroll position / max scroll (from JS)
 #### **Features:**
 - Native rendering via `pdfrx` (works on Linux!)
 - Text selection enabled
-- Page-based navigation
-- No TOC support (PDFs don't have standard TOC)
+- Page-based navigation with `PdfViewerController`
+- TOC support via `PdfDocument.loadOutline()` → converted to `TOCItem` tree
+- Background color from `ReaderSettings`
+- Progress bar with accurate page/total tracking
 
 ---
 

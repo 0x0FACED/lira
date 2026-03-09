@@ -14,7 +14,6 @@ class SearchBookCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final l10n = AppLocalizations.of(context)!;
 
     // Watch download progress (0.0 to 1.0), or null if not downloading
     final downloadProgress = ref.watch(downloadNotifierProvider)[book.md5];
@@ -47,17 +46,25 @@ class SearchBookCard extends ConsumerWidget {
                   else
                     _buildFallbackCover(theme),
 
-                  // Download Overlay
-                  if (isDownloading)
-                    Container(
-                      color: Colors.black54,
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          value: downloadProgress > 0 ? downloadProgress : null,
-                          color: _getContrastColor(context),
-                        ),
-                      ),
-                    ),
+                  // Download Overlay with animation
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: isDownloading
+                        ? Container(
+                            key: const ValueKey('downloading'),
+                            color: Colors.black54,
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                // -1 means indeterminate (preparing), 0+ means actual progress
+                                value: downloadProgress > 0
+                                    ? downloadProgress
+                                    : null,
+                                color: _getContrastColor(context),
+                              ),
+                            ),
+                          )
+                        : const SizedBox.shrink(key: ValueKey('idle')),
+                  ),
                 ],
               ),
             ),
@@ -110,18 +117,25 @@ class SearchBookCard extends ConsumerWidget {
               ),
             ),
 
-            // Download Button Area
+            // Download / Cancel Button Area
             Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: IconButton(
-                icon: isDownloading
-                    ? const Icon(Icons.downloading)
-                    : const Icon(Icons.download_rounded),
-                color: theme.colorScheme.primary,
-                onPressed: isDownloading
-                    ? null // Disable if already downloading
-                    : () => _handleDownload(context, ref),
-              ),
+              child: isDownloading
+                  ? IconButton(
+                      icon: const Icon(Icons.close),
+                      color: Colors.red,
+                      tooltip: 'Cancel download',
+                      onPressed: () {
+                        ref
+                            .read(downloadNotifierProvider.notifier)
+                            .cancelDownload(book.md5);
+                      },
+                    )
+                  : IconButton(
+                      icon: const Icon(Icons.download_rounded),
+                      color: theme.colorScheme.primary,
+                      onPressed: () => _handleDownload(context, ref),
+                    ),
             ),
           ],
         ),
@@ -165,6 +179,7 @@ class SearchBookCard extends ConsumerWidget {
 
   Future<void> _handleDownload(BuildContext context, WidgetRef ref) async {
     final l10n = AppLocalizations.of(context)!;
+
     try {
       await ref
           .read(booksControllerProvider.notifier)
@@ -184,20 +199,14 @@ class SearchBookCard extends ConsumerWidget {
       String errorMessage = e.toString();
       if (errorMessage.contains('duplicate_book')) {
         errorMessage = l10n.duplicateBookError;
+      } else if (errorMessage.contains('download_cancelled')) {
+        // Download was cancelled by user — no error snackbar needed
+        return;
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
       );
     }
-  }
-
-  String _formatBytes(int bytes) {
-    if (bytes <= 0) return '0 B';
-    const suffixes = ['B', 'KB', 'MB', 'GB'];
-    int i = (bytes.toDouble() / 1024).floor().toString().length ~/ 3;
-    if (i >= suffixes.length) i = suffixes.length - 1;
-    double size = bytes / (1024 * i > 0 ? 1024 * i : 1);
-    return '${size.toStringAsFixed(1)}${suffixes[i]}';
   }
 }

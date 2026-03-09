@@ -200,4 +200,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchLibrary => 'Search library...';
+
+  @override
+  String get downloadCancelled => 'Download cancelled';
 }

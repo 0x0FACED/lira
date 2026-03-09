@@ -298,10 +298,17 @@ class BookDetailScreen extends ConsumerWidget {
           File(currentBook.coverUrl!), // <-- using ! here is safe due to check
           fit: BoxFit.contain,
           width: double.infinity,
+          errorBuilder: (context, error, stackTrace) {
+            return _buildFormatFallback(currentBook);
+          },
         ),
       );
     }
 
+    return _buildFormatFallback(currentBook);
+  }
+
+  Widget _buildFormatFallback(BookDto currentBook) {
     final isEpub = currentBook.format.toLowerCase() == 'epub';
     return Container(
       decoration: BoxDecoration(
@@ -314,10 +321,26 @@ class BookDetailScreen extends ConsumerWidget {
         ),
       ),
       child: Center(
-        child: Icon(
-          isEpub ? Icons.auto_stories : Icons.picture_as_pdf,
-          size: 80,
-          color: isEpub ? const Color(0xFF64B5F6) : const Color(0xFFEF9A9A),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isEpub ? Icons.auto_stories : Icons.picture_as_pdf,
+              size: 80,
+              color: isEpub ? const Color(0xFF64B5F6) : const Color(0xFFEF9A9A),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              currentBook.format.toUpperCase(),
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: isEpub
+                    ? const Color(0xFF64B5F6)
+                    : const Color(0xFFEF9A9A),
+              ),
+            ),
+          ],
         ),
       ),
     );

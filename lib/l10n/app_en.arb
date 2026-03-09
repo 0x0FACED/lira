@@ -98,5 +98,7 @@
     "failedToInitReader": "Failed to initialize reader engine.",
     "noChapters": "This EPUB has no readable chapters.",
 
-    "searchLibrary": "Search library..."
+    "searchLibrary": "Search library...",
+
+    "downloadCancelled": "Download cancelled"
 }

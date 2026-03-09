@@ -72,8 +72,13 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
         final parsed = await EpubParser.parse(bytes);
         author = parsed.author;
 
-        // Count chapters as a proxy for pages if real page count isn't available
-        pageCount = parsed.chapters.length;
+        // Estimate page count based on total characters (~1800 chars/page)
+        final totalChars = parsed.chapters.fold<int>(
+          0,
+          (sum, c) =>
+              sum + c.htmlContent.replaceAll(RegExp(r'<[^>]*>'), '').length,
+        );
+        pageCount = (totalChars / 1800).ceil().clamp(1, 999999);
 
         if (parsed.coverImage != null) {
           final coversDir = Directory(p.join(appDocDir.path, 'covers'));
@@ -163,6 +168,9 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
     }
 
     // Get download links from the API
+    // Immediately show indeterminate progress indicator
+    ref.read(downloadNotifierProvider.notifier).setProgress(book.md5, -1);
+
     final annaApi = anna.AnnaApi();
     final downloadLinks = await annaApi.getDownloadLinks(book.md5);
 
@@ -182,6 +190,11 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
     final bookId = const Uuid().v4();
     final newFilePath = p.join(booksDir.path, '$bookId.$extension');
 
+    // Create a CancelToken for this download
+    final cancelToken = ref
+        .read(downloadNotifierProvider.notifier)
+        .startDownload(book.md5);
+
     // Try links until one works
     bool success = false;
     for (final link in downloadLinks) {
@@ -189,6 +202,7 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
         await Dio().download(
           link,
           newFilePath,
+          cancelToken: cancelToken,
           onReceiveProgress: (count, total) {
             if (total != -1) {
               final progress = count / total;
@@ -199,7 +213,19 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
           },
         );
         success = true;
-        break; // Sucessfully downloaded
+        break; // Successfully downloaded
+      } on DioException catch (e) {
+        if (e.type == DioExceptionType.cancel) {
+          // User cancelled — clean up partial file if exists
+          final partialFile = File(newFilePath);
+          if (await partialFile.exists()) {
+            await partialFile.delete();
+          }
+          throw Exception('download_cancelled');
+        }
+        // ignore: avoid_print
+        print('Download from link failed: $link - $e');
+        continue;
       } catch (e) {
         // ignore: avoid_print
         print('Download from link failed: $link - $e');
@@ -226,7 +252,13 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
         if (author.isEmpty) {
           author = parsed.author;
         }
-        pageCount = parsed.chapters.length;
+        // Estimate page count based on total characters (~1800 chars/page)
+        final totalChars = parsed.chapters.fold<int>(
+          0,
+          (sum, c) =>
+              sum + c.htmlContent.replaceAll(RegExp(r'<[^>]*>'), '').length,
+        );
+        pageCount = (totalChars / 1800).ceil().clamp(1, 999999);
 
         if (parsed.coverImage != null) {
           final coversDir = Directory(p.join(appDocDir.path, 'covers'));

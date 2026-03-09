@@ -6,13 +6,14 @@
 
 ## Part 1: Quick Reader Fixes
 
-- [ ] **Fix EPUB sliding window bug (landscape mode)** — When jumping from chapter 1 to 5, the sliding window gets stuck between pages. Must ensure clean page alignment when switching chapters
-- [ ] **Add PDF reader features** — Progress bar, settings (background color), TOC, in-document search
-- [ ] **Fix EPUB page count calculation** — Render book in horizontal mode, count pages properly, save to DB (never recalculate)
-- [ ] **Fix image decoding fallback** — When image fails to decode, show fallback icon (PDF/EPUB badge) instead of exception text
-- [ ] **Fix download indicator animation** — Show loading indicator immediately with smooth animation (no 3+ second delay)
-- [ ] **Add cancel download functionality** — Allow users to cancel ongoing downloads
-- [ ] **Hide downloaded book cards from search** — Once download starts, remove card from search results screen
+- [x] **Fix EPUB sliding window bug (landscape mode)** — When jumping from chapter 1 to 5, the sliding window gets stuck between pages. Must ensure clean page alignment when switching chapters
+- [x] **Add PDF reader features** — Progress bar, settings (background color), TOC, in-document search
+- [x] **Fix EPUB page count calculation** — Render book in horizontal mode, count pages properly, save to DB (never recalculate)
+- [x] **Fix image decoding fallback** — When image fails to decode, show fallback icon (PDF/EPUB badge) instead of exception text
+- [x] **Fix download indicator animation** — Show loading indicator immediately with smooth animation (no 3+ second delay)
+- [x] **Add cancel download functionality** — Allow users to cancel ongoing downloads
+- [x] **Hide downloaded book cards from search** — Once download starts, remove card from search results screen
+- [x] **Fix EPUB WebView OOM crash** — Replaced `loadHtmlString()` with a local `HttpServer` to avoid inflating large books into 120MB+ Base64 strings across platform channels.
 
 ---
 

@@ -101,5 +101,7 @@
     "failedToInitReader": "Не удалось инициализировать движок чтения.",
     "noChapters": "В этом EPUB нет доступных глав.",
 
-    "searchLibrary": "Поиск по библиотеке..."
+    "searchLibrary": "Поиск по библиотеке...",
+
+    "downloadCancelled": "Загрузка отменена"
 }

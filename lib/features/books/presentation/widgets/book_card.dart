@@ -103,10 +103,10 @@ class BookCard extends StatelessWidget {
             Text(
               book.title.trim(),
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                    height: 1.2,
-                  ),
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                height: 1.2,
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -114,8 +114,9 @@ class BookCard extends StatelessWidget {
             // Author - 1 line with ellipsis
             Text(
               book.author.trim(),
-              style: Theme.of(context).textTheme.bodySmall
-                  ?.copyWith(color: Colors.grey, fontSize: 11),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: Colors.grey, fontSize: 11),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -171,10 +172,14 @@ class BookCard extends StatelessWidget {
         File(book.coverUrl!).existsSync()) {
       // Fill the entire area with the cover, using a blurred background
       // to hide cropped edges gracefully
+      // Use errorBuilder to show fallback if image fails to decode
       final image = Image.file(
         File(book.coverUrl!),
         fit: BoxFit.cover,
         alignment: Alignment.center,
+        errorBuilder: (context, error, stackTrace) {
+          return _buildFormatFallback();
+        },
       );
 
       return Stack(
@@ -211,6 +216,10 @@ class BookCard extends StatelessWidget {
       );
     }
 
+    return _buildFormatFallback();
+  }
+
+  Widget _buildFormatFallback() {
     final isEpub = book.format.toLowerCase() == 'epub';
     return Container(
       decoration: BoxDecoration(

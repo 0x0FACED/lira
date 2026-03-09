@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import 'epub_parser.dart';
 import 'models/reader_settings.dart';
@@ -67,7 +70,10 @@ class EpubReaderViewState extends State<EpubReaderView> {
             _onBookLoaded();
           },
           onNavigationRequest: (NavigationRequest request) {
-            if (request.url.startsWith('http')) {
+            if (request.url.startsWith('file://')) {
+              // Allow navigation to our local temp file
+              return NavigationDecision.navigate;
+            } else if (request.url.startsWith('http')) {
               // External link (can launch in external browser if needed)
               return NavigationDecision.prevent;
             } else if (request.url.startsWith('lira://')) {
@@ -80,6 +86,11 @@ class EpubReaderViewState extends State<EpubReaderView> {
           },
         ),
       );
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 
   // ---------------------------------------------------------------------------
@@ -277,6 +288,13 @@ class EpubReaderViewState extends State<EpubReaderView> {
     width: 60%;
     opacity: 0.3;
   }
+  
+  pre, code {
+    white-space: pre-wrap !important;
+    word-break: break-all !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
 ''');
 
     // Add layout-specific CSS
@@ -295,12 +313,13 @@ class EpubReaderViewState extends State<EpubReaderView> {
   }
 
   #content {
-    /* Multi-column layout handles text splitting natively */
-    column-width: calc(100vw - ${paddingH * 2}px);
-    column-gap: ${paddingH * 2}px;
+    /* Each column = exactly 100vw, no gap, no padding on this element.
+       This guarantees page stride == window.innerWidth exactly. */
+    column-width: 100vw;
+    column-gap: 0px;
     column-fill: auto;
-    height: 100%; /* Fill the container minus its padding */
-    padding: 0 ${paddingH}px;
+    height: 100%;
+    padding: 0;
     box-sizing: border-box;
     /* Smooth CSS slide animation */
     transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
@@ -309,10 +328,17 @@ class EpubReaderViewState extends State<EpubReaderView> {
     overflow-wrap: break-word;
   }
   
+  /* Horizontal padding is on each chapter block, not #content */
+  .chapter-block {
+    padding-left: ${paddingH}px;
+    padding-right: ${paddingH}px;
+  }
+  
   /* Prevent large blocks from overflowing columns */
   p, div, blockquote {
     max-width: 100%;
   }
+
 ''');
     } else {
       buffer.write('''
@@ -340,6 +366,7 @@ class EpubReaderViewState extends State<EpubReaderView> {
   let isHorizontal = ${isHorizontal ? 'true' : 'false'};
   let currentPage = 0;
   let totalPages = 1;
+  let pageStride = window.innerWidth; // Actual stride per page (computed from DOM)
 
   function throttle(func, limit) {
     let inThrottle;
@@ -409,6 +436,8 @@ class EpubReaderViewState extends State<EpubReaderView> {
     const content = document.getElementById('content');
     if (content) {
       totalPages = Math.ceil(content.scrollWidth / window.innerWidth) || 1;
+      // Compute the actual stride from the DOM to avoid sub-pixel drift
+      pageStride = totalPages > 1 ? (content.scrollWidth / totalPages) : window.innerWidth;
     }
   }
 
@@ -416,10 +445,27 @@ class EpubReaderViewState extends State<EpubReaderView> {
     if (!isHorizontal) return;
     const content = document.getElementById('content');
     if (content) {
-      const xOffset = -(currentPage * window.innerWidth);
+      currentPage = Math.round(currentPage);
+      currentPage = Math.max(0, Math.min(currentPage, totalPages - 1));
+      // Use pageStride instead of window.innerWidth to avoid cumulative drift
+      const xOffset = -(currentPage * pageStride);
       content.style.transform = `translateX(\${xOffset}px)`;
       reportProgress();
     }
+  }
+
+  function snapToNearestPage() {
+    if (!isHorizontal) return;
+    const content = document.getElementById('content');
+    if (!content) return;
+    const style = window.getComputedStyle(content);
+    const matrix = new DOMMatrix(style.transform);
+    const currentX = -matrix.m41;
+    const exactPage = currentX / pageStride;
+    currentPage = Math.round(exactPage);
+    currentPage = Math.max(0, Math.min(currentPage, totalPages - 1));
+    content.style.transition = '';
+    applyHorizontalTransform();
   }
 
   // --- External API called by Dart ---
@@ -434,7 +480,8 @@ class EpubReaderViewState extends State<EpubReaderView> {
       const width = ch.getBoundingClientRect().width;
       const targetX = left + (width * fraction);
       
-      currentPage = Math.floor(targetX / window.innerWidth);
+      // Use Math.round to snap to nearest page boundary
+      currentPage = Math.round(targetX / pageStride);
       currentPage = Math.max(0, Math.min(currentPage, totalPages - 1));
       
       const content = document.getElementById('content');
@@ -468,7 +515,8 @@ class EpubReaderViewState extends State<EpubReaderView> {
       if (isHorizontal) {
         recalcHorizontalPages();
         const absoluteLeft = el.offsetLeft; 
-        currentPage = Math.floor(absoluteLeft / window.innerWidth);
+        // Use Math.round to snap to nearest page boundary
+        currentPage = Math.round(absoluteLeft / pageStride);
         currentPage = Math.max(0, Math.min(currentPage, totalPages - 1));
         applyHorizontalTransform();
       } else {
@@ -579,7 +627,9 @@ class EpubReaderViewState extends State<EpubReaderView> {
       final chapter = widget.epub.chapters[i];
       var htmlContent = chapter.htmlContent;
 
-      // Inject images directly
+      // Inject images directly as Base64.
+      // OOM usually happens when sending this massive string via MethodChannels.
+      // By writing this to a file instead, we avoid the MethodChannel limit.
       if (widget.epub.images.isNotEmpty) {
         htmlContent = htmlContent.replaceAllMapped(imgRegex, (match) {
           final src = match.group(1);
@@ -629,8 +679,30 @@ class EpubReaderViewState extends State<EpubReaderView> {
 
     buffer.write('</div></div></body></html>');
 
-    // Load into WebView base utf-8
-    _controller.loadHtmlString(buffer.toString());
+    // Write the massive HTML string to a temporary file,
+    // avoiding passing a 150MB+ string across MethodChannels (which causes OOM).
+    _writeToTempAndLoad(buffer.toString());
+  }
+
+  Future<void> _writeToTempAndLoad(String htmlContent) async {
+    try {
+      final dir = await getTemporaryDirectory();
+      final file = File(
+        '${dir.path}/epub_temp_${DateTime.now().millisecondsSinceEpoch}.html',
+      );
+      await file.writeAsString(htmlContent);
+
+      // Need allow file access
+      if (_controller.platform is AndroidWebViewController) {
+        (_controller.platform as AndroidWebViewController).setAllowFileAccess(
+          true,
+        );
+      }
+
+      await _controller.loadFile(file.path);
+    } catch (e) {
+      debugPrint('Failed to load EPUB from temp file: $e');
+    }
   }
 
   @override
