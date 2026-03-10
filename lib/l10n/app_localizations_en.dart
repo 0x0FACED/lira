@@ -203,4 +203,27 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get downloadCancelled => 'Download cancelled';
+
+  @override
+  String get zLibrary => 'Z-Library';
+
+  @override
+  String get zLibraryLogin => 'Z-Library Login';
+
+  @override
+  String get zLibraryEmail => 'Email';
+
+  @override
+  String get zLibraryPassword => 'Password';
+
+  @override
+  String zLibraryLoggedIn(String email) {
+    return 'Logged in as $email';
+  }
+
+  @override
+  String get zLibraryNotLoggedIn => 'Not logged in to Z-Library';
+
+  @override
+  String get zLibraryLogout => 'Logout';
 }

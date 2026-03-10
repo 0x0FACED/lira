@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lira/features/search/domain/providers/search_state.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../../core/providers/preferences_provider.dart';
 import '../domain/providers/search_provider.dart';
 import 'widgets/search_book_card.dart';
 
@@ -38,6 +39,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
     final searchState = ref.watch(searchProvider);
+    final searchSource = ref.watch(searchSourceProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -55,10 +57,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 onSubmitted: (_) => _performSearch(),
               ),
             ),
-            IconButton(
-              icon: const Icon(Icons.search),
-              onPressed: () => _performSearch(),
-            ),
             if (_searchController.text.isNotEmpty)
               IconButton(
                 icon: const Icon(Icons.clear),
@@ -70,9 +68,40 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               ),
           ],
         ),
+        actions: [
+          PopupMenuButton<SearchSource>(
+            initialValue: searchSource,
+            icon: const Icon(Icons.source),
+            tooltip: 'Search Source',
+            onSelected: (source) {
+              ref.read(searchSourceProvider.notifier).setSource(source);
+              if (_searchController.text.isNotEmpty) {
+                _performSearch();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: SearchSource.anna,
+                child: Text("Anna's Archive"),
+              ),
+              const PopupMenuItem(
+                value: SearchSource.zlibrary,
+                child: Text('Z-Library'),
+              ),
+              const PopupMenuItem(
+                value: SearchSource.both,
+                child: Text('Both'),
+              ),
+            ],
+          ),
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () => _performSearch(),
+          ),
+        ],
       ),
       body: searchState.map(
-        initial: (_) => _buildInitialState(theme, l10n),
+        initial: (_) => _buildInitialState(theme, l10n, searchSource),
         loading: (_) => const Center(child: CircularProgressIndicator()),
         loaded: (state) {
           final books = state.books;
@@ -93,28 +122,66 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             },
           );
         },
-        error: (state) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+        error: (state) {
+          final partialResults = state.partialResults;
+          if (partialResults != null && partialResults.isNotEmpty) {
+            return Column(
               children: [
-                const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                const SizedBox(height: 16),
-                Text(
-                  'Error searching: ${state.message}',
-                  style: const TextStyle(color: Colors.red),
-                  textAlign: TextAlign.center,
+                Container(
+                  color: Colors.orange.withAlpha(50),
+                  padding: const EdgeInsets.all(8.0),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning, color: Colors.orange, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Some sources failed: ${state.message}',
+                          style: const TextStyle(color: Colors.orange),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                    itemCount: partialResults.length,
+                    itemBuilder: (context, index) {
+                      return SearchBookCard(book: partialResults[index]);
+                    },
+                  ),
                 ),
               ],
+            );
+          }
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error searching: ${state.message}',
+                    style: const TextStyle(color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildInitialState(ThemeData theme, AppLocalizations l10n) {
+  Widget _buildInitialState(ThemeData theme, AppLocalizations l10n, SearchSource source) {
+    String sourceName = "Anna's Archive";
+    if (source == SearchSource.zlibrary) sourceName = 'Z-Library';
+    if (source == SearchSource.both) sourceName = "Anna's Archive and Z-Library";
+    
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -130,7 +197,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             Text(l10n.searchBooks, style: theme.textTheme.headlineSmall),
             const SizedBox(height: 12),
             Text(
-              "Search Anna's Archive for epub and pdf books. Enter a title, author, or ISBN.",
+              "Search $sourceName for epub and pdf books. Enter a title, author, or ISBN.",
               style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
               textAlign: TextAlign.center,
             ),
@@ -140,3 +207,4 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     );
   }
 }
+

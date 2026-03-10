@@ -481,6 +481,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Download cancelled'**
   String get downloadCancelled;
+
+  /// No description provided for @zLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Z-Library'**
+  String get zLibrary;
+
+  /// No description provided for @zLibraryLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Z-Library Login'**
+  String get zLibraryLogin;
+
+  /// No description provided for @zLibraryEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get zLibraryEmail;
+
+  /// No description provided for @zLibraryPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get zLibraryPassword;
+
+  /// No description provided for @zLibraryLoggedIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Logged in as {email}'**
+  String zLibraryLoggedIn(String email);
+
+  /// No description provided for @zLibraryNotLoggedIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Not logged in to Z-Library'**
+  String get zLibraryNotLoggedIn;
+
+  /// No description provided for @zLibraryLogout.
+  ///
+  /// In en, this message translates to:
+  /// **'Logout'**
+  String get zLibraryLogout;
 }
 
 class _AppLocalizationsDelegate

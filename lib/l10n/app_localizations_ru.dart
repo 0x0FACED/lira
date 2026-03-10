@@ -205,4 +205,27 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get downloadCancelled => 'Загрузка отменена';
+
+  @override
+  String get zLibrary => 'Z-Library';
+
+  @override
+  String get zLibraryLogin => 'Вход в Z-Library';
+
+  @override
+  String get zLibraryEmail => 'Email';
+
+  @override
+  String get zLibraryPassword => 'Пароль';
+
+  @override
+  String zLibraryLoggedIn(String email) {
+    return 'Вошли как $email';
+  }
+
+  @override
+  String get zLibraryNotLoggedIn => 'Нет входа в Z-Library';
+
+  @override
+  String get zLibraryLogout => 'Выйти';
 }

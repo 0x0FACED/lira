@@ -128,13 +128,13 @@ return error(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  initial,TResult Function()?  loading,TResult Function( List<anna.Book> books)?  loaded,TResult Function( String message)?  error,required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  initial,TResult Function()?  loading,TResult Function( List<SearchResultItem> books)?  loaded,TResult Function( String message,  List<SearchResultItem>? partialResults)?  error,required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Initial() when initial != null:
 return initial();case _Loading() when loading != null:
 return loading();case _Loaded() when loaded != null:
 return loaded(_that.books);case _Error() when error != null:
-return error(_that.message);case _:
+return error(_that.message,_that.partialResults);case _:
   return orElse();
 
 }
@@ -152,13 +152,13 @@ return error(_that.message);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  initial,required TResult Function()  loading,required TResult Function( List<anna.Book> books)  loaded,required TResult Function( String message)  error,}) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  initial,required TResult Function()  loading,required TResult Function( List<SearchResultItem> books)  loaded,required TResult Function( String message,  List<SearchResultItem>? partialResults)  error,}) {final _that = this;
 switch (_that) {
 case _Initial():
 return initial();case _Loading():
 return loading();case _Loaded():
 return loaded(_that.books);case _Error():
-return error(_that.message);case _:
+return error(_that.message,_that.partialResults);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -175,13 +175,13 @@ return error(_that.message);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  initial,TResult? Function()?  loading,TResult? Function( List<anna.Book> books)?  loaded,TResult? Function( String message)?  error,}) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  initial,TResult? Function()?  loading,TResult? Function( List<SearchResultItem> books)?  loaded,TResult? Function( String message,  List<SearchResultItem>? partialResults)?  error,}) {final _that = this;
 switch (_that) {
 case _Initial() when initial != null:
 return initial();case _Loading() when loading != null:
 return loading();case _Loaded() when loaded != null:
 return loaded(_that.books);case _Error() when error != null:
-return error(_that.message);case _:
+return error(_that.message,_that.partialResults);case _:
   return null;
 
 }
@@ -257,11 +257,11 @@ String toString() {
 
 
 class _Loaded implements SearchState {
-  const _Loaded(final  List<anna.Book> books): _books = books;
+  const _Loaded(final  List<SearchResultItem> books): _books = books;
   
 
- final  List<anna.Book> _books;
- List<anna.Book> get books {
+ final  List<SearchResultItem> _books;
+ List<SearchResultItem> get books {
   if (_books is EqualUnmodifiableListView) return _books;
   // ignore: implicit_dynamic_type
   return EqualUnmodifiableListView(_books);
@@ -298,7 +298,7 @@ abstract mixin class _$LoadedCopyWith<$Res> implements $SearchStateCopyWith<$Res
   factory _$LoadedCopyWith(_Loaded value, $Res Function(_Loaded) _then) = __$LoadedCopyWithImpl;
 @useResult
 $Res call({
- List<anna.Book> books
+ List<SearchResultItem> books
 });
 
 
@@ -318,7 +318,7 @@ class __$LoadedCopyWithImpl<$Res>
 @pragma('vm:prefer-inline') $Res call({Object? books = null,}) {
   return _then(_Loaded(
 null == books ? _self._books : books // ignore: cast_nullable_to_non_nullable
-as List<anna.Book>,
+as List<SearchResultItem>,
   ));
 }
 
@@ -329,10 +329,19 @@ as List<anna.Book>,
 
 
 class _Error implements SearchState {
-  const _Error(this.message);
+  const _Error(this.message, {final  List<SearchResultItem>? partialResults}): _partialResults = partialResults;
   
 
  final  String message;
+ final  List<SearchResultItem>? _partialResults;
+ List<SearchResultItem>? get partialResults {
+  final value = _partialResults;
+  if (value == null) return null;
+  if (_partialResults is EqualUnmodifiableListView) return _partialResults;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(value);
+}
+
 
 /// Create a copy of SearchState
 /// with the given fields replaced by the non-null parameter values.
@@ -344,16 +353,16 @@ _$ErrorCopyWith<_Error> get copyWith => __$ErrorCopyWithImpl<_Error>(this, _$ide
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Error&&(identical(other.message, message) || other.message == message));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Error&&(identical(other.message, message) || other.message == message)&&const DeepCollectionEquality().equals(other._partialResults, _partialResults));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,message);
+int get hashCode => Object.hash(runtimeType,message,const DeepCollectionEquality().hash(_partialResults));
 
 @override
 String toString() {
-  return 'SearchState.error(message: $message)';
+  return 'SearchState.error(message: $message, partialResults: $partialResults)';
 }
 
 
@@ -364,7 +373,7 @@ abstract mixin class _$ErrorCopyWith<$Res> implements $SearchStateCopyWith<$Res>
   factory _$ErrorCopyWith(_Error value, $Res Function(_Error) _then) = __$ErrorCopyWithImpl;
 @useResult
 $Res call({
- String message
+ String message, List<SearchResultItem>? partialResults
 });
 
 
@@ -381,10 +390,11 @@ class __$ErrorCopyWithImpl<$Res>
 
 /// Create a copy of SearchState
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') $Res call({Object? message = null,}) {
+@pragma('vm:prefer-inline') $Res call({Object? message = null,Object? partialResults = freezed,}) {
   return _then(_Error(
 null == message ? _self.message : message // ignore: cast_nullable_to_non_nullable
-as String,
+as String,partialResults: freezed == partialResults ? _self._partialResults : partialResults // ignore: cast_nullable_to_non_nullable
+as List<SearchResultItem>?,
   ));
 }
 

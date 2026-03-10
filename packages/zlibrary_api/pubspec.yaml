@@ -1,0 +1,15 @@
+name: zlibrary_api
+description: "Unofficial Z-Library API client in Dart"
+version: 0.0.1
+publish_to: 'none'
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  http: ^1.2.0
+  html: ^0.15.5
+  crypto: ^3.0.7
+
+dev_dependencies:
+  test: ^1.24.0

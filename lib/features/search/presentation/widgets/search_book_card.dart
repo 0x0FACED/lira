@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:annas_archive_api/annas_archive_api.dart' as anna;
 
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/providers/download_provider.dart';
 import '../../../books/domain/providers/books_provider.dart';
+import '../../domain/models/search_result_item.dart';
 
 class SearchBookCard extends ConsumerWidget {
-  final anna.Book book;
+  final SearchResultItem book;
 
   const SearchBookCard({super.key, required this.book});
 
@@ -16,7 +16,7 @@ class SearchBookCard extends ConsumerWidget {
     final theme = Theme.of(context);
 
     // Watch download progress (0.0 to 1.0), or null if not downloading
-    final downloadProgress = ref.watch(downloadNotifierProvider)[book.md5];
+    final downloadProgress = ref.watch(downloadNotifierProvider)[book.id];
     final isDownloading = downloadProgress != null;
 
     return Card(
@@ -26,13 +26,13 @@ class SearchBookCard extends ConsumerWidget {
       elevation: 4,
       shadowColor: theme.colorScheme.shadow.withAlpha(40),
       child: SizedBox(
-        height: 120,
+        height: 130, // Increased height to prevent overflow
         child: Row(
           children: [
             // Cover Area
             SizedBox(
-              width: 120, // Square aspect ratio 120x120
-              height: 120,
+              width: 100, // Slightly reduced width to match new proportions, or keep 120? Let's use 100 to make it more vertical rectangle
+              height: 130,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -40,6 +40,9 @@ class SearchBookCard extends ConsumerWidget {
                     Image.network(
                       book.imgUrl,
                       fit: BoxFit.cover,
+                      headers: book.source == SearchResultSource.anna 
+                        ? const {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'} 
+                        : null,
                       errorBuilder: (context, error, stackTrace) =>
                           _buildFallbackCover(theme),
                     )
@@ -95,21 +98,27 @@ class SearchBookCard extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 8),
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         _buildBadge(
                           context,
-                          book.format.extension.toUpperCase(),
+                          book.source == SearchResultSource.anna ? "Anna's Archive" : 'Z-Library',
+                          color: book.source == SearchResultSource.anna ? Colors.blue : Colors.green,
                         ),
-                        if (book.size.isNotEmpty) ...[
-                          const SizedBox(width: 8),
+                        _buildBadge(
+                          context,
+                          book.format.toUpperCase(),
+                        ),
+                        if (book.size.isNotEmpty)
                           Text(
                             book.size,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: Colors.grey,
                             ),
                           ),
-                        ],
                       ],
                     ),
                   ],
@@ -128,7 +137,7 @@ class SearchBookCard extends ConsumerWidget {
                       onPressed: () {
                         ref
                             .read(downloadNotifierProvider.notifier)
-                            .cancelDownload(book.md5);
+                            .cancelDownload(book.id);
                       },
                     )
                   : IconButton(
@@ -159,11 +168,12 @@ class SearchBookCard extends ConsumerWidget {
     return isDark ? Colors.white : Theme.of(context).colorScheme.primary;
   }
 
-  Widget _buildBadge(BuildContext context, String text) {
+  Widget _buildBadge(BuildContext context, String text, {Color? color}) {
+    final badgeColor = color ?? Theme.of(context).colorScheme.primary;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary.withAlpha(30),
+        color: badgeColor.withAlpha(30),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
@@ -171,7 +181,7 @@ class SearchBookCard extends ConsumerWidget {
         style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.bold,
-          color: Theme.of(context).colorScheme.primary,
+          color: badgeColor,
         ),
       ),
     );
@@ -210,3 +220,4 @@ class SearchBookCard extends ConsumerWidget {
     }
   }
 }
+

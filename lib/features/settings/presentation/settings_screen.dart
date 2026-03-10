@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:zlibrary_api/zlibrary_api.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../../core/providers/preferences_provider.dart';
@@ -8,6 +9,88 @@ import '../../auth/domain/providers/auth_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
+
+  void _showZLibraryLoginDialog(BuildContext context, WidgetRef ref) {
+    final emailController = TextEditingController();
+    final passwordController = TextEditingController();
+    bool isLoading = false;
+    String? error;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        final l10n = AppLocalizations.of(context)!;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text(l10n.zLibraryLogin),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: emailController,
+                    decoration: InputDecoration(labelText: l10n.zLibraryEmail),
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  TextField(
+                    controller: passwordController,
+                    decoration: InputDecoration(labelText: l10n.zLibraryPassword),
+                    obscureText: true,
+                  ),
+                  if (error != null) ...[
+                    const SizedBox(height: 8),
+                    Text(error!, style: const TextStyle(color: Colors.red)),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isLoading ? null : () => Navigator.pop(context),
+                  child: Text(l10n.cancel),
+                ),
+                ElevatedButton(
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                          setState(() {
+                            isLoading = true;
+                            error = null;
+                          });
+                          try {
+                            final api = ZLibraryApi();
+                            await api.login(
+                              emailController.text,
+                              passwordController.text,
+                            );
+                            await ref.read(zLibraryCredentialsProvider.notifier).saveCredentials(
+                              emailController.text,
+                              api.cookies,
+                            );
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                            }
+                          } catch (e) {
+                            setState(() {
+                              error = e.toString();
+                              isLoading = false;
+                            });
+                          }
+                        },
+                  child: isLoading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(l10n.signIn),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -84,6 +167,40 @@ class SettingsScreen extends ConsumerWidget {
                     await ref.read(authProvider.notifier).logout();
                   },
                 ),
+            ],
+          ),
+
+          _buildSection(
+            context,
+            title: l10n.zLibrary,
+            children: [
+              Consumer(
+                builder: (context, ref, child) {
+                  final zLibCreds = ref.watch(zLibraryCredentialsProvider);
+                  
+                  if (zLibCreds != null) {
+                    return ListTile(
+                      leading: const Icon(Icons.library_books, color: Colors.green),
+                      title: Text(l10n.zLibraryLoggedIn(zLibCreds.email)),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.logout, color: Colors.red),
+                        onPressed: () {
+                          ref.read(zLibraryCredentialsProvider.notifier).clearCredentials();
+                        },
+                      ),
+                    );
+                  } else {
+                    return ListTile(
+                      leading: const Icon(Icons.library_books),
+                      title: Text(l10n.zLibraryNotLoggedIn),
+                      trailing: ElevatedButton(
+                        onPressed: () => _showZLibraryLoginDialog(context, ref),
+                        child: Text(l10n.signIn),
+                      ),
+                    );
+                  }
+                },
+              ),
             ],
           ),
 

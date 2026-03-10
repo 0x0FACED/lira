@@ -11,8 +11,11 @@ import 'package:path/path.dart' as p;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import 'package:annas_archive_api/annas_archive_api.dart' as anna;
+import 'package:zlibrary_api/zlibrary_api.dart';
 
 import '../../../../core/di/injection.dart';
+import '../../../../core/providers/preferences_provider.dart';
+import '../../../search/domain/models/search_result_item.dart';
 import '../models/book_dto.dart';
 import '../../data/repositories/books_local_repository.dart';
 import '../../../search/domain/providers/download_provider.dart';
@@ -153,7 +156,7 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
     state = AsyncData([...currentBooks, newBook]);
   }
 
-  Future<void> downloadAndImportBook(anna.Book book, WidgetRef ref) async {
+  Future<void> downloadAndImportBook(SearchResultItem book, WidgetRef ref) async {
     final currentBooks = state.value ?? [];
 
     // Duplicate check by title and author as requested
@@ -167,14 +170,29 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
       throw Exception('duplicate_book');
     }
 
-    // Get download links from the API
     // Immediately show indeterminate progress indicator
-    ref.read(downloadNotifierProvider.notifier).setProgress(book.md5, -1);
+    ref.read(downloadNotifierProvider.notifier).setProgress(book.id, -1);
 
-    final annaApi = anna.AnnaApi();
-    final downloadLinks = await annaApi.getDownloadLinks(book.md5);
+    List<String> downloadLinks = [];
+    
+    if (book.source == SearchResultSource.anna) {
+      final annaApi = anna.AnnaApi();
+      downloadLinks = await annaApi.getDownloadLinks(book.id);
+    } else if (book.source == SearchResultSource.zlibrary) {
+      final zLibCreds = ref.read(zLibraryCredentialsProvider);
+      if (zLibCreds == null) {
+        ref.read(downloadNotifierProvider.notifier).finish(book.id);
+        throw Exception('Z-Library: Not logged in');
+      }
+      final zLibApi = ZLibraryApi(cookies: zLibCreds.cookies);
+      final bookDetails = await zLibApi.fetchBookDetails(book.originalObject as ZLibraryBook);
+      if (bookDetails.downloadUrl != null) {
+        downloadLinks = [bookDetails.downloadUrl!];
+      }
+    }
 
     if (downloadLinks.isEmpty) {
+      ref.read(downloadNotifierProvider.notifier).finish(book.id);
       throw Exception('No download links found');
     }
 
@@ -185,30 +203,35 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
       await booksDir.create(recursive: true);
     }
 
-    // Anna archive provides extension, default to epub if missing
-    final extension = book.format.extension;
+    final extension = book.format;
     final bookId = const Uuid().v4();
     final newFilePath = p.join(booksDir.path, '$bookId.$extension');
 
     // Create a CancelToken for this download
     final cancelToken = ref
         .read(downloadNotifierProvider.notifier)
-        .startDownload(book.md5);
+        .startDownload(book.id);
 
     // Try links until one works
     bool success = false;
     for (final link in downloadLinks) {
       try {
+        final options = Options(
+          headers: book.source == SearchResultSource.zlibrary 
+              ? {'Cookie': ref.read(zLibraryCredentialsProvider)?.cookies.entries.map((e) => '\${e.key}=\${e.value}').join('; ') ?? ''} 
+              : null,
+        );
         await Dio().download(
           link,
           newFilePath,
+          options: options,
           cancelToken: cancelToken,
           onReceiveProgress: (count, total) {
             if (total != -1) {
               final progress = count / total;
               ref
                   .read(downloadNotifierProvider.notifier)
-                  .setProgress(book.md5, progress);
+                  .setProgress(book.id, progress);
             }
           },
         );
@@ -233,7 +256,7 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
       }
     }
 
-    ref.read(downloadNotifierProvider.notifier).finish(book.md5);
+    ref.read(downloadNotifierProvider.notifier).finish(book.id);
 
     if (!success) {
       throw Exception('Failed to download from all available links');
