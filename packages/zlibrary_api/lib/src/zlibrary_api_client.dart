@@ -12,8 +12,8 @@ class ZLibraryApi {
 
   ZLibraryApi({
     this.mirrors = const [
-      'https://z-library.sk',
       'https://z-lib.sk',
+      'https://z-library.sk',
     ],
     Map<String, String>? cookies,
   }) {
@@ -116,13 +116,14 @@ class ZLibraryApi {
         );
         print('ZLibraryApi: Response status: ${response.statusCode}');
 
-        if (response.statusCode == 503 && response.body.contains('Checking your browser')) {
+        if (response.statusCode == 503 &&
+            response.body.contains('Checking your browser')) {
           print('ZLibraryApi: Encountered JS challenge, solving...');
           final token = BrowserCheckSolver.solve(response.body);
           if (token != null) {
             print('ZLibraryApi: Solved challenge. c_token=$token');
             _cookies['c_token'] = token;
-            
+
             // Retry request
             response = await _client.get(
               Uri.parse(urlString),
@@ -207,6 +208,10 @@ class ZLibraryApi {
             .join(', ');
       }
 
+      final downloadPath = zBookcard.attributes['download'] ?? '';
+      final downloadUrl =
+          downloadPath.isNotEmpty ? '$mirror$downloadPath' : null;
+
       results.add(ZLibraryBook(
         id: id,
         isbn: isbn,
@@ -220,6 +225,7 @@ class ZLibraryApi {
         size: size,
         rating: rating,
         url: urlPath.isNotEmpty ? '$mirror$urlPath' : '',
+        downloadUrl: downloadUrl,
       ));
     }
 
@@ -232,7 +238,8 @@ class ZLibraryApi {
       throw Exception('Book URL is empty');
     }
 
-    final response = await _client.get(
+    print('ZLibraryApi: Fetching book details -> ${book.url}');
+    http.Response response = await _client.get(
       Uri.parse(book.url),
       headers: {
         'User-Agent':
@@ -240,6 +247,30 @@ class ZLibraryApi {
         'Cookie': _cookieHeader,
       },
     );
+    print('ZLibraryApi: Response status: ${response.statusCode}');
+
+    if (response.statusCode == 503 &&
+        response.body.contains('Checking your browser')) {
+      print('ZLibraryApi: Encountered JS challenge, solving...');
+      final token = BrowserCheckSolver.solve(response.body);
+      if (token != null) {
+        print('ZLibraryApi: Solved challenge. c_token=$token');
+        _cookies['c_token'] = token;
+
+        // Retry request
+        response = await _client.get(
+          Uri.parse(book.url),
+          headers: {
+            'User-Agent':
+                'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36',
+            'Cookie': _cookieHeader,
+          },
+        );
+        print('ZLibraryApi: Retry response status: ${response.statusCode}');
+      } else {
+        print('ZLibraryApi: Failed to solve challenge.');
+      }
+    }
 
     _updateCookies(response);
 
@@ -258,5 +289,55 @@ class ZLibraryApi {
     }
 
     return book.copyWith(downloadUrl: downloadUrl);
+  }
+
+  /// Resolve the browser check challenge for a download URL.
+  /// Returns cookies (including c_token) to use in the actual download request.
+  Future<Map<String, String>> resolveDownloadCookies(String downloadUrl) async {
+    print('ZLibraryApi: Resolving download cookies for $downloadUrl');
+    final response = await _client.get(
+      Uri.parse(downloadUrl),
+      headers: {
+        'User-Agent':
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36',
+        'Cookie': _cookieHeader,
+      },
+    );
+
+    if (response.statusCode == 503 &&
+        response.body.contains('Checking your browser')) {
+      print('ZLibraryApi: Download challenge encountered, solving...');
+      final token = BrowserCheckSolver.solve(response.body);
+      if (token != null) {
+        print('ZLibraryApi: Download challenge solved. c_token=$token');
+        _cookies['c_token'] = token;
+
+        // Retry with c_token to validate it (streamed to avoid downloading the file)
+        final retryRequest = http.Request('GET', Uri.parse(downloadUrl));
+        retryRequest.headers['User-Agent'] =
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36';
+        retryRequest.headers['Cookie'] = _cookieHeader;
+        final retryResponse = await _client.send(retryRequest);
+        print(
+            'ZLibraryApi: Download retry status: ${retryResponse.statusCode}');
+
+        // Update cookies from retry response
+        final setCookie = retryResponse.headers['set-cookie'];
+        if (setCookie != null) {
+          final mockResponse = http.Response('', retryResponse.statusCode,
+              headers: {'set-cookie': setCookie});
+          _updateCookies(mockResponse);
+        }
+
+        // Drain the stream immediately — we don't need the file body here
+        await retryResponse.stream.drain();
+      } else {
+        print('ZLibraryApi: Failed to solve download challenge.');
+      }
+    } else {
+      _updateCookies(response);
+    }
+
+    return Map<String, String>.from(_cookies);
   }
 }

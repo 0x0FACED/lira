@@ -156,7 +156,10 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
     state = AsyncData([...currentBooks, newBook]);
   }
 
-  Future<void> downloadAndImportBook(SearchResultItem book, WidgetRef ref) async {
+  Future<void> downloadAndImportBook(
+    SearchResultItem book,
+    WidgetRef ref,
+  ) async {
     final currentBooks = state.value ?? [];
 
     // Duplicate check by title and author as requested
@@ -174,20 +177,22 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
     ref.read(downloadNotifierProvider.notifier).setProgress(book.id, -1);
 
     List<String> downloadLinks = [];
-    
+
     if (book.source == SearchResultSource.anna) {
       final annaApi = anna.AnnaApi();
       downloadLinks = await annaApi.getDownloadLinks(book.id);
     } else if (book.source == SearchResultSource.zlibrary) {
       final zLibCreds = ref.read(zLibraryCredentialsProvider);
-      if (zLibCreds == null) {
-        ref.read(downloadNotifierProvider.notifier).finish(book.id);
-        throw Exception('Z-Library: Not logged in');
-      }
-      final zLibApi = ZLibraryApi(cookies: zLibCreds.cookies);
-      final bookDetails = await zLibApi.fetchBookDetails(book.originalObject as ZLibraryBook);
-      if (bookDetails.downloadUrl != null) {
-        downloadLinks = [bookDetails.downloadUrl!];
+      final zBook = book.originalObject as ZLibraryBook;
+      if (zBook.downloadUrl != null) {
+        downloadLinks = [zBook.downloadUrl!];
+      } else {
+        // Fallback: fetch book page for download link
+        final zLibApi = ZLibraryApi(cookies: zLibCreds?.cookies);
+        final bookDetails = await zLibApi.fetchBookDetails(zBook);
+        if (bookDetails.downloadUrl != null) {
+          downloadLinks = [bookDetails.downloadUrl!];
+        }
       }
     }
 
@@ -212,13 +217,67 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
         .read(downloadNotifierProvider.notifier)
         .startDownload(book.id);
 
+    // For Z-Library downloads, build initial cookies and resolve the browser check via Dio
+    String? zLibCookieHeader;
+    if (book.source == SearchResultSource.zlibrary) {
+      final userCookies = ref.read(zLibraryCredentialsProvider)?.cookies;
+      final cookieMap = <String, String>{};
+      if (userCookies != null) cookieMap.addAll(userCookies);
+
+      // Probe the download URL to solve the JS browser check challenge
+      final probeDio = Dio();
+      for (final link in downloadLinks) {
+        try {
+          final probeResponse = await probeDio.get(
+            link,
+            options: Options(
+              headers: {
+                'User-Agent':
+                    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36',
+                if (cookieMap.isNotEmpty)
+                  'Cookie': cookieMap.entries
+                      .map((e) => '${e.key}=${e.value}')
+                      .join('; '),
+              },
+              validateStatus: (status) => true, // Accept 503
+              responseType: ResponseType.plain,
+              followRedirects: false,
+            ),
+          );
+
+          if (probeResponse.statusCode == 503 &&
+              probeResponse.data.toString().contains('Checking your browser')) {
+            print('ZLibraryApi: Download challenge encountered, solving...');
+            final token = BrowserCheckSolver.solve(
+              probeResponse.data.toString(),
+            );
+            if (token != null) {
+              print('ZLibraryApi: Download challenge solved. c_token=$token');
+              cookieMap['c_token'] = token;
+            }
+          }
+          break; // Only need to probe one link
+        } catch (e) {
+          print('ZLibraryApi: Probe failed for $link - $e');
+        }
+      }
+
+      zLibCookieHeader = cookieMap.entries
+          .map((e) => '${e.key}=${e.value}')
+          .join('; ');
+    }
+
     // Try links until one works
     bool success = false;
     for (final link in downloadLinks) {
       try {
         final options = Options(
-          headers: book.source == SearchResultSource.zlibrary 
-              ? {'Cookie': ref.read(zLibraryCredentialsProvider)?.cookies.entries.map((e) => '\${e.key}=\${e.value}').join('; ') ?? ''} 
+          headers: zLibCookieHeader != null
+              ? {
+                  'User-Agent':
+                      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36',
+                  'Cookie': zLibCookieHeader,
+                }
               : null,
         );
         await Dio().download(

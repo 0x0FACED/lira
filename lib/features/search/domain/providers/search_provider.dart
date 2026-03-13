@@ -16,8 +16,8 @@ class SearchNotifier extends StateNotifier<SearchState> {
   final anna.AnnaApi _annaApi;
 
   SearchNotifier(this._ref)
-      : _annaApi = anna.AnnaApi(),
-        super(const SearchState.initial());
+    : _annaApi = anna.AnnaApi(),
+      super(const SearchState.initial());
 
   Future<void> search(String query) async {
     if (query.trim().isEmpty) {
@@ -30,10 +30,7 @@ class SearchNotifier extends StateNotifier<SearchState> {
     final source = _ref.read(searchSourceProvider);
     final zLibCreds = _ref.read(zLibraryCredentialsProvider);
 
-    ZLibraryApi? zLibApi;
-    if (zLibCreds != null) {
-      zLibApi = ZLibraryApi(cookies: zLibCreds.cookies);
-    }
+    final zLibApi = ZLibraryApi(cookies: zLibCreds?.cookies);
 
     List<SearchResultItem> allResults = [];
     List<String> errors = [];
@@ -46,23 +43,23 @@ class SearchNotifier extends StateNotifier<SearchState> {
             formats: [anna.Format.epub, anna.Format.pdf],
           ),
         );
-        allResults.addAll(results.books.map((b) => SearchResultItem.fromAnnaBook(b)));
+        allResults.addAll(
+          results.books.map((b) => SearchResultItem.fromAnnaBook(b)),
+        );
       } catch (e) {
         errors.add("Anna's Archive: $e");
       }
     }
 
     Future<void> fetchZLibrary() async {
-      if (zLibApi == null) {
-        errors.add('Z-Library: Not logged in');
-        return;
-      }
       try {
         final results = await zLibApi.search(
           query: query,
           extensions: ['epub', 'pdf'],
         );
-        allResults.addAll(results.map((b) => SearchResultItem.fromZLibraryBook(b)));
+        allResults.addAll(
+          results.map((b) => SearchResultItem.fromZLibraryBook(b)),
+        );
       } catch (e) {
         errors.add('Z-Library: $e');
       }
@@ -80,7 +77,10 @@ class SearchNotifier extends StateNotifier<SearchState> {
       if (errors.isNotEmpty && allResults.isEmpty) {
         state = SearchState.error(errors.join('\n'));
       } else if (errors.isNotEmpty && allResults.isNotEmpty) {
-        state = SearchState.error(errors.join('\n'), partialResults: allResults);
+        state = SearchState.error(
+          errors.join('\n'),
+          partialResults: allResults,
+        );
       } else {
         state = SearchState.loaded(allResults);
       }
@@ -93,4 +93,3 @@ class SearchNotifier extends StateNotifier<SearchState> {
     state = const SearchState.initial();
   }
 }
-
