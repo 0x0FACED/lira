@@ -1,8 +1,8 @@
 name: lira
-description: "A new Flutter project."
+description: "Lira is your free feature-rich library"
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 0.3.0+1
 
 environment:
   sdk: ^3.9.4
@@ -47,6 +47,7 @@ dependencies:
   scrollable_positioned_list: ^0.3.8
   zlibrary_api:
     path: packages/zlibrary_api
+  package_info_plus: ^8.1.2
 
 dev_dependencies:
   flutter_test:

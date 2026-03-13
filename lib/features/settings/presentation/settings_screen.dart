@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:zlibrary_api/zlibrary_api.dart';
 
 import '../../../l10n/app_localizations.dart';
@@ -274,10 +275,16 @@ class SettingsScreen extends ConsumerWidget {
             context,
             title: l10n.about,
             children: [
-              ListTile(
-                leading: const Icon(Icons.info_outline),
-                title: Text(l10n.version),
-                subtitle: const Text('1.0.0'),
+              FutureBuilder<PackageInfo>(
+                future: PackageInfo.fromPlatform(),
+                builder: (context, snapshot) {
+                  final version = snapshot.data?.version ?? '—';
+                  return ListTile(
+                    leading: const Icon(Icons.info_outline),
+                    title: Text(l10n.version),
+                    subtitle: Text(version),
+                  );
+                },
               ),
             ],
           ),
