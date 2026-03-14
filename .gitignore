@@ -43,3 +43,16 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Custom
+book_search_zlib.html
+assets/icon/*.png
+
+# Android signing
+android/key.properties
+**/*.jks
+**/*.keystore
+# Build artifacts
+build_dist/
+lira-icon-last.png
+

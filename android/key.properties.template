@@ -1,0 +1,14 @@
+# This file stores your keystore credentials for Android release signing
+# DO NOT commit this file to version control!
+
+# Path to your keystore file (absolute or relative to android/)
+storeFile=/home/USER/lira-release-key.jks
+
+# Keystore password
+storePassword=
+
+# Key alias
+keyAlias=lira
+
+# Key password
+keyPassword=

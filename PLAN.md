@@ -21,7 +21,7 @@
 
 - [ ] **Fix images not loading in search** — Debug and fix cover image loading issue
 - [ ] **Add search filters** — Language selector + file format selector (EPUB/PDF)
-- [ ] **Show source badge on book cards** — Display "Anna's Archive" or "Z-Library" badge on each search result card
+- [x] **Show source badge on book cards** — Display "Anna's Archive" or "Z-Library" badge on each search result card
 - [ ] **Deduplicate search results** — Remove duplicate cards with identical download links
 - [ ] **Add download retry handling** — Handle failed downloads gracefully
 
@@ -29,12 +29,12 @@
 
 ## Part 3: Z-Library API Integration
 
-- [ ] **Rewrite Z-Library API from Python to Dart** — Native integration for Flutter client
-- [ ] **Add dual-source support in Settings** — Allow users to enable/disable:
+- [x] **Rewrite Z-Library API from Python to Dart** — Native integration for Flutter client
+- [x] **Add dual-source support in Settings** — Allow users to enable/disable:
   - Anna's Archive
   - Z-Library
   - Both sources simultaneously
-- [ ] **Merge search results from both sources** — Unified search results with proper deduplication
+- [x] **Merge search results from both sources** — Unified search results with proper deduplication
 
 ---
 

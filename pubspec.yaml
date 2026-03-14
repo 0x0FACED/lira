@@ -52,7 +52,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  
+
   source_gen: 4.2.0
   # Генераторы (оставляем стабильные)
   build_runner: ^2.4.13
@@ -61,8 +61,23 @@ dev_dependencies:
   json_serializable: ^6.9.0
   injectable_generator: ^2.6.1
   retrofit_generator: 10.2.3
+  # Иконки приложения (версия 0.9.3 без конфликта image)
+  flutter_launcher_icons: ^0.9.3
   # Линтеры временно удалены из-за конфликта (analyzer_plugin)
 
 flutter:
   generate: true
   uses-material-design: true
+
+  # assets:
+  #   - assets/
+
+# Flutter Launcher Icons configuration
+# Run: flutter pub run flutter_launcher_icons:main
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/icon.png"
+  # Adaptive icon for Android 8.0+ (optional)
+  # adaptive_icon_background: "#000000"
+  # adaptive_icon_foreground: "assets/icon/icon_foreground.png"
