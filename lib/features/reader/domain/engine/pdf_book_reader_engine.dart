@@ -59,6 +59,7 @@ class PdfBookReaderEngine implements BookReaderEngine {
     onProgressChanged,
     required void Function(String text, BookLocation location) onTextSelected,
     VoidCallback? onCenterTapped,
+    List<Map<String, dynamic>> highlights = const [],
   }) {
     int initialPage = 1;
     if (initialLocation.locator.isNotEmpty) {

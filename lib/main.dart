@@ -1,16 +1,23 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'l10n/app_localizations.dart';
 import 'core/di/injection.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/providers/preferences_provider.dart';
 import 'core/network/proxy_http_overrides.dart';
+import 'features/settings/data/settings_provider.dart' show sharedPrefs;
 
-void main() {
+void main() async {
   HttpOverrides.global = ProxyHttpOverrides();
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load SharedPreferences before runApp so all providers
+  // can read persisted state synchronously (no async race conditions).
+  sharedPrefs = await SharedPreferences.getInstance();
+
   configureDependencies();
   runApp(const ProviderScope(child: LiraApp()));
 }

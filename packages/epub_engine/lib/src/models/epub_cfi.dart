@@ -15,12 +15,21 @@ class EpubCfi {
   final int charOffset;
   final double scrollFraction;
 
+  /// For highlights: character offsets of the selected text range within the chapter.
+  final int? startOffset;
+  final int? endOffset;
+
   const EpubCfi({
     required this.spineIndex,
     this.anchor,
     this.charOffset = 0,
     this.scrollFraction = 0.0,
+    this.startOffset,
+    this.endOffset,
   });
+
+  /// Whether this CFI contains a text selection range (i.e. is a highlight location).
+  bool get hasRange => startOffset != null && endOffset != null;
 
   String toJson() {
     return jsonEncode({
@@ -28,6 +37,8 @@ class EpubCfi {
       if (anchor != null) 'a': anchor,
       'c': charOffset,
       'f': scrollFraction,
+      if (startOffset != null) 'so': startOffset,
+      if (endOffset != null) 'eo': endOffset,
     });
   }
 
@@ -40,6 +51,8 @@ class EpubCfi {
         anchor: map['a'] as String?,
         charOffset: map['c'] as int? ?? 0,
         scrollFraction: (map['f'] as num?)?.toDouble() ?? 0.0,
+        startOffset: map['so'] as int?,
+        endOffset: map['eo'] as int?,
       );
     } catch (_) {
       return null;

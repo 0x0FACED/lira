@@ -14,6 +14,8 @@ class EpubLocation {
     String? anchor,
     int charOffset = 0,
     double scrollFraction = 0.0,
+    int? startOffset,
+    int? endOffset,
   }) {
     return EpubLocation(
       cfi: EpubCfi(
@@ -21,6 +23,8 @@ class EpubLocation {
         anchor: anchor,
         charOffset: charOffset,
         scrollFraction: scrollFraction,
+        startOffset: startOffset,
+        endOffset: endOffset,
       ),
     );
   }
@@ -29,6 +33,8 @@ class EpubLocation {
   String? get anchor => cfi.anchor;
   int get charOffset => cfi.charOffset;
   double get scrollFraction => cfi.scrollFraction;
+  int? get startOffset => cfi.startOffset;
+  int? get endOffset => cfi.endOffset;
 
   /// Serialize for storage
   String toJson() => cfi.toJson();

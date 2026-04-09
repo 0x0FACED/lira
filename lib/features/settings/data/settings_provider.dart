@@ -3,25 +3,31 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:epub_engine/epub_engine.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Pre-loaded SharedPreferences instance, set in main() before runApp.
+late final SharedPreferences sharedPrefs;
+
 final readerSettingsProvider =
     StateNotifierProvider<ReaderSettingsNotifier, ReaderSettings>((ref) {
-      return ReaderSettingsNotifier();
+      return ReaderSettingsNotifier(sharedPrefs);
     });
 
 class ReaderSettingsNotifier extends StateNotifier<ReaderSettings> {
   static const _settingsKey = 'reader_settings';
-  late final SharedPreferences _prefs;
+  final SharedPreferences _prefs;
 
-  ReaderSettingsNotifier() : super(const ReaderSettings()) {
-    _init();
-  }
+  ReaderSettingsNotifier(this._prefs)
+      : super(_loadInitial(_prefs));
 
-  Future<void> _init() async {
-    _prefs = await SharedPreferences.getInstance();
-    final settingsJson = _prefs.getString(_settingsKey);
+  static ReaderSettings _loadInitial(SharedPreferences prefs) {
+    final settingsJson = prefs.getString(_settingsKey);
     if (settingsJson != null) {
-      state = ReaderSettings.fromJson(jsonDecode(settingsJson));
+      try {
+        return ReaderSettings.fromJson(jsonDecode(settingsJson));
+      } catch (_) {
+        // Corrupted settings — fall back to defaults
+      }
     }
+    return const ReaderSettings();
   }
 
   Future<void> updateSettings(ReaderSettings newSettings) async {

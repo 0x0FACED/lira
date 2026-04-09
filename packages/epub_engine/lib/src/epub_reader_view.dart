@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -24,6 +25,10 @@ class EpubReaderView extends StatefulWidget {
   final void Function(String text, String location)? onTextSelected;
   final VoidCallback? onCenterTapped;
 
+  /// Serialized highlight data for rendering in the WebView.
+  /// Each map must contain: highlightId, chapterIndex, startOffset, endOffset, color.
+  final List<Map<String, dynamic>> highlights;
+
   const EpubReaderView({
     super.key,
     required this.epub,
@@ -33,6 +38,7 @@ class EpubReaderView extends StatefulWidget {
     this.onLocationChanged,
     this.onTextSelected,
     this.onCenterTapped,
+    this.highlights = const [],
   });
 
   @override
@@ -190,6 +196,21 @@ class EpubReaderViewState extends State<EpubReaderView> {
         case 'tap':
           widget.onCenterTapped?.call();
           break;
+        case 'textSelected':
+          final String text = data['text'] ?? '';
+          final int chapterIndex = data['chapterIndex'] ?? 0;
+          final int startOffset = data['startOffset'] ?? 0;
+          final int endOffset = data['endOffset'] ?? 0;
+          if (text.length < 2) break;
+          final location = EpubLocation.fromPosition(
+            chapterIndex: chapterIndex,
+            charOffset: startOffset,
+            scrollFraction: 0,
+            startOffset: startOffset,
+            endOffset: endOffset,
+          );
+          widget.onTextSelected?.call(text, location.toJson());
+          break;
       }
     } catch (e) {
       debugPrint("Error parsing JS message: $e\nData: ${message.message}");
@@ -209,6 +230,14 @@ class EpubReaderViewState extends State<EpubReaderView> {
       final frac = widget.initialLocation!.scrollFraction;
       _controller.runJavaScript("scrollToChapterFraction($idx, $frac)");
     }
+
+    // Apply initial brightness via CSS filter
+    if (widget.settings.brightness < 1.0) {
+      _applyBrightnessViaJS(widget.settings.brightness);
+    }
+
+    // Render saved highlights
+    _renderHighlights();
 
     // Slight delay to allow CSS columns to render before fading in
     Future.delayed(const Duration(milliseconds: 50), () {
@@ -296,6 +325,12 @@ class EpubReaderViewState extends State<EpubReaderView> {
     word-break: break-all !important;
     max-width: 100% !important;
     overflow-x: hidden !important;
+  }
+
+  mark {
+    background-color: transparent;
+    border-radius: 2px;
+    padding: 0 1px;
   }
 ''');
 
@@ -538,6 +573,84 @@ class EpubReaderViewState extends State<EpubReaderView> {
     }
   }
 
+  // --- Highlight rendering ---
+
+  // Convert hex color (#RRGGBB) to rgba with alpha
+  function hexToRgba(hex, alpha) {
+    const h = hex.replace('#', '');
+    const r = parseInt(h.substring(0, 2), 16);
+    const g = parseInt(h.substring(2, 4), 16);
+    const b = parseInt(h.substring(4, 6), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+  }
+
+  function styleMark(mark, color, highlightId) {
+    mark.setAttribute('data-highlight-id', highlightId);
+    mark.style.backgroundColor = hexToRgba(color, 0.35);
+    mark.style.borderRadius = '2px';
+    mark.style.padding = '0 1px';
+  }
+
+  function applyHighlight(chapterIndex, startOffset, endOffset, color, highlightId) {
+    const chapterEl = document.getElementById('chapter-' + chapterIndex);
+    if (!chapterEl) return;
+
+    const walker = document.createTreeWalker(chapterEl, NodeFilter.SHOW_TEXT, null);
+    let charCount = 0;
+    let startNode = null, startNodeOffset = 0;
+    let endNode = null, endNodeOffset = 0;
+
+    while (walker.nextNode()) {
+      const tn = walker.currentNode;
+      const len = tn.length;
+      if (!startNode && charCount + len > startOffset) {
+        startNode = tn;
+        startNodeOffset = startOffset - charCount;
+      }
+      if (!endNode && charCount + len >= endOffset) {
+        endNode = tn;
+        endNodeOffset = endOffset - charCount;
+        break;
+      }
+      charCount += len;
+    }
+
+    if (!startNode || !endNode) return;
+
+    try {
+      const range = document.createRange();
+      range.setStart(startNode, Math.min(startNodeOffset, startNode.length));
+      range.setEnd(endNode, Math.min(endNodeOffset, endNode.length));
+
+      const mark = document.createElement('mark');
+      styleMark(mark, color, highlightId);
+      range.surroundContents(mark);
+    } catch(e) {
+      // surroundContents fails if range crosses element boundaries;
+      // fall back to extractContents + insertNode
+      try {
+        const range = document.createRange();
+        range.setStart(startNode, Math.min(startNodeOffset, startNode.length));
+        range.setEnd(endNode, Math.min(endNodeOffset, endNode.length));
+        const frag = range.extractContents();
+        const mark = document.createElement('mark');
+        styleMark(mark, color, highlightId);
+        mark.appendChild(frag);
+        range.insertNode(mark);
+      } catch(e2) { /* skip broken ranges */ }
+    }
+  }
+
+  function removeHighlight(highlightId) {
+    const mark = document.querySelector('mark[data-highlight-id="' + highlightId + '"]');
+    if (mark) {
+      const parent = mark.parentNode;
+      while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+      parent.removeChild(mark);
+      parent.normalize();
+    }
+  }
+
   // --- Event Listeners ---
   
   window.onload = function() {
@@ -666,6 +779,74 @@ class EpubReaderViewState extends State<EpubReaderView> {
     }
   });
 
+  // Text selection — send selected text + location to Dart
+  function getSelectionInfo() {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || sel.toString().trim().length < 2) return null;
+
+    const text = sel.toString().trim();
+    const range = sel.getRangeAt(0);
+
+    // Find which chapter the selection starts in
+    let chapterIndex = 0;
+    let node = range.startContainer;
+    while (node && node !== document.body) {
+      if (node.classList && node.classList.contains('chapter-block')) {
+        chapterIndex = parseInt(node.getAttribute('data-index')) || 0;
+        break;
+      }
+      node = node.parentNode;
+    }
+
+    // Calculate character offsets within the chapter's text content
+    const chapterEl = document.getElementById('chapter-' + chapterIndex);
+    if (!chapterEl) return null;
+
+    // Use TreeWalker to count text characters up to selection start/end
+    const walker = document.createTreeWalker(chapterEl, NodeFilter.SHOW_TEXT, null);
+    let charCount = 0;
+    let startOffset = 0;
+    let endOffset = 0;
+    let foundStart = false;
+    let foundEnd = false;
+
+    while (walker.nextNode()) {
+      const tn = walker.currentNode;
+      if (tn === range.startContainer) {
+        startOffset = charCount + range.startOffset;
+        foundStart = true;
+      }
+      if (tn === range.endContainer) {
+        endOffset = charCount + range.endOffset;
+        foundEnd = true;
+        break;
+      }
+      charCount += tn.length;
+    }
+
+    if (!foundStart) startOffset = charCount;
+    if (!foundEnd) endOffset = startOffset + text.length;
+
+    return { text, chapterIndex, startOffset, endOffset };
+  }
+
+  // Debounce: only send after user finishes selecting
+  let selectionTimer = null;
+  document.addEventListener('mouseup', () => {
+    clearTimeout(selectionTimer);
+    selectionTimer = setTimeout(() => {
+      const info = getSelectionInfo();
+      if (info) sendMessage('textSelected', info);
+    }, 200);
+  });
+  document.addEventListener('touchend', () => {
+    clearTimeout(selectionTimer);
+    selectionTimer = setTimeout(() => {
+      const info = getSelectionInfo();
+      if (info) sendMessage('textSelected', info);
+    }, 200);
+  });
+
   window.addEventListener('resize', () => {
     if (isHorizontal) {
       recalcHorizontalPages();
@@ -776,41 +957,145 @@ class EpubReaderViewState extends State<EpubReaderView> {
     final old = oldWidget.settings;
     final cur = widget.settings;
 
-    // Brightness is a Flutter overlay — no HTML reload needed, just setState
+    // Brightness — apply via CSS filter inside WebView (not a Flutter overlay,
+    // because IgnorePointer over a platform view blocks trackpad on macOS).
     if (old.brightness != cur.brightness &&
         old.copyWith(brightness: cur.brightness) == cur) {
-      setState(() {});
+      _applyBrightnessViaJS(cur.brightness);
       return;
     }
 
-    // Background color change — update via JS without full reload
-    if (old.backgroundColor != cur.backgroundColor &&
-        old.copyWith(backgroundColor: cur.backgroundColor) == cur) {
+    // Reading mode change (vertical ↔ horizontal) requires full HTML reload
+    // because the CSS layout structure is fundamentally different.
+    if (old.readingMode != cur.readingMode) {
+      setState(() {
+        _isLoading = true;
+        _webviewOpacity = 0.0;
+      });
+      if (Platform.isAndroid) {
+        _controller.setBackgroundColor(Color(cur.backgroundColor));
+      }
+      _loadFullBook();
+      return;
+    }
+
+    // All other changes (font, size, line height, padding, bg color) —
+    // update via JavaScript to avoid WKWebView reload bug on macOS
+    // where a second loadFile call breaks the internal scroll view.
+    _applySettingsViaJS(old, cur);
+    setState(() {});
+  }
+
+  /// Update CSS properties via JavaScript without reloading the HTML.
+  /// This avoids a macOS WKWebView bug where reloading content via loadFile
+  /// breaks the internal NSScrollView scrolling.
+  void _applySettingsViaJS(ReaderSettings old, ReaderSettings cur) {
+    final js = StringBuffer();
+
+    if (old.backgroundColor != cur.backgroundColor) {
       final bgColor = Color(cur.backgroundColor);
       final bgStr = '#${cur.backgroundColor.toRadixString(16).padLeft(8, '0').substring(2)}';
       final textColor = bgColor.computeLuminance() > 0.5 ? '#1A1A1A' : '#E0E0E0';
       final linkColor = bgColor.computeLuminance() > 0.5 ? '#6200EE' : '#BB86FC';
-      _controller.runJavaScript('''
+      final divColor = bgColor.computeLuminance() > 0.5 ? '#CCCCCC' : '#444444';
+      js.writeln('''
+        document.documentElement.style.backgroundColor = '$bgStr';
         document.body.style.backgroundColor = '$bgStr';
         document.body.style.color = '$textColor';
         document.querySelectorAll('a').forEach(a => a.style.color = '$linkColor');
+        document.querySelectorAll('.chapter-divider').forEach(d => d.style.borderTopColor = '$divColor');
       ''');
       if (Platform.isAndroid) {
         _controller.setBackgroundColor(bgColor);
       }
-      setState(() {});
-      return;
     }
 
-    // Structural change (font, size, mode, padding, etc.) — full reload required
-    setState(() {
-      _isLoading = true;
-      _webviewOpacity = 0.0;
-    });
-    if (Platform.isAndroid) {
-      _controller.setBackgroundColor(Color(cur.backgroundColor));
+    if (old.fontFamily != cur.fontFamily) {
+      js.writeln("document.body.style.fontFamily = '${cur.fontFamily}, sans-serif';");
     }
-    _loadFullBook();
+
+    if (old.fontSize != cur.fontSize) {
+      js.writeln("document.body.style.fontSize = '${cur.fontSize}px';");
+    }
+
+    if (old.lineHeight != cur.lineHeight) {
+      js.writeln("document.body.style.lineHeight = '${cur.lineHeight}';");
+    }
+
+    if (old.horizontalPadding != cur.horizontalPadding) {
+      final paddingH = cur.horizontalPadding.toInt();
+      if (cur.readingMode == ReadingMode.horizontal) {
+        js.writeln('''
+          document.querySelectorAll('.chapter-block').forEach(ch => {
+            ch.style.paddingLeft = '${paddingH}px';
+            ch.style.paddingRight = '${paddingH}px';
+          });
+        ''');
+      } else {
+        js.writeln('''
+          var cc = document.getElementById('content-container');
+          if (cc) { cc.style.paddingLeft = '${paddingH}px'; cc.style.paddingRight = '${paddingH}px'; }
+        ''');
+      }
+    }
+
+    // In horizontal mode, recalculate pagination after CSS changes
+    if (cur.readingMode == ReadingMode.horizontal &&
+        (old.fontSize != cur.fontSize ||
+         old.fontFamily != cur.fontFamily ||
+         old.lineHeight != cur.lineHeight ||
+         old.horizontalPadding != cur.horizontalPadding)) {
+      js.writeln('setTimeout(function() { recalcHorizontalPages(); snapToNearestPage(); }, 50);');
+    }
+
+    if (old.brightness != cur.brightness) {
+      _applyBrightnessViaJS(cur.brightness);
+    }
+
+    if (js.isNotEmpty) {
+      _controller.runJavaScript(js.toString());
+    }
+  }
+
+  /// Apply brightness as a CSS filter inside the WebView.
+  /// Using a Flutter overlay (IgnorePointer + Container) blocks trackpad
+  /// gestures on macOS platform views, so we dim via CSS instead.
+  void _applyBrightnessViaJS(double brightness) {
+    final b = brightness.clamp(0.0, 1.0);
+    _controller.runJavaScript(
+      "document.body.style.filter = 'brightness($b)';",
+    );
+  }
+
+  /// Render all saved highlights into the WebView.
+  void _renderHighlights() {
+    for (final h in widget.highlights) {
+      addHighlightMark(
+        highlightId: h['highlightId'] as String,
+        chapterIndex: h['chapterIndex'] as int,
+        startOffset: h['startOffset'] as int,
+        endOffset: h['endOffset'] as int,
+        color: h['color'] as String,
+      );
+    }
+  }
+
+  /// Add a single highlight mark to the WebView.
+  void addHighlightMark({
+    required String highlightId,
+    required int chapterIndex,
+    required int startOffset,
+    required int endOffset,
+    required String color,
+  }) {
+    _controller.runJavaScript(
+      "applyHighlight($chapterIndex, $startOffset, $endOffset, '$color', '$highlightId');",
+    );
+  }
+
+  /// Remove a single highlight mark from the WebView.
+  void removeHighlightMark(String highlightId) {
+    _controller.runJavaScript("removeHighlight('$highlightId');");
   }
 
   @override
@@ -839,8 +1124,6 @@ class EpubReaderViewState extends State<EpubReaderView> {
           });
         }
 
-        final brightness = widget.settings.brightness.clamp(0.0, 1.0);
-
         return Container(
           color: Color(widget.settings.backgroundColor),
           child: Padding(
@@ -853,18 +1136,18 @@ class EpubReaderViewState extends State<EpubReaderView> {
                 AnimatedOpacity(
                   opacity: _webviewOpacity,
                   duration: const Duration(milliseconds: 300),
-                  child: WebViewWidget(controller: _controller),
+                  child: WebViewWidget(
+                    controller: _controller,
+                    gestureRecognizers: {
+                      Factory<EagerGestureRecognizer>(
+                        () => EagerGestureRecognizer(),
+                      ),
+                    },
+                  ),
                 ),
 
-                // Brightness overlay — dims content when brightness < 1.0
-                if (brightness < 1.0)
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: Container(
-                        color: Colors.black.withAlpha(((1.0 - brightness) * 200).round()),
-                      ),
-                    ),
-                  ),
+                // Brightness is applied via CSS filter inside WebView
+                // (not a Flutter overlay — IgnorePointer blocks trackpad on macOS).
 
                 if (_isLoading)
                   Positioned.fill(

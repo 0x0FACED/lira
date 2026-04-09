@@ -23,6 +23,7 @@ abstract class BookReaderEngine {
     onProgressChanged,
     required void Function(String text, BookLocation location) onTextSelected,
     VoidCallback? onCenterTapped,
+    List<Map<String, dynamic>> highlights = const [],
   });
 
   /// Navigates to a specific location in the book

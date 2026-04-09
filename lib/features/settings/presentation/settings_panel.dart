@@ -115,12 +115,15 @@ class SettingsPanel extends ConsumerWidget {
     final selected = settings.fontFamily == family;
     return Padding(
       padding: const EdgeInsets.only(right: 6),
-      child: ChoiceChip(
-        label: Text(label, style: TextStyle(fontFamily: family, fontSize: 12)),
-        selected: selected,
-        onSelected: (_) => notifier.updateSettings(settings.copyWith(fontFamily: family)),
-        visualDensity: VisualDensity.compact,
-        padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: ChoiceChip(
+          label: Text(label, style: TextStyle(fontFamily: family, fontSize: 12)),
+          selected: selected,
+          onSelected: (_) => notifier.updateSettings(settings.copyWith(fontFamily: family)),
+          visualDensity: VisualDensity.compact,
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+        ),
       ),
     );
   }

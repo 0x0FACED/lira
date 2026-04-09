@@ -262,16 +262,18 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     IconData icon,
   ) {
     final selected = current == value;
-    return FilterChip(
-      label: Text(label),
-      avatar: Icon(icon, size: 16),
-      selected: selected,
-      onSelected: (_) {
-        ref.read(searchSourceProvider.notifier).setSource(value);
-        if (_searchController.text.isNotEmpty) {
-          _performSearch();
-        }
-      },
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: FilterChip(
+        label: Text(label),
+        avatar: Icon(icon, size: 16),
+        selected: selected,
+        onSelected: (_) {
+          ref.read(searchSourceProvider.notifier).setSource(value);
+          if (_searchController.text.isNotEmpty) {
+            _performSearch();
+          }
+        },
       selectedColor: theme.colorScheme.primary.withAlpha(40),
       checkmarkColor: theme.colorScheme.primary,
       side: BorderSide(
@@ -282,6 +284,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       padding: const EdgeInsets.symmetric(horizontal: 4),
       visualDensity: VisualDensity.compact,
+      ),
     );
   }
 

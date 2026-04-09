@@ -1,17 +1,21 @@
 import 'dart:io';
 import 'package:epub_engine/epub_engine.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../books/domain/models/book_dto.dart';
+import '../../highlights/domain/models/highlight_dto.dart';
+import '../../highlights/domain/providers/highlights_provider.dart';
+import '../../progress/domain/providers/reading_progress_provider.dart';
+import '../../settings/data/settings_provider.dart';
+import '../../settings/presentation/settings_panel.dart';
 import '../domain/engine/book_reader_engine.dart';
 import '../domain/engine/epub_book_reader_engine.dart';
 import '../domain/engine/pdf_book_reader_engine.dart';
 import '../domain/models/book_location.dart';
-import '../../progress/domain/providers/reading_progress_provider.dart';
-import '../../highlights/domain/providers/highlights_provider.dart';
-import '../../settings/data/settings_provider.dart';
-import '../../settings/presentation/settings_panel.dart';
+
+const _highlightColors = ['#BB86FC', '#FFEB3B', '#4CAF50', '#42A5F5', '#EF5350'];
 
 class ReaderScreen extends ConsumerStatefulWidget {
   final BookDto book;
@@ -33,6 +37,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   // Tap detection
   Offset? _pointerDownPos;
   DateTime? _pointerDownTime;
+
+  // Text selection state
+  String? _selectedText;
+  String? _selectedLocation;  // EpubCfi JSON
 
   @override
   void initState() {
@@ -68,6 +76,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   void _toggleUi() {
     setState(() {
       _showUi = !_showUi;
+      // Dismiss selection bar when tapping in empty space
+      _selectedText = null;
+      _selectedLocation = null;
     });
   }
 
@@ -77,6 +88,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       readingProgressControllerProvider(widget.book.id),
     );
     final settings = ref.watch(readerSettingsProvider);
+    final highlightsAsync = ref.watch(
+      highlightsControllerProvider(widget.book.id),
+    );
 
     return FutureBuilder<BookReaderEngine>(
       future: _engineFuture,
@@ -136,6 +150,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                               ? BookLocation(locator: progress.location)
                               : const BookLocation(locator: ''),
                           onCenterTapped: _toggleUi,
+                          highlights: _buildHighlightsData(highlightsAsync),
                           onProgressChanged: (location, percentage) {
                             setState(() {
                               _readingProgress = percentage.clamp(0, 100) / 100;
@@ -154,22 +169,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                                 );
                           },
                           onTextSelected: (text, location) {
-                            ref
-                                .read(
-                                  highlightsControllerProvider(
-                                    widget.book.id,
-                                  ).notifier,
-                                )
-                                .addHighlight(
-                                  text: text,
-                                  location: location.locator,
-                                );
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Highlight saved'),
-                                duration: Duration(seconds: 1),
-                              ),
-                            );
+                            setState(() {
+                              _selectedText = text;
+                              _selectedLocation = location.locator;
+                            });
                           },
                         );
                       },
@@ -295,6 +298,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                               ),
                               IconButton(
                                 icon: const Icon(
+                                  Icons.bookmark_outline,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
+                                tooltip: 'Highlights',
+                                onPressed: () => _showHighlightsPanel(context),
+                              ),
+                              IconButton(
+                                icon: const Icon(
                                   Icons.settings,
                                   color: Colors.white,
                                   size: 22,
@@ -310,10 +322,200 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                   ),
                 ),
               ),
+              // Selection action bar — slides in from the right
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOutCubic,
+                right: _selectedText != null ? 12 : -60,
+                top: 0,
+                bottom: 0,
+                child: Center(child: _buildSelectionBar()),
+              ),
             ],
           ),
         );
       },
+    );
+  }
+
+  /// Convert highlights from provider into the format expected by EpubReaderView.
+  List<Map<String, dynamic>> _buildHighlightsData(
+    AsyncValue<List<HighlightDto>> highlightsAsync,
+  ) {
+    final highlights = highlightsAsync.valueOrNull ?? [];
+    final result = <Map<String, dynamic>>[];
+    for (final h in highlights) {
+      final cfi = EpubCfi.fromJson(h.location);
+      if (cfi == null || !cfi.hasRange) continue;
+      result.add({
+        'highlightId': h.id,
+        'chapterIndex': cfi.spineIndex,
+        'startOffset': cfi.startOffset!,
+        'endOffset': cfi.endOffset!,
+        'color': h.color,
+      });
+    }
+    return result;
+  }
+
+  Widget _buildSelectionBar() {
+    return Container(
+      width: 44,
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.black87,
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Color dots
+          for (final color in _highlightColors)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: GestureDetector(
+                onTap: () => _saveHighlight(color),
+                child: Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    color: _parseColor(color),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white24, width: 1.5),
+                  ),
+                ),
+              ),
+            ),
+          const SizedBox(height: 4),
+          // Note
+          _miniButton(Icons.note_add, _addNote),
+          const SizedBox(height: 6),
+          // Copy
+          _miniButton(Icons.copy, _copySelection),
+        ],
+      ),
+    );
+  }
+
+  Widget _miniButton(IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 30,
+        height: 30,
+        decoration: BoxDecoration(
+          color: Colors.white12,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, color: Colors.white70, size: 16),
+      ),
+    );
+  }
+
+  void _saveHighlight(String color) {
+    if (_selectedText == null || _selectedLocation == null) return;
+    ref
+        .read(highlightsControllerProvider(widget.book.id).notifier)
+        .addHighlight(
+          text: _selectedText!,
+          location: _selectedLocation!,
+          color: color,
+        );
+    setState(() {
+      _selectedText = null;
+      _selectedLocation = null;
+    });
+  }
+
+  void _addNote() {
+    if (_selectedText == null || _selectedLocation == null) return;
+    final noteController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add note'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '"${_selectedText!.length > 100 ? '${_selectedText!.substring(0, 100)}...' : _selectedText!}"',
+              style: TextStyle(
+                fontStyle: FontStyle.italic,
+                color: Theme.of(context).colorScheme.onSurface.withAlpha(150),
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: noteController,
+              autofocus: true,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: 'Your note...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              ref
+                  .read(highlightsControllerProvider(widget.book.id).notifier)
+                  .addHighlight(
+                    text: _selectedText!,
+                    location: _selectedLocation!,
+                    note: noteController.text.isNotEmpty ? noteController.text : null,
+                  );
+              Navigator.pop(ctx);
+              setState(() {
+                _selectedText = null;
+                _selectedLocation = null;
+              });
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _copySelection() {
+    if (_selectedText != null) {
+      Clipboard.setData(ClipboardData(text: _selectedText!));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Copied'), duration: Duration(seconds: 1)),
+      );
+    }
+    setState(() {
+      _selectedText = null;
+      _selectedLocation = null;
+    });
+  }
+
+  Color _parseColor(String hex) {
+    final h = hex.replaceFirst('#', '');
+    return Color(int.parse('FF$h', radix: 16));
+  }
+
+  void _showHighlightsPanel(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _HighlightsPanel(
+        bookId: widget.book.id,
+        onNavigate: (location) {
+          _engine?.goToLocation(BookLocation(locator: location));
+          Navigator.pop(ctx);
+          if (_showUi) _toggleUi();
+        },
+      ),
     );
   }
 
@@ -464,5 +666,196 @@ class _ExpandableTocItemState extends State<_ExpandableTocItem> {
         onNavigate: widget.onNavigate,
       );
     }).toList();
+  }
+}
+
+/// Bottom sheet panel listing all highlights for a book.
+class _HighlightsPanel extends ConsumerWidget {
+  final String bookId;
+  final void Function(String location) onNavigate;
+
+  const _HighlightsPanel({required this.bookId, required this.onNavigate});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final highlightsAsync = ref.watch(highlightsControllerProvider(bookId));
+    final theme = Theme.of(context);
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.5,
+      minChildSize: 0.3,
+      maxChildSize: 0.85,
+      builder: (ctx, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Drag handle
+              Padding(
+                padding: const EdgeInsets.only(top: 12, bottom: 8),
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.onSurface.withAlpha(40),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Text('Highlights', style: theme.textTheme.titleMedium),
+                    const Spacer(),
+                    highlightsAsync.whenOrNull(
+                      data: (list) => Text(
+                        '${list.length}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withAlpha(120),
+                        ),
+                      ),
+                    ) ?? const SizedBox.shrink(),
+                  ],
+                ),
+              ),
+              const Divider(),
+              Expanded(
+                child: highlightsAsync.when(
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Center(child: Text('Error: $e')),
+                  data: (highlights) {
+                    if (highlights.isEmpty) {
+                      return Center(
+                        child: Text(
+                          'No highlights yet.\nSelect text in the book to highlight it.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurface.withAlpha(100),
+                          ),
+                        ),
+                      );
+                    }
+                    return ListView.builder(
+                      controller: scrollController,
+                      itemCount: highlights.length,
+                      padding: const EdgeInsets.only(bottom: 24),
+                      itemBuilder: (ctx, i) => _buildHighlightTile(
+                        context, ref, highlights[i], theme,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildHighlightTile(
+    BuildContext context,
+    WidgetRef ref,
+    HighlightDto highlight,
+    ThemeData theme,
+  ) {
+    final color = _parseHex(highlight.color);
+    return Dismissible(
+      key: Key(highlight.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        color: Colors.red.withAlpha(40),
+        child: const Icon(Icons.delete_outline, color: Colors.red),
+      ),
+      onDismissed: (_) {
+        ref
+            .read(highlightsControllerProvider(bookId).notifier)
+            .removeHighlight(highlight.id);
+      },
+      child: ListTile(
+        leading: Container(
+          width: 4,
+          height: 40,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        title: Text(
+          highlight.text,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 13),
+        ),
+        subtitle: highlight.note != null
+            ? Text(
+                highlight.note!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colorScheme.onSurface.withAlpha(120),
+                ),
+              )
+            : null,
+        trailing: IconButton(
+          icon: Icon(
+            highlight.note != null ? Icons.edit_note : Icons.note_add_outlined,
+            size: 18,
+            color: theme.colorScheme.onSurface.withAlpha(100),
+          ),
+          onPressed: () => _editNote(context, ref, highlight),
+        ),
+        onTap: () => onNavigate(highlight.location),
+      ),
+    );
+  }
+
+  void _editNote(BuildContext context, WidgetRef ref, HighlightDto highlight) {
+    final controller = TextEditingController(text: highlight.note ?? '');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit note'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            hintText: 'Your note...',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              ref
+                  .read(highlightsControllerProvider(bookId).notifier)
+                  .updateNote(
+                    highlight.id,
+                    controller.text.isNotEmpty ? controller.text : null,
+                  );
+              Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _parseHex(String hex) {
+    final h = hex.replaceFirst('#', '');
+    return Color(int.parse('FF$h', radix: 16));
   }
 }

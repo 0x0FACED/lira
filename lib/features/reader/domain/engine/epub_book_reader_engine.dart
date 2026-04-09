@@ -44,6 +44,7 @@ class EpubBookReaderEngine implements BookReaderEngine {
     onProgressChanged,
     required void Function(String text, BookLocation location) onTextSelected,
     VoidCallback? onCenterTapped,
+    List<Map<String, dynamic>> highlights = const [],
   }) {
     // Parse location from string to EpubLocation
     EpubLocation? parsedLocation;
@@ -57,6 +58,7 @@ class EpubBookReaderEngine implements BookReaderEngine {
       initialLocation: parsedLocation,
       settings: settings,
       theme: theme,
+      highlights: highlights,
       onLocationChanged: (epubLocation, percentage) {
         onProgressChanged(
           BookLocation(locator: epubLocation.toJson()),
