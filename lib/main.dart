@@ -6,17 +6,10 @@ import 'core/di/injection.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/providers/preferences_provider.dart';
-
-class MyHttpOverrides extends HttpOverrides {
-  @override
-  HttpClient createHttpClient(SecurityContext? context) {
-    return super.createHttpClient(context)
-      ..badCertificateCallback = (X509Certificate cert, String host, int port) => true;
-  }
-}
+import 'core/network/proxy_http_overrides.dart';
 
 void main() {
-  HttpOverrides.global = MyHttpOverrides();
+  HttpOverrides.global = ProxyHttpOverrides();
   WidgetsFlutterBinding.ensureInitialized();
   configureDependencies();
   runApp(const ProviderScope(child: LiraApp()));
@@ -30,6 +23,10 @@ class LiraApp extends ConsumerWidget {
     final router = ref.watch(appRouterProvider);
     final themeMode = ref.watch(themeModeProvider);
     final locale = ref.watch(localeProvider);
+
+    // Keep global proxy config in sync with provider state
+    final proxyConfig = ref.watch(socks5ConfigProvider);
+    updateGlobalProxyConfig(proxyConfig);
 
     return MaterialApp.router(
       title: 'Lira',

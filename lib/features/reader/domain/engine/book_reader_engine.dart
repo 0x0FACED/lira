@@ -22,6 +22,7 @@ abstract class BookReaderEngine {
     required void Function(BookLocation location, double percentage)
     onProgressChanged,
     required void Function(String text, BookLocation location) onTextSelected,
+    VoidCallback? onCenterTapped,
   });
 
   /// Navigates to a specific location in the book

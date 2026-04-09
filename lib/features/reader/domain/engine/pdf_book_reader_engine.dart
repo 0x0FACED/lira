@@ -58,6 +58,7 @@ class PdfBookReaderEngine implements BookReaderEngine {
     required void Function(BookLocation location, double percentage)
     onProgressChanged,
     required void Function(String text, BookLocation location) onTextSelected,
+    VoidCallback? onCenterTapped,
   }) {
     int initialPage = 1;
     if (initialLocation.locator.isNotEmpty) {

@@ -14,25 +14,30 @@ class SearchBookCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
-    // Watch download progress (0.0 to 1.0), or null if not downloading
     final downloadProgress = ref.watch(downloadNotifierProvider)[book.id];
     final isDownloading = downloadProgress != null;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
+    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.colorScheme.outline.withAlpha(20),
+        ),
+      ),
       clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 4,
-      shadowColor: theme.colorScheme.shadow.withAlpha(40),
-      child: SizedBox(
-        height: 130, // Increased height to prevent overflow
+      child: IntrinsicHeight(
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Cover Area
+            // Cover
             SizedBox(
-              width: 100, // Slightly reduced width to match new proportions, or keep 120? Let's use 100 to make it more vertical rectangle
-              height: 130,
+              width: 90,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -40,16 +45,41 @@ class SearchBookCard extends ConsumerWidget {
                     Image.network(
                       book.imgUrl,
                       fit: BoxFit.cover,
-                      headers: book.source == SearchResultSource.anna 
-                        ? const {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'} 
-                        : null,
+                      headers: book.source == SearchResultSource.anna
+                          ? const {
+                              'User-Agent':
+                                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                            }
+                          : null,
                       errorBuilder: (context, error, stackTrace) =>
                           _buildFallbackCover(theme),
                     )
                   else
                     _buildFallbackCover(theme),
 
-                  // Download Overlay with animation
+                  // Format badge overlay (top-right of cover)
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withAlpha(160),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        book.format.toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Download overlay
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 300),
                     child: isDownloading
@@ -57,12 +87,15 @@ class SearchBookCard extends ConsumerWidget {
                             key: const ValueKey('downloading'),
                             color: Colors.black54,
                             child: Center(
-                              child: CircularProgressIndicator(
-                                // -1 means indeterminate (preparing), 0+ means actual progress
-                                value: downloadProgress > 0
-                                    ? downloadProgress
-                                    : null,
-                                color: _getContrastColor(context),
+                              child: SizedBox(
+                                width: 36,
+                                height: 36,
+                                child: CircularProgressIndicator(
+                                  value:
+                                      downloadProgress > 0 ? downloadProgress : null,
+                                  strokeWidth: 3,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           )
@@ -72,18 +105,19 @@ class SearchBookCard extends ConsumerWidget {
               ),
             ),
 
-            // Book Info Area
+            // Info
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
                       book.title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        height: 1.3,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -91,34 +125,33 @@ class SearchBookCard extends ConsumerWidget {
                     const SizedBox(height: 4),
                     Text(
                       book.author,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: theme.colorScheme.onSurface.withAlpha(140),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
+                    const SizedBox(height: 10),
+                    Row(
                       children: [
-                        _buildBadge(
-                          context,
-                          book.source == SearchResultSource.anna ? "Anna's Archive" : 'Z-Library',
-                          color: book.source == SearchResultSource.anna ? Colors.blue : Colors.green,
-                        ),
-                        _buildBadge(
-                          context,
-                          book.format.toUpperCase(),
-                        ),
-                        if (book.size.isNotEmpty)
+                        _buildSourceBadge(context),
+                        if (book.size.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          Icon(
+                            Icons.storage_rounded,
+                            size: 12,
+                            color: theme.colorScheme.onSurface.withAlpha(80),
+                          ),
+                          const SizedBox(width: 3),
                           Text(
                             book.size,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.grey,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: theme.colorScheme.onSurface.withAlpha(100),
                             ),
                           ),
+                        ],
                       ],
                     ),
                   ],
@@ -126,25 +159,33 @@ class SearchBookCard extends ConsumerWidget {
               ),
             ),
 
-            // Download / Cancel Button Area
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: isDownloading
-                  ? IconButton(
-                      icon: const Icon(Icons.close),
-                      color: Colors.red,
-                      tooltip: 'Cancel download',
-                      onPressed: () {
-                        ref
-                            .read(downloadNotifierProvider.notifier)
-                            .cancelDownload(book.id);
-                      },
-                    )
-                  : IconButton(
-                      icon: const Icon(Icons.download_rounded),
-                      color: theme.colorScheme.primary,
-                      onPressed: () => _handleDownload(context, ref),
-                    ),
+            // Action button
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: isDownloading
+                    ? IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 20),
+                        style: IconButton.styleFrom(
+                          foregroundColor: Colors.red.withAlpha(200),
+                          backgroundColor: Colors.red.withAlpha(20),
+                        ),
+                        tooltip: 'Cancel download',
+                        onPressed: () {
+                          ref
+                              .read(downloadNotifierProvider.notifier)
+                              .cancelDownload(book.id);
+                        },
+                      )
+                    : IconButton(
+                        icon: const Icon(Icons.download_rounded, size: 22),
+                        style: IconButton.styleFrom(
+                          foregroundColor: theme.colorScheme.primary,
+                          backgroundColor: theme.colorScheme.primary.withAlpha(20),
+                        ),
+                        onPressed: () => _handleDownload(context, ref),
+                      ),
+              ),
             ),
           ],
         ),
@@ -154,34 +195,35 @@ class SearchBookCard extends ConsumerWidget {
 
   Widget _buildFallbackCover(ThemeData theme) {
     return Container(
-      color: theme.colorScheme.surfaceContainerHighest,
-      child: Icon(
-        Icons.book,
-        size: 48,
-        color: theme.colorScheme.onSurfaceVariant.withAlpha(100),
+      color: theme.colorScheme.primary.withAlpha(15),
+      child: Center(
+        child: Icon(
+          Icons.menu_book_rounded,
+          size: 36,
+          color: theme.colorScheme.primary.withAlpha(60),
+        ),
       ),
     );
   }
 
-  Color _getContrastColor(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return isDark ? Colors.white : Theme.of(context).colorScheme.primary;
-  }
+  Widget _buildSourceBadge(BuildContext context) {
+    final isAnna = book.source == SearchResultSource.anna;
+    final color = isAnna ? Colors.blue : Colors.green;
+    final label = isAnna ? "Anna's" : 'Z-Lib';
 
-  Widget _buildBadge(BuildContext context, String text, {Color? color}) {
-    final badgeColor = color ?? Theme.of(context).colorScheme.primary;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: badgeColor.withAlpha(30),
-        borderRadius: BorderRadius.circular(4),
+        color: color.withAlpha(25),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withAlpha(50)),
       ),
       child: Text(
-        text,
+        label,
         style: TextStyle(
           fontSize: 10,
-          fontWeight: FontWeight.bold,
-          color: badgeColor,
+          fontWeight: FontWeight.w600,
+          color: color,
         ),
       ),
     );
@@ -210,7 +252,6 @@ class SearchBookCard extends ConsumerWidget {
       if (errorMessage.contains('duplicate_book')) {
         errorMessage = l10n.duplicateBookError;
       } else if (errorMessage.contains('download_cancelled')) {
-        // Download was cancelled by user — no error snackbar needed
         return;
       }
 
@@ -220,4 +261,3 @@ class SearchBookCard extends ConsumerWidget {
     }
   }
 }
-

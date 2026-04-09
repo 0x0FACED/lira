@@ -8,6 +8,9 @@ const _keyLocale = 'pref_locale';
 const _keySearchSource = 'pref_search_source';
 const _keyZLibCookies = 'pref_zlib_cookies';
 const _keyZLibEmail = 'pref_zlib_email';
+const _keyProxyEnabled = 'pref_proxy_enabled';
+const _keyProxyHost = 'pref_proxy_host';
+const _keyProxyPort = 'pref_proxy_port';
 
 enum SearchSource {
   anna,
@@ -150,6 +153,66 @@ class ZLibraryCredentialsNotifier extends Notifier<ZLibCredentials?> {
     await prefs.remove(_keyZLibEmail);
     await prefs.remove(_keyZLibCookies);
     state = null;
+  }
+}
+
+/// SOCKS5 proxy configuration
+class Socks5Config {
+  final bool enabled;
+  final String host;
+  final int port;
+
+  const Socks5Config({
+    this.enabled = false,
+    this.host = '127.0.0.1',
+    this.port = 1080,
+  });
+
+  Socks5Config copyWith({bool? enabled, String? host, int? port}) {
+    return Socks5Config(
+      enabled: enabled ?? this.enabled,
+      host: host ?? this.host,
+      port: port ?? this.port,
+    );
+  }
+}
+
+final socks5ConfigProvider = NotifierProvider<Socks5ConfigNotifier, Socks5Config>(
+  () => Socks5ConfigNotifier(),
+);
+
+class Socks5ConfigNotifier extends Notifier<Socks5Config> {
+  @override
+  Socks5Config build() {
+    _load();
+    return const Socks5Config();
+  }
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = Socks5Config(
+      enabled: prefs.getBool(_keyProxyEnabled) ?? false,
+      host: prefs.getString(_keyProxyHost) ?? '127.0.0.1',
+      port: prefs.getInt(_keyProxyPort) ?? 1080,
+    );
+  }
+
+  Future<void> setEnabled(bool enabled) async {
+    state = state.copyWith(enabled: enabled);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyProxyEnabled, enabled);
+  }
+
+  Future<void> setHost(String host) async {
+    state = state.copyWith(host: host);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyProxyHost, host);
+  }
+
+  Future<void> setPort(int port) async {
+    state = state.copyWith(port: port);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_keyProxyPort, port);
   }
 }
 

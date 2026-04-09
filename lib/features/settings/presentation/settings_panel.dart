@@ -10,279 +10,181 @@ class SettingsPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(readerSettingsProvider);
     final notifier = ref.read(readerSettingsProvider.notifier);
+    final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        color: theme.colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Reader Settings',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: () => notifier.resetSettings(),
-                tooltip: 'Reset to default',
-              ),
-            ],
+          // Drag handle
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.onSurface.withAlpha(40),
+              borderRadius: BorderRadius.circular(2),
+            ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 12),
 
-          // Reading Mode
-          Text('Reading Mode', style: Theme.of(context).textTheme.labelLarge),
-          const SizedBox(height: 8),
+          // Reading Mode toggle
           SegmentedButton<ReadingMode>(
             segments: const [
-              ButtonSegment<ReadingMode>(
-                value: ReadingMode.vertical,
-                label: Text('Vertical'),
-                icon: Icon(Icons.swap_vert),
-              ),
-              ButtonSegment<ReadingMode>(
-                value: ReadingMode.horizontal,
-                label: Text('Horizontal'),
-                icon: Icon(Icons.swap_horiz),
-              ),
+              ButtonSegment(value: ReadingMode.vertical, icon: Icon(Icons.swap_vert, size: 18), label: Text('Vertical')),
+              ButtonSegment(value: ReadingMode.horizontal, icon: Icon(Icons.swap_horiz, size: 18), label: Text('Horizontal')),
             ],
             selected: {settings.readingMode},
-            onSelectionChanged: (Set<ReadingMode> newSelection) {
-              notifier.updateSettings(
-                settings.copyWith(readingMode: newSelection.first),
-              );
-            },
+            onSelectionChanged: (s) => notifier.updateSettings(settings.copyWith(readingMode: s.first)),
+            style: SegmentedButton.styleFrom(visualDensity: VisualDensity.compact),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 14),
 
-          // Font Family
-          Text('Font Family', style: Theme.of(context).textTheme.labelLarge),
-          const SizedBox(height: 8),
+          // Font family chips
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _FontChip(
-                  label: 'Sans Serif',
-                  fontFamily: 'sans-serif',
-                  isSelected: settings.fontFamily == 'sans-serif',
-                  onTap: () => notifier.updateSettings(
-                    settings.copyWith(fontFamily: 'sans-serif'),
-                  ),
-                ),
-                _FontChip(
-                  label: 'Serif',
-                  fontFamily: 'serif',
-                  isSelected: settings.fontFamily == 'serif',
-                  onTap: () => notifier.updateSettings(
-                    settings.copyWith(fontFamily: 'serif'),
-                  ),
-                ),
-                _FontChip(
-                  label: 'Monospace',
-                  fontFamily: 'monospace',
-                  isSelected: settings.fontFamily == 'monospace',
-                  onTap: () => notifier.updateSettings(
-                    settings.copyWith(fontFamily: 'monospace'),
-                  ),
-                ),
+                _fontChip(theme, 'Sans Serif', 'sans-serif', settings, notifier),
+                _fontChip(theme, 'Serif', 'serif', settings, notifier),
+                _fontChip(theme, 'Mono', 'monospace', settings, notifier),
               ],
             ),
           ),
+          const SizedBox(height: 10),
 
-          const SizedBox(height: 24),
-
-          // Font Size
-          Row(
-            children: [
-              const Icon(Icons.text_fields, size: 16),
-              Expanded(
-                child: Slider(
-                  value: settings.fontSize,
-                  min: 12,
-                  max: 32,
-                  divisions: 10,
-                  label: settings.fontSize.round().toString(),
-                  onChanged: (val) =>
-                      notifier.updateSettings(settings.copyWith(fontSize: val)),
-                ),
-              ),
-              const Icon(Icons.text_fields, size: 24),
-            ],
+          // Font size
+          _sliderRow(
+            icon: Icons.text_fields,
+            value: settings.fontSize,
+            min: 12, max: 32, divisions: 10,
+            label: '${settings.fontSize.round()}',
+            onChanged: (v) => notifier.updateSettings(settings.copyWith(fontSize: v)),
           ),
 
-          // Line Height
-          Row(
-            children: [
-              const Icon(Icons.format_line_spacing),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Slider(
-                  value: settings.lineHeight,
-                  min: 1.0,
-                  max: 2.5,
-                  onChanged: (val) => notifier.updateSettings(
-                    settings.copyWith(lineHeight: val),
-                  ),
-                ),
-              ),
-            ],
+          // Line height
+          _sliderRow(
+            icon: Icons.format_line_spacing,
+            value: settings.lineHeight,
+            min: 1.0, max: 2.5,
+            label: settings.lineHeight.toStringAsFixed(1),
+            onChanged: (v) => notifier.updateSettings(settings.copyWith(lineHeight: v)),
           ),
 
-          // Horizontal Padding
-          Row(
-            children: [
-              const Icon(
-                Icons.unfold_more_rounded,
-                size: 20,
-              ), // Placeholder for padding icon
-              const SizedBox(width: 16),
-              Expanded(
-                child: Slider(
-                  value: settings.horizontalPadding,
-                  min: 8,
-                  max: 64,
-                  onChanged: (val) => notifier.updateSettings(
-                    settings.copyWith(horizontalPadding: val),
-                  ),
-                ),
-              ),
-            ],
+          // Horizontal padding
+          _sliderRow(
+            icon: Icons.horizontal_distribute,
+            value: settings.horizontalPadding,
+            min: 8, max: 64,
+            label: '${settings.horizontalPadding.round()}',
+            onChanged: (v) => notifier.updateSettings(settings.copyWith(horizontalPadding: v)),
           ),
 
-          const SizedBox(height: 16),
+          // Brightness
+          _sliderRow(
+            icon: Icons.brightness_6_rounded,
+            value: settings.brightness,
+            min: 0.2, max: 1.0,
+            label: '${(settings.brightness * 100).round()}%',
+            onChanged: (v) => notifier.updateSettings(settings.copyWith(brightness: v)),
+          ),
 
-          // Background Color
-          Text('Background', style: Theme.of(context).textTheme.labelLarge),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
+
+          // Background colors
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _ColorCircle(
-                color: const Color(0xFF121212),
-                isSelected: settings.backgroundColor == 0xFF121212,
-                onTap: () => notifier.updateSettings(
-                  settings.copyWith(backgroundColor: 0xFF121212),
-                ),
-              ),
-              _ColorCircle(
-                color: const Color(0xFF1E1E1E),
-                isSelected: settings.backgroundColor == 0xFF1E1E1E,
-                onTap: () => notifier.updateSettings(
-                  settings.copyWith(backgroundColor: 0xFF1E1E1E),
-                ),
-              ),
-              _ColorCircle(
-                color: const Color(0xFF2C2C2C),
-                isSelected: settings.backgroundColor == 0xFF2C2C2C,
-                onTap: () => notifier.updateSettings(
-                  settings.copyWith(backgroundColor: 0xFF2C2C2C),
-                ),
-              ),
-              _ColorCircle(
-                color: const Color(0xFFF5F5F5),
-                isSelected: settings.backgroundColor == 0xFFF5F5F5,
-                borderColor: Colors.grey,
-                onTap: () => notifier.updateSettings(
-                  settings.copyWith(backgroundColor: 0xFFF5F5F5),
-                ),
-              ),
-              _ColorCircle(
-                color: const Color(0xFFFFF8E1),
-                isSelected: settings.backgroundColor == 0xFFFFF8E1,
-                onTap: () => notifier.updateSettings(
-                  settings.copyWith(backgroundColor: 0xFFFFF8E1),
-                ),
-              ),
+              _colorDot(theme, 0xFF121212, settings, notifier),
+              _colorDot(theme, 0xFF1E1E1E, settings, notifier),
+              _colorDot(theme, 0xFF2C2C2C, settings, notifier),
+              _colorDot(theme, 0xFFF5F5F5, settings, notifier, border: Colors.grey),
+              _colorDot(theme, 0xFFFFF8E1, settings, notifier),
             ],
           ),
-          const SizedBox(height: 16),
         ],
       ),
     );
   }
-}
 
-class _FontChip extends StatelessWidget {
-  final String label;
-  final String fontFamily;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _FontChip({
-    required this.label,
-    required this.fontFamily,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _fontChip(ThemeData theme, String label, String family, ReaderSettings settings, ReaderSettingsNotifier notifier) {
+    final selected = settings.fontFamily == family;
     return Padding(
-      padding: const EdgeInsets.only(right: 8.0),
+      padding: const EdgeInsets.only(right: 6),
       child: ChoiceChip(
-        label: Text(label, style: TextStyle(fontFamily: fontFamily)),
-        selected: isSelected,
-        onSelected: (_) => onTap(),
+        label: Text(label, style: TextStyle(fontFamily: family, fontSize: 12)),
+        selected: selected,
+        onSelected: (_) => notifier.updateSettings(settings.copyWith(fontFamily: family)),
+        visualDensity: VisualDensity.compact,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
       ),
     );
   }
-}
 
-class _ColorCircle extends StatelessWidget {
-  final Color color;
-  final bool isSelected;
-  final VoidCallback onTap;
-  final Color? borderColor;
-
-  const _ColorCircle({
-    required this.color,
-    required this.isSelected,
-    required this.onTap,
-    this.borderColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: isSelected
-                ? Theme.of(context).colorScheme.primary
-                : (borderColor ?? Colors.transparent),
-            width: 3,
-          ),
-          boxShadow: [
-            if (isSelected)
-              BoxShadow(
-                color: Theme.of(context).colorScheme.primary.withAlpha(80),
-                blurRadius: 8,
-                spreadRadius: 2,
+  Widget _sliderRow({
+    required IconData icon,
+    required double value,
+    required double min,
+    required double max,
+    int? divisions,
+    required String label,
+    required ValueChanged<double> onChanged,
+  }) {
+    return SizedBox(
+      height: 36,
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: Colors.grey),
+          Expanded(
+            child: SliderTheme(
+              data: const SliderThemeData(
+                trackHeight: 2,
+                thumbShape: RoundSliderThumbShape(enabledThumbRadius: 6),
+                overlayShape: RoundSliderOverlayShape(overlayRadius: 14),
               ),
-          ],
+              child: Slider(
+                value: value,
+                min: min,
+                max: max,
+                divisions: divisions,
+                onChanged: onChanged,
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 36,
+            child: Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey), textAlign: TextAlign.right),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _colorDot(ThemeData theme, int colorValue, ReaderSettings settings, ReaderSettingsNotifier notifier, {Color? border}) {
+    final selected = settings.backgroundColor == colorValue;
+    final color = Color(colorValue);
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => notifier.updateSettings(settings.copyWith(backgroundColor: colorValue)),
+        child: Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: selected ? theme.colorScheme.primary : (border ?? Colors.transparent),
+              width: selected ? 2.5 : 1,
+            ),
+            boxShadow: selected ? [BoxShadow(color: theme.colorScheme.primary.withAlpha(60), blurRadius: 6, spreadRadius: 1)] : null,
+          ),
+          child: selected ? Icon(Icons.check, size: 16, color: color.computeLuminance() > 0.5 ? Colors.black : Colors.white) : null,
         ),
-        child: isSelected
-            ? Icon(
-                Icons.check,
-                color: color.computeLuminance() > 0.5
-                    ? Colors.black
-                    : Colors.white,
-                size: 20,
-              )
-            : null,
       ),
     );
   }

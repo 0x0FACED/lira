@@ -22,6 +22,7 @@ class EpubReaderView extends StatefulWidget {
   final void Function(EpubLocation location, double percentage)?
   onLocationChanged;
   final void Function(String text, String location)? onTextSelected;
+  final VoidCallback? onCenterTapped;
 
   const EpubReaderView({
     super.key,
@@ -31,6 +32,7 @@ class EpubReaderView extends StatefulWidget {
     this.initialLocation,
     this.onLocationChanged,
     this.onTextSelected,
+    this.onCenterTapped,
   });
 
   @override
@@ -43,6 +45,7 @@ class EpubReaderViewState extends State<EpubReaderView> {
   bool _isLoading = true;
   double _webviewOpacity = 0.0;
   double _pageHeight = 0;
+  double _pageWidth = 0;
 
   // Text weights for accurate book-wide progress
   late final List<int> _chapterWeights;
@@ -59,7 +62,6 @@ class EpubReaderViewState extends State<EpubReaderView> {
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Color(widget.settings.backgroundColor))
       ..addJavaScriptChannel(
         'LiraApp',
         onMessageReceived: _handleJavaScriptMessage,
@@ -86,6 +88,12 @@ class EpubReaderViewState extends State<EpubReaderView> {
           },
         ),
       );
+
+    // setBackgroundColor is not supported on macOS WKWebView (throws "opaque is not implemented")
+    // Background color is already applied via CSS in the generated HTML
+    if (Platform.isAndroid) {
+      _controller.setBackgroundColor(Color(widget.settings.backgroundColor));
+    }
   }
 
   @override
@@ -179,6 +187,9 @@ class EpubReaderViewState extends State<EpubReaderView> {
           final String href = data['href'];
           scrollToChapter(href);
           break;
+        case 'tap':
+          widget.onCenterTapped?.call();
+          break;
       }
     } catch (e) {
       debugPrint("Error parsing JS message: $e\nData: ${message.message}");
@@ -214,26 +225,16 @@ class EpubReaderViewState extends State<EpubReaderView> {
     if (_pageHeight <= 0) return; // Wait for layout
 
     final isHorizontal = widget.settings.readingMode == ReadingMode.horizontal;
+    // Two-page spread when window is wide enough (>= 900px)
+    final isTwoPage = isHorizontal && _pageWidth >= 900;
 
-    // Color conversion
-    final bgColorStr =
-        '#' +
-        widget.settings.backgroundColor
-            .toRadixString(16)
-            .padLeft(8, '0')
-            .substring(2);
-    final textColorStr =
-        '#' +
-        widget.theme.colorScheme.onSurface.value
-            .toRadixString(16)
-            .padLeft(8, '0')
-            .substring(2);
-    final divColorStr =
-        '#' +
-        widget.theme.dividerColor.value
-            .toRadixString(16)
-            .padLeft(8, '0')
-            .substring(2);
+    // Color conversion — compute text color from background luminance
+    final bgColor = Color(widget.settings.backgroundColor);
+    final bgColorStr = '#${widget.settings.backgroundColor.toRadixString(16).padLeft(8, '0').substring(2)}';
+    final textColor = bgColor.computeLuminance() > 0.5 ? const Color(0xFF1A1A1A) : const Color(0xFFE0E0E0);
+    final textColorStr = '#${textColor.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}';
+    final linkColor = bgColor.computeLuminance() > 0.5 ? '#6200EE' : '#BB86FC';
+    final divColorStr = bgColor.computeLuminance() > 0.5 ? '#CCCCCC' : '#444444';
     final paddingH = widget.settings.horizontalPadding.toInt();
 
     // Define the img replacement regex
@@ -248,6 +249,7 @@ class EpubReaderViewState extends State<EpubReaderView> {
 <!DOCTYPE html>
 <html>
 <head>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <style>
   html, body {
@@ -269,7 +271,7 @@ class EpubReaderViewState extends State<EpubReaderView> {
   }
   
   a {
-    color: $textColorStr;
+    color: $linkColor;
     text-decoration: underline;
   }
   
@@ -298,43 +300,43 @@ class EpubReaderViewState extends State<EpubReaderView> {
 ''');
 
     // Add layout-specific CSS
+    // Two-page: each column = 50vw, gap between columns
+    final colWidth = isTwoPage ? '50vw' : '100vw';
+    final colGap = isTwoPage ? '0px' : '0px';
+    // Step size: how much translateX moves per "page turn"
+    // Single page: 100vw, Two-page: 100vw (two columns = one spread)
     if (isHorizontal) {
       buffer.write('''
   /* HORIZONTAL PAGINATION CSS */
   html, body {
-    height: ${_pageHeight}px; 
-    overflow: hidden; /* Prevent vertical scrolling */
+    height: ${_pageHeight}px;
+    overflow: hidden;
   }
-  
+
   #content-container {
     height: ${_pageHeight}px;
-    padding: 24px 0; /* Add top and bottom margins for text so it breathes */
+    padding: 24px 0;
     box-sizing: border-box;
   }
 
   #content {
-    /* Each column = exactly 100vw, no gap, no padding on this element.
-       This guarantees page stride == window.innerWidth exactly. */
-    column-width: 100vw;
-    column-gap: 0px;
+    column-width: $colWidth;
+    column-gap: $colGap;
     column-fill: auto;
     height: 100%;
     padding: 0;
     box-sizing: border-box;
-    /* Smooth CSS slide animation */
     transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     will-change: transform;
     word-wrap: break-word;
     overflow-wrap: break-word;
   }
-  
-  /* Horizontal padding is on each chapter block, not #content */
+
   .chapter-block {
     padding-left: ${paddingH}px;
     padding-right: ${paddingH}px;
   }
-  
-  /* Prevent large blocks from overflowing columns */
+
   p, div, blockquote {
     max-width: 100%;
   }
@@ -364,9 +366,10 @@ class EpubReaderViewState extends State<EpubReaderView> {
 </style>
 <script>
   let isHorizontal = ${isHorizontal ? 'true' : 'false'};
+  let isTwoPage = ${isTwoPage ? 'true' : 'false'};
   let currentPage = 0;
   let totalPages = 1;
-  let pageStride = window.innerWidth; // Actual stride per page (computed from DOM)
+  let pageStride = window.innerWidth;
 
   function throttle(func, limit) {
     let inThrottle;
@@ -434,10 +437,17 @@ class EpubReaderViewState extends State<EpubReaderView> {
   function recalcHorizontalPages() {
     if (!isHorizontal) return;
     const content = document.getElementById('content');
-    if (content) {
-      totalPages = Math.ceil(content.scrollWidth / window.innerWidth) || 1;
-      // Compute the actual stride from the DOM to avoid sub-pixel drift
-      pageStride = totalPages > 1 ? (content.scrollWidth / totalPages) : window.innerWidth;
+    if (!content) return;
+    const sw = content.scrollWidth;
+    const vw = window.innerWidth;
+    if (isTwoPage) {
+      // Each column is 50vw; a "page" (spread) = 2 columns = 100vw
+      const totalCols = Math.ceil(sw / (vw / 2)) || 1;
+      totalPages = Math.ceil(totalCols / 2) || 1;
+      pageStride = vw; // one spread = full viewport width
+    } else {
+      totalPages = Math.ceil(sw / vw) || 1;
+      pageStride = totalPages > 1 ? (sw / totalPages) : vw;
     }
   }
 
@@ -558,7 +568,7 @@ class EpubReaderViewState extends State<EpubReaderView> {
   
   function handleSwipe() {
     if (!isHorizontal) return;
-    const SWIPE_THRESHOLD = 50;
+    const SWIPE_THRESHOLD = 80;
     if (touchEndX < touchStartX - SWIPE_THRESHOLD) {
       // Swipe Left (Next)
       if (currentPage < totalPages - 1) {
@@ -602,7 +612,60 @@ class EpubReaderViewState extends State<EpubReaderView> {
   }, {passive: true});
   
   window.addEventListener('mouseleave', () => { isMouseDown = false; });
-  
+
+  // Trackpad / mouse wheel support for horizontal mode (macOS, desktop)
+  let wheelAccum = 0;
+  let wheelLocked = false;
+  const WHEEL_PAGE_THRESHOLD = 300;
+  const WHEEL_LOCK_MS = 400;
+  window.addEventListener('wheel', e => {
+    if (!isHorizontal) return;
+    e.preventDefault();
+    if (wheelLocked) return;
+    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    wheelAccum += delta;
+    if (Math.abs(wheelAccum) > WHEEL_PAGE_THRESHOLD) {
+      const dir = wheelAccum > 0 ? 1 : -1;
+      wheelAccum = 0;
+      wheelLocked = true;
+      setTimeout(() => { wheelLocked = false; wheelAccum = 0; }, WHEEL_LOCK_MS);
+      const next = currentPage + dir;
+      if (next >= 0 && next < totalPages) { currentPage = next; applyHorizontalTransform(); }
+    }
+  }, {passive: false});
+
+  // Arrow keys for horizontal navigation
+  window.addEventListener('keydown', e => {
+    if (!isHorizontal) return;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (currentPage < totalPages - 1) { currentPage++; applyHorizontalTransform(); }
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (currentPage > 0) { currentPage--; applyHorizontalTransform(); }
+    }
+  });
+
+  // Tap detection (for toggling UI bars)
+  let tapStartX = 0, tapStartY = 0, tapStartTime = 0;
+  window.addEventListener('pointerdown', e => {
+    tapStartX = e.clientX;
+    tapStartY = e.clientY;
+    tapStartTime = Date.now();
+  });
+  window.addEventListener('pointerup', e => {
+    const dx = e.clientX - tapStartX;
+    const dy = e.clientY - tapStartY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const elapsed = Date.now() - tapStartTime;
+    if (dist < 20 && elapsed < 400) {
+      // It's a tap, not a swipe or drag
+      const sel = window.getSelection();
+      if (sel && sel.toString().length > 0) return; // text selected, skip
+      sendMessage('tap', {});
+    }
+  });
+
   window.addEventListener('resize', () => {
     if (isHorizontal) {
       recalcHorizontalPages();
@@ -690,7 +753,7 @@ class EpubReaderViewState extends State<EpubReaderView> {
       final file = File(
         '${dir.path}/epub_temp_${DateTime.now().millisecondsSinceEpoch}.html',
       );
-      await file.writeAsString(htmlContent);
+      await file.writeAsString(htmlContent, encoding: utf8);
 
       // Need allow file access
       if (_controller.platform is AndroidWebViewController) {
@@ -708,15 +771,46 @@ class EpubReaderViewState extends State<EpubReaderView> {
   @override
   void didUpdateWidget(EpubReaderView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // User changed settings (mode, font size, etc.)
-    if (widget.settings != oldWidget.settings) {
-      setState(() {
-        _isLoading = true;
-        _webviewOpacity = 0.0;
-      });
-      _controller.setBackgroundColor(Color(widget.settings.backgroundColor));
-      _loadFullBook();
+    if (widget.settings == oldWidget.settings) return;
+
+    final old = oldWidget.settings;
+    final cur = widget.settings;
+
+    // Brightness is a Flutter overlay — no HTML reload needed, just setState
+    if (old.brightness != cur.brightness &&
+        old.copyWith(brightness: cur.brightness) == cur) {
+      setState(() {});
+      return;
     }
+
+    // Background color change — update via JS without full reload
+    if (old.backgroundColor != cur.backgroundColor &&
+        old.copyWith(backgroundColor: cur.backgroundColor) == cur) {
+      final bgColor = Color(cur.backgroundColor);
+      final bgStr = '#${cur.backgroundColor.toRadixString(16).padLeft(8, '0').substring(2)}';
+      final textColor = bgColor.computeLuminance() > 0.5 ? '#1A1A1A' : '#E0E0E0';
+      final linkColor = bgColor.computeLuminance() > 0.5 ? '#6200EE' : '#BB86FC';
+      _controller.runJavaScript('''
+        document.body.style.backgroundColor = '$bgStr';
+        document.body.style.color = '$textColor';
+        document.querySelectorAll('a').forEach(a => a.style.color = '$linkColor');
+      ''');
+      if (Platform.isAndroid) {
+        _controller.setBackgroundColor(bgColor);
+      }
+      setState(() {});
+      return;
+    }
+
+    // Structural change (font, size, mode, padding, etc.) — full reload required
+    setState(() {
+      _isLoading = true;
+      _webviewOpacity = 0.0;
+    });
+    if (Platform.isAndroid) {
+      _controller.setBackgroundColor(Color(cur.backgroundColor));
+    }
+    _loadFullBook();
   }
 
   @override
@@ -734,14 +828,18 @@ class EpubReaderViewState extends State<EpubReaderView> {
         // In horizontal mode, we need the exact inner height to set CSS correctly.
         final newHeight =
             constraints.maxHeight - safePadding.top - safePadding.bottom;
+        final newWidth = constraints.maxWidth;
 
-        if (_pageHeight != newHeight) {
+        if (_pageHeight != newHeight || _pageWidth != newWidth) {
           _pageHeight = newHeight;
+          _pageWidth = newWidth;
           // First frame: load full book
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _loadFullBook();
           });
         }
+
+        final brightness = widget.settings.brightness.clamp(0.0, 1.0);
 
         return Container(
           color: Color(widget.settings.backgroundColor),
@@ -757,6 +855,16 @@ class EpubReaderViewState extends State<EpubReaderView> {
                   duration: const Duration(milliseconds: 300),
                   child: WebViewWidget(controller: _controller),
                 ),
+
+                // Brightness overlay — dims content when brightness < 1.0
+                if (brightness < 1.0)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Container(
+                        color: Colors.black.withAlpha(((1.0 - brightness) * 200).round()),
+                      ),
+                    ),
+                  ),
 
                 if (_isLoading)
                   Positioned.fill(

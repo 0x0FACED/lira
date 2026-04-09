@@ -11,10 +11,7 @@ class AppTheme {
         secondary: Color(0xFF03DAC6),
         surface: Color(0xFF121212),
       ),
-      navigationBarTheme: NavigationBarThemeData(
-        indicatorColor: const Color(0xFFBB86FC).withAlpha(40),
-        backgroundColor: const Color(0xFF1E1E1E),
-      ),
+      // Navigation bar is custom glass widget in MainShell
     );
   }
 

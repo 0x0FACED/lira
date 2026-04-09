@@ -19,7 +19,9 @@ class BookCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
       onTap: onTap,
       onLongPress: () {
         showDialog(
@@ -87,6 +89,7 @@ class BookCard extends StatelessWidget {
           ),
         ),
       ),
+    ),
     );
   }
 

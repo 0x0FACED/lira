@@ -139,6 +139,76 @@ I/flutter ( 8240): Could not launch "ch03.html#ch_datamodels": unsupported
 - [x] EPUB парсится неправильно. Например, я запарсил книгу из 10+ глав, однако у меня после первой главы идет опять первая глава. И так все главы заменены на первую. То есть первая глава только парится как будто, а остальные нет.
 - [x] В нижней панели в epub reader у нас есть TOC и настройки. Хочется с ними поработать. При нажатии на TOC слева выезжает оглавление кликабельное - можно переместиться куда захотим по нажатию. В настройках можно будет менять шрифт, размер шрифта, цвет фона, отступы и т.д. Все это необходимо сохранять будет в локальное хранилище юзера, чтобы при повторном открытии любогй epub книги настройки применялись.
 
+---
+
+# New Tasks (added 2026-04-09)
+
+## Phase 8: macOS — критические проблемы
+
+- [x] **[CRITICAL]** Добавить entitlement `com.apple.security.files.user-selected.read-write` в `macos/Runner/DebugProfile.entitlements` и `Release.entitlements`. Без него file picker не работает в sandbox — кнопка импорта книг не реагирует.
+- [x] **[CRITICAL]** Добавить entitlement `com.apple.security.network.client` в оба entitlements файла. Без него исходящие HTTP-запросы блокируются sandbox — поиск книг не работает. (Сейчас в DebugProfile есть только `network.server`, в Release — ничего.)
+
+## Phase 9: Reader — темы и цвета
+
+Сейчас при смене фона в настройках ридера меняется только `backgroundColor`. Контент никак не адаптируется:
+
+- [ ] **[HIGH]** EPUB: цвет текста берётся из `theme.colorScheme.onSurface` (глобальная тема приложения), а не вычисляется от фона ридера. При светлом фоне (#F5F5F5) + тёмной теме приложения → белый текст на белом фоне. Нужно вычислять цвет текста по luminance фона: `bgColor.computeLuminance() > 0.5 ? black : white`.
+- [ ] **[HIGH]** EPUB: ссылки используют тот же цвет, что и текст (`color: $textColorStr`). Нужно выделять ссылки отдельным цветом (accent) с учётом контраста.
+- [ ] **[MEDIUM]** PDF: `PdfViewerWidget` только оборачивает контент в `Container(color: backgroundColor)`, но содержимое PDF не адаптируется. Исследовать возможности `pdfrx` для color overlay / blend mode.
+- [ ] **[MEDIUM]** EPUB: картинки не фильтруются при тёмном фоне (яркие изображения бьют по глазам). Добавить CSS `filter: brightness(0.8)` или инвертацию для тёмных тем.
+- [ ] **[LOW]** Top/bottom bars ридера захардкожены в `Colors.black87` — не адаптируются к фону.
+
+## Phase 10: Security (was 8)
+
+- [ ] **[CRITICAL]** Убрать глобальный SSL bypass (`MyHttpOverrides` в `main.dart`). `badCertificateCallback` принимает все сертификаты — уязвимость для MITM атак. Оставить только для dev-режима или убрать полностью.
+- [ ] Перенести Z-Library креды (email, cookies) из `SharedPreferences` в `flutter_secure_storage`. Сейчас хранятся в plaintext.
+- [ ] Добавить input sanitization в диалог редактирования книги (`book_detail_screen.dart`).
+
+## Phase 11: Localization (i18n)
+
+~40% строк в UI захардкожены на английском. Нужно перенести в ARB файлы:
+
+- [ ] `book_card.dart` — 'Delete Book', 'Are you sure...', 'Cancel', 'Delete'.
+- [ ] `reader_screen.dart` — 'Table of Contents', 'Settings', 'Contents', 'Table of Contents is not available.'
+- [ ] `settings_panel.dart` — 'Reader Settings', 'Reset to default', 'Reading Mode', 'Vertical', 'Horizontal', 'Font Family', названия шрифтов.
+- [ ] `search_screen.dart` — 'No results found', описания источников, help text.
+- [ ] `search_book_card.dart` — '... downloaded and added to library.', 'Cancel download'.
+- [ ] `book_detail_screen.dart` — диалоговые строки.
+- [ ] `library_screen.dart` — сообщения об ошибках (сейчас показывается raw `$e`).
+
+## Phase 12: Architecture & Code Quality
+
+- [ ] Разбить `BooksController` (`books_provider.dart`, 465 строк) на отдельные use-case провайдеры: `ImportBookUseCase`, `DownloadBookUseCase`, `DeleteBookUseCase`.
+- [ ] Вынести бизнес-логику из UI виджетов:
+  - `book_detail_screen.dart` — `_showEditDialog()` содержит логику обновления.
+  - `settings_screen.dart` — `_showZLibraryLoginDialog()` напрямую вызывает `ZLibraryApi()`.
+  - `library_screen.dart` — логика фильтрации в UI.
+- [ ] Заменить все `print()` на нормальный логгер (например, `logger` или `logging`). Сейчас в `books_provider.dart` ~15 вызовов `print()` с `// ignore: avoid_print`.
+- [ ] Унифицировать обработку ошибок: часть экранов использует `try/catch`, часть — provider error states. Выбрать один подход.
+- [ ] Добавить проверку `context.mounted` перед UI-обновлениями после async операций в `reader_screen.dart`.
+- [ ] Оптимизировать `SearchBookCard` — использовать `ref.watch(provider.select(...))` вместо подписки на весь `downloadNotifierProvider`.
+
+## Phase 13: UX Improvements
+
+- [ ] Добавить retry/resume для прерванных загрузок.
+- [ ] Добавить пагинацию результатов поиска (сейчас все результаты в одном списке).
+- [ ] Добавить debounce на поиск в библиотеке (`library_screen.dart`).
+- [ ] Показывать user-friendly ошибки вместо raw exception (`$e`) в SnackBar.
+- [ ] Добавить экспорт highlights (в текст/markdown).
+
+## Phase 14: API & Backend Prep
+
+- [ ] Перенести `baseUrl` из `dio_module.dart` в конфиг/env файл (сейчас захардкожен `localhost:8080`).
+- [ ] Реализовать реальные API вызовы в `auth_provider.dart` (login/register — сейчас заглушки с `// TODO: Call auth API`).
+
+## Phase X (not soon): Desktop WebView
+
+EPUB ридер использует `webview_flutter` + `webview_flutter_wkwebview`. На десктопах WebView может работать нестабильно:
+
+- [ ] Протестировать и пофиксить WebView на Windows (возможны проблемы с WebView2 runtime).
+- [ ] Протестировать WebView на Linux (требуется webkit2gtk).
+- [ ] Рассмотреть fallback рендеринг EPUB без WebView для десктопов (например, через `flutter_widget_from_html` напрямую).
+
 ## Phase X (not soon): Sync Feature (Go Server Backend)
 - [ ] Setup authorization flow (login/register to API).
 - [ ] Implement books metadata sync (Pull/Push).

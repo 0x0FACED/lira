@@ -43,6 +43,7 @@ class EpubBookReaderEngine implements BookReaderEngine {
     required void Function(BookLocation location, double percentage)
     onProgressChanged,
     required void Function(String text, BookLocation location) onTextSelected,
+    VoidCallback? onCenterTapped,
   }) {
     // Parse location from string to EpubLocation
     EpubLocation? parsedLocation;
@@ -65,6 +66,7 @@ class EpubBookReaderEngine implements BookReaderEngine {
       onTextSelected: (text, locator) {
         onTextSelected(text, BookLocation(locator: locator));
       },
+      onCenterTapped: onCenterTapped,
     );
   }
 

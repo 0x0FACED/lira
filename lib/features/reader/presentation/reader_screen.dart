@@ -135,6 +135,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                           initialLocation: progress != null
                               ? BookLocation(locator: progress.location)
                               : const BookLocation(locator: ''),
+                          onCenterTapped: _toggleUi,
                           onProgressChanged: (location, percentage) {
                             setState(() {
                               _readingProgress = percentage.clamp(0, 100) / 100;
@@ -180,6 +181,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                   ),
                 ),
               ),
+
+              // Brightness overlay for non-EPUB (EPUB handles it internally)
+              if (settings.brightness < 1.0 && widget.book.format != 'epub')
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Container(
+                      color: Colors.black.withAlpha(((1.0 - settings.brightness) * 200).round()),
+                    ),
+                  ),
+                ),
 
               // Top bar
               AnimatedPositioned(

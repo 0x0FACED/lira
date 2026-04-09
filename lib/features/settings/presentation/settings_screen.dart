@@ -7,6 +7,7 @@ import 'package:zlibrary_api/zlibrary_api.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/providers/preferences_provider.dart';
 import '../../auth/domain/providers/auth_provider.dart';
+import '../../books/presentation/library_screen.dart' show kBottomNavBarHeight;
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -104,6 +105,9 @@ class SettingsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: Text(l10n.settings), centerTitle: true),
       body: ListView(
+        padding: EdgeInsets.only(
+          bottom: kBottomNavBarHeight + MediaQuery.of(context).padding.bottom + 16,
+        ),
         children: [
           _buildSection(
             context,
@@ -271,6 +275,8 @@ class SettingsScreen extends ConsumerWidget {
             ],
           ),
 
+          _buildProxySection(context, ref),
+
           _buildSection(
             context,
             title: l10n.about,
@@ -290,6 +296,80 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildProxySection(BuildContext context, WidgetRef ref) {
+    final proxyConfig = ref.watch(socks5ConfigProvider);
+    final theme = Theme.of(context);
+
+    return _buildSection(
+      context,
+      title: 'SOCKS5 Proxy',
+      children: [
+        ListTile(
+          leading: Icon(
+            Icons.vpn_lock_rounded,
+            color: proxyConfig.enabled ? Colors.green : null,
+          ),
+          title: const Text('SOCKS5 Proxy'),
+          subtitle: Text(
+            proxyConfig.enabled
+                ? '${proxyConfig.host}:${proxyConfig.port}'
+                : 'Disabled',
+          ),
+          trailing: Switch.adaptive(
+            value: proxyConfig.enabled,
+            activeTrackColor: theme.colorScheme.primary.withAlpha(120),
+            activeThumbColor: theme.colorScheme.primary,
+            onChanged: (value) {
+              ref.read(socks5ConfigProvider.notifier).setEnabled(value);
+            },
+          ),
+        ),
+        // Host & Port fields (only visible when toggled on)
+        AnimatedCrossFade(
+          duration: const Duration(milliseconds: 200),
+          crossFadeState: proxyConfig.enabled
+              ? CrossFadeState.showFirst
+              : CrossFadeState.showSecond,
+          secondChild: const SizedBox.shrink(),
+          firstChild: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: _ProxyTextField(
+                    label: 'Host',
+                    initialValue: proxyConfig.host,
+                    onChanged: (value) {
+                      if (value.isNotEmpty) {
+                        ref.read(socks5ConfigProvider.notifier).setHost(value);
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 1,
+                  child: _ProxyTextField(
+                    label: 'Port',
+                    initialValue: proxyConfig.port.toString(),
+                    keyboardType: TextInputType.number,
+                    onChanged: (value) {
+                      final port = int.tryParse(value);
+                      if (port != null && port > 0 && port <= 65535) {
+                        ref.read(socks5ConfigProvider.notifier).setPort(port);
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -314,6 +394,73 @@ class SettingsScreen extends ConsumerWidget {
         ...children,
         const Divider(height: 1),
       ],
+    );
+  }
+}
+
+/// Compact text field for proxy host/port input.
+class _ProxyTextField extends StatefulWidget {
+  final String label;
+  final String initialValue;
+  final TextInputType? keyboardType;
+  final ValueChanged<String> onChanged;
+
+  const _ProxyTextField({
+    required this.label,
+    required this.initialValue,
+    required this.onChanged,
+    this.keyboardType,
+  });
+
+  @override
+  State<_ProxyTextField> createState() => _ProxyTextFieldState();
+}
+
+class _ProxyTextFieldState extends State<_ProxyTextField> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialValue);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return TextField(
+      controller: _controller,
+      keyboardType: widget.keyboardType,
+      style: const TextStyle(fontSize: 14),
+      decoration: InputDecoration(
+        labelText: widget.label,
+        labelStyle: TextStyle(fontSize: 13, color: theme.colorScheme.onSurface.withAlpha(140)),
+        filled: true,
+        fillColor: isDark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(8),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: theme.colorScheme.outline.withAlpha(40)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: theme.colorScheme.outline.withAlpha(40)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: theme.colorScheme.primary),
+        ),
+        isDense: true,
+      ),
+      onChanged: widget.onChanged,
     );
   }
 }
