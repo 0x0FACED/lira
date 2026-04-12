@@ -17,6 +17,7 @@ _ReaderSettings _$ReaderSettingsFromJson(Map<String, dynamic> json) =>
       readingMode:
           $enumDecodeNullable(_$ReadingModeEnumMap, json['readingMode']) ??
           ReadingMode.vertical,
+      enableDualPageSpread: json['enableDualPageSpread'] as bool? ?? true,
       brightness: (json['brightness'] as num?)?.toDouble() ?? 1.0,
     );
 
@@ -28,6 +29,7 @@ Map<String, dynamic> _$ReaderSettingsToJson(_ReaderSettings instance) =>
       'lineHeight': instance.lineHeight,
       'horizontalPadding': instance.horizontalPadding,
       'readingMode': _$ReadingModeEnumMap[instance.readingMode]!,
+      'enableDualPageSpread': instance.enableDualPageSpread,
       'brightness': instance.brightness,
     };
 

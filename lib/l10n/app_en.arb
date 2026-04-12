@@ -94,6 +94,7 @@
   "tocComingSoon": "TOC will be available in a future update.",
   "readerSettings": "Reader Settings",
   "readerSettingsHint": "Font size, theme, and other settings will be available in a future update.",
+  "readerTwoPageSpread": "Two-page spread",
   "highlightSaved": "Highlight saved",
   "errorLoadingBook": "Error loading book",
   "errorLoadingProgress": "Error loading progress",

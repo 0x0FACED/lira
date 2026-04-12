@@ -440,6 +440,12 @@ abstract class AppLocalizations {
   /// **'Font size, theme, and other settings will be available in a future update.'**
   String get readerSettingsHint;
 
+  /// No description provided for @readerTwoPageSpread.
+  ///
+  /// In en, this message translates to:
+  /// **'Two-page spread'**
+  String get readerTwoPageSpread;
+
   /// No description provided for @highlightSaved.
   ///
   /// In en, this message translates to:

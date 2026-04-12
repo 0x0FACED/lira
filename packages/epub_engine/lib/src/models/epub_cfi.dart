@@ -14,6 +14,8 @@ class EpubCfi {
   final String? anchor;
   final int charOffset;
   final double scrollFraction;
+  final double? bookScrollOffset;
+  final double? bookScrollFraction;
 
   /// For highlights: character offsets of the selected text range within the chapter.
   final int? startOffset;
@@ -24,6 +26,8 @@ class EpubCfi {
     this.anchor,
     this.charOffset = 0,
     this.scrollFraction = 0.0,
+    this.bookScrollOffset,
+    this.bookScrollFraction,
     this.startOffset,
     this.endOffset,
   });
@@ -37,6 +41,8 @@ class EpubCfi {
       if (anchor != null) 'a': anchor,
       'c': charOffset,
       'f': scrollFraction,
+      if (bookScrollOffset != null) 'bo': bookScrollOffset,
+      if (bookScrollFraction != null) 'bf': bookScrollFraction,
       if (startOffset != null) 'so': startOffset,
       if (endOffset != null) 'eo': endOffset,
     });
@@ -51,6 +57,8 @@ class EpubCfi {
         anchor: map['a'] as String?,
         charOffset: map['c'] as int? ?? 0,
         scrollFraction: (map['f'] as num?)?.toDouble() ?? 0.0,
+        bookScrollOffset: (map['bo'] as num?)?.toDouble(),
+        bookScrollFraction: (map['bf'] as num?)?.toDouble(),
         startOffset: map['so'] as int?,
         endOffset: map['eo'] as int?,
       );

@@ -186,6 +186,9 @@ class AppLocalizationsRu extends AppLocalizations {
       'Размер шрифта, тема и другие настройки будут доступны в следующем обновлении.';
 
   @override
+  String get readerTwoPageSpread => 'Разворот на 2 страницы';
+
+  @override
   String get highlightSaved => 'Выделение сохранено';
 
   @override

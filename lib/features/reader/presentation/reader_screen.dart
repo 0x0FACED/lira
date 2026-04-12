@@ -15,7 +15,13 @@ import '../domain/engine/epub_book_reader_engine.dart';
 import '../domain/engine/pdf_book_reader_engine.dart';
 import '../domain/models/book_location.dart';
 
-const _highlightColors = ['#BB86FC', '#FFEB3B', '#4CAF50', '#42A5F5', '#EF5350'];
+const _highlightColors = [
+  '#BB86FC',
+  '#FFEB3B',
+  '#4CAF50',
+  '#42A5F5',
+  '#EF5350',
+];
 
 class ReaderScreen extends ConsumerStatefulWidget {
   final BookDto book;
@@ -34,13 +40,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   String _progressLabel = '';
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  // Tap detection
-  Offset? _pointerDownPos;
-  DateTime? _pointerDownTime;
-
   // Text selection state
   String? _selectedText;
-  String? _selectedLocation;  // EpubCfi JSON
+  String? _selectedLocation; // EpubCfi JSON
 
   @override
   void initState() {
@@ -76,9 +78,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   void _toggleUi() {
     setState(() {
       _showUi = !_showUi;
-      // Dismiss selection bar when tapping in empty space
-      _selectedText = null;
-      _selectedLocation = null;
     });
   }
 
@@ -124,63 +123,54 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               Positioned.fill(
                 child: Container(
                   color: Color(settings.backgroundColor),
-                  child: Listener(
-                    onPointerDown: (e) {
-                      _pointerDownPos = e.position;
-                      _pointerDownTime = DateTime.now();
-                    },
-                    onPointerUp: (e) {
-                      if (_pointerDownPos != null && _pointerDownTime != null) {
-                        final dist = (e.position - _pointerDownPos!).distance;
-                        final dur = DateTime.now().difference(_pointerDownTime!);
-                        if (dist < 20 && dur.inMilliseconds < 300) {
-                          _toggleUi();
-                        }
-                      }
-                      _pointerDownPos = null;
-                      _pointerDownTime = null;
-                    },
-                    child: progressAsyncValue.when(
-                      data: (progress) {
-                        return engine.buildReaderWidget(
-                          context: context,
-                          settings: settings,
-                          theme: Theme.of(context),
-                          initialLocation: progress != null
-                              ? BookLocation(locator: progress.location)
-                              : const BookLocation(locator: ''),
-                          onCenterTapped: _toggleUi,
-                          highlights: _buildHighlightsData(highlightsAsync),
-                          onProgressChanged: (location, percentage) {
+                  child: progressAsyncValue.when(
+                    data: (progress) {
+                      return engine.buildReaderWidget(
+                        context: context,
+                        settings: settings,
+                        theme: Theme.of(context),
+                        initialLocation: progress != null
+                            ? BookLocation(locator: progress.location)
+                            : const BookLocation(locator: ''),
+                        onCenterTapped: _toggleUi,
+                        highlights: _buildHighlightsData(highlightsAsync),
+                        onProgressChanged: (location, percentage) {
+                          setState(() {
+                            _readingProgress = percentage.clamp(0, 100) / 100;
+                            _progressLabel =
+                                '${percentage.toStringAsFixed(1)}%';
+                          });
+                          ref
+                              .read(
+                                readingProgressControllerProvider(
+                                  widget.book.id,
+                                ).notifier,
+                              )
+                              .saveProgress(
+                                location: location.locator,
+                                percentage: percentage,
+                              );
+                        },
+                        onTextSelected: (text, location) {
+                          if (text.trim().isEmpty || location.locator.isEmpty) {
                             setState(() {
-                              _readingProgress = percentage.clamp(0, 100) / 100;
-                              _progressLabel =
-                                  '${percentage.toStringAsFixed(1)}%';
+                              _selectedText = null;
+                              _selectedLocation = null;
                             });
-                            ref
-                                .read(
-                                  readingProgressControllerProvider(
-                                    widget.book.id,
-                                  ).notifier,
-                                )
-                                .saveProgress(
-                                  location: location.locator,
-                                  percentage: percentage,
-                                );
-                          },
-                          onTextSelected: (text, location) {
-                            setState(() {
-                              _selectedText = text;
-                              _selectedLocation = location.locator;
-                            });
-                          },
-                        );
-                      },
-                      loading: () =>
-                          const Center(child: CircularProgressIndicator()),
-                      error: (e, st) =>
-                          Center(child: Text('Error loading progress')),
-                    ),
+                            return;
+                          }
+
+                          setState(() {
+                            _selectedText = text;
+                            _selectedLocation = location.locator;
+                          });
+                        },
+                      );
+                    },
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (e, st) =>
+                        Center(child: Text('Error loading progress')),
                   ),
                 ),
               ),
@@ -190,7 +180,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 Positioned.fill(
                   child: IgnorePointer(
                     child: Container(
-                      color: Colors.black.withAlpha(((1.0 - settings.brightness) * 200).round()),
+                      color: Colors.black.withAlpha(
+                        ((1.0 - settings.brightness) * 200).round(),
+                      ),
                     ),
                   ),
                 ),
@@ -284,8 +276,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                           ),
                           const SizedBox(height: 4),
                           // Buttons row
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          Wrap(
+                            alignment: WrapAlignment.spaceEvenly,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 20,
                             children: [
                               IconButton(
                                 icon: const Icon(
@@ -294,7 +288,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                                   size: 22,
                                 ),
                                 tooltip: 'Table of Contents',
-                                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                                onPressed: () =>
+                                    _scaffoldKey.currentState?.openDrawer(),
                               ),
                               IconButton(
                                 icon: const Icon(
@@ -329,7 +324,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 right: _selectedText != null ? 12 : -60,
                 top: 0,
                 bottom: 0,
-                child: Center(child: _buildSelectionBar()),
+                child: SafeArea(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.of(context).size.height - 32,
+                      ),
+                      child: _buildSelectionBar(),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
@@ -359,40 +363,44 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   }
 
   Widget _buildSelectionBar() {
-    return Container(
-      width: 44,
-      padding: const EdgeInsets.symmetric(vertical: 10),
+    return DecoratedBox(
       decoration: BoxDecoration(
         color: Colors.black87,
         borderRadius: BorderRadius.circular(22),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Color dots
-          for (final color in _highlightColors)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: GestureDetector(
-                onTap: () => _saveHighlight(color),
-                child: Container(
-                  width: 26,
-                  height: 26,
-                  decoration: BoxDecoration(
-                    color: _parseColor(color),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white24, width: 1.5),
+      child: SizedBox(
+        width: 44,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Color dots
+              for (final color in _highlightColors)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: GestureDetector(
+                    onTap: () => _saveHighlight(color),
+                    child: Container(
+                      width: 26,
+                      height: 26,
+                      decoration: BoxDecoration(
+                        color: _parseColor(color),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white24, width: 1.5),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-          const SizedBox(height: 4),
-          // Note
-          _miniButton(Icons.note_add, _addNote),
-          const SizedBox(height: 6),
-          // Copy
-          _miniButton(Icons.copy, _copySelection),
-        ],
+              const SizedBox(height: 4),
+              // Note
+              _miniButton(Icons.note_add, _addNote),
+              const SizedBox(height: 6),
+              // Copy
+              _miniButton(Icons.copy, _copySelection),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -470,7 +478,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                   .addHighlight(
                     text: _selectedText!,
                     location: _selectedLocation!,
-                    note: noteController.text.isNotEmpty ? noteController.text : null,
+                    note: noteController.text.isNotEmpty
+                        ? noteController.text
+                        : null,
                   );
               Navigator.pop(ctx);
               setState(() {
@@ -628,7 +638,9 @@ class _ExpandableTocItemState extends State<_ExpandableTocItem> {
           contentPadding: EdgeInsets.only(left: widget.padding),
           leading: IconButton(
             icon: Icon(
-              _expanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_right,
+              _expanded
+                  ? Icons.keyboard_arrow_down
+                  : Icons.keyboard_arrow_right,
               size: 20,
             ),
             padding: EdgeInsets.zero,
@@ -642,8 +654,7 @@ class _ExpandableTocItemState extends State<_ExpandableTocItem> {
           title: Text(widget.item.title),
           onTap: () => widget.onNavigate(widget.item.fileName),
         ),
-        if (_expanded)
-          ..._buildSubItems(widget.item.subItems),
+        if (_expanded) ..._buildSubItems(widget.item.subItems),
       ],
     );
   }
@@ -712,20 +723,22 @@ class _HighlightsPanel extends ConsumerWidget {
                     Text('Highlights', style: theme.textTheme.titleMedium),
                     const Spacer(),
                     highlightsAsync.whenOrNull(
-                      data: (list) => Text(
-                        '${list.length}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface.withAlpha(120),
-                        ),
-                      ),
-                    ) ?? const SizedBox.shrink(),
+                          data: (list) => Text(
+                            '${list.length}',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurface.withAlpha(120),
+                            ),
+                          ),
+                        ) ??
+                        const SizedBox.shrink(),
                   ],
                 ),
               ),
               const Divider(),
               Expanded(
                 child: highlightsAsync.when(
-                  loading: () => const Center(child: CircularProgressIndicator()),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
                   error: (e, _) => Center(child: Text('Error: $e')),
                   data: (highlights) {
                     if (highlights.isEmpty) {
@@ -744,7 +757,10 @@ class _HighlightsPanel extends ConsumerWidget {
                       itemCount: highlights.length,
                       padding: const EdgeInsets.only(bottom: 24),
                       itemBuilder: (ctx, i) => _buildHighlightTile(
-                        context, ref, highlights[i], theme,
+                        context,
+                        ref,
+                        highlights[i],
+                        theme,
                       ),
                     );
                   },

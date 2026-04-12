@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$ReaderSettings {
 
- String get fontFamily; double get fontSize; int get backgroundColor; double get lineHeight; double get horizontalPadding; ReadingMode get readingMode; double get brightness;
+ String get fontFamily; double get fontSize; int get backgroundColor; double get lineHeight; double get horizontalPadding; ReadingMode get readingMode; bool get enableDualPageSpread; double get brightness;
 /// Create a copy of ReaderSettings
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $ReaderSettingsCopyWith<ReaderSettings> get copyWith => _$ReaderSettingsCopyWith
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is ReaderSettings&&(identical(other.fontFamily, fontFamily) || other.fontFamily == fontFamily)&&(identical(other.fontSize, fontSize) || other.fontSize == fontSize)&&(identical(other.backgroundColor, backgroundColor) || other.backgroundColor == backgroundColor)&&(identical(other.lineHeight, lineHeight) || other.lineHeight == lineHeight)&&(identical(other.horizontalPadding, horizontalPadding) || other.horizontalPadding == horizontalPadding)&&(identical(other.readingMode, readingMode) || other.readingMode == readingMode)&&(identical(other.brightness, brightness) || other.brightness == brightness));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ReaderSettings&&(identical(other.fontFamily, fontFamily) || other.fontFamily == fontFamily)&&(identical(other.fontSize, fontSize) || other.fontSize == fontSize)&&(identical(other.backgroundColor, backgroundColor) || other.backgroundColor == backgroundColor)&&(identical(other.lineHeight, lineHeight) || other.lineHeight == lineHeight)&&(identical(other.horizontalPadding, horizontalPadding) || other.horizontalPadding == horizontalPadding)&&(identical(other.readingMode, readingMode) || other.readingMode == readingMode)&&(identical(other.enableDualPageSpread, enableDualPageSpread) || other.enableDualPageSpread == enableDualPageSpread)&&(identical(other.brightness, brightness) || other.brightness == brightness));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,fontFamily,fontSize,backgroundColor,lineHeight,horizontalPadding,readingMode,brightness);
+int get hashCode => Object.hash(runtimeType,fontFamily,fontSize,backgroundColor,lineHeight,horizontalPadding,readingMode,enableDualPageSpread,brightness);
 
 @override
 String toString() {
-  return 'ReaderSettings(fontFamily: $fontFamily, fontSize: $fontSize, backgroundColor: $backgroundColor, lineHeight: $lineHeight, horizontalPadding: $horizontalPadding, readingMode: $readingMode, brightness: $brightness)';
+  return 'ReaderSettings(fontFamily: $fontFamily, fontSize: $fontSize, backgroundColor: $backgroundColor, lineHeight: $lineHeight, horizontalPadding: $horizontalPadding, readingMode: $readingMode, enableDualPageSpread: $enableDualPageSpread, brightness: $brightness)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $ReaderSettingsCopyWith<$Res>  {
   factory $ReaderSettingsCopyWith(ReaderSettings value, $Res Function(ReaderSettings) _then) = _$ReaderSettingsCopyWithImpl;
 @useResult
 $Res call({
- String fontFamily, double fontSize, int backgroundColor, double lineHeight, double horizontalPadding, ReadingMode readingMode, double brightness
+ String fontFamily, double fontSize, int backgroundColor, double lineHeight, double horizontalPadding, ReadingMode readingMode, bool enableDualPageSpread, double brightness
 });
 
 
@@ -65,7 +65,7 @@ class _$ReaderSettingsCopyWithImpl<$Res>
 
 /// Create a copy of ReaderSettings
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? fontFamily = null,Object? fontSize = null,Object? backgroundColor = null,Object? lineHeight = null,Object? horizontalPadding = null,Object? readingMode = null,Object? brightness = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? fontFamily = null,Object? fontSize = null,Object? backgroundColor = null,Object? lineHeight = null,Object? horizontalPadding = null,Object? readingMode = null,Object? enableDualPageSpread = null,Object? brightness = null,}) {
   return _then(_self.copyWith(
 fontFamily: null == fontFamily ? _self.fontFamily : fontFamily // ignore: cast_nullable_to_non_nullable
 as String,fontSize: null == fontSize ? _self.fontSize : fontSize // ignore: cast_nullable_to_non_nullable
@@ -73,7 +73,8 @@ as double,backgroundColor: null == backgroundColor ? _self.backgroundColor : bac
 as int,lineHeight: null == lineHeight ? _self.lineHeight : lineHeight // ignore: cast_nullable_to_non_nullable
 as double,horizontalPadding: null == horizontalPadding ? _self.horizontalPadding : horizontalPadding // ignore: cast_nullable_to_non_nullable
 as double,readingMode: null == readingMode ? _self.readingMode : readingMode // ignore: cast_nullable_to_non_nullable
-as ReadingMode,brightness: null == brightness ? _self.brightness : brightness // ignore: cast_nullable_to_non_nullable
+as ReadingMode,enableDualPageSpread: null == enableDualPageSpread ? _self.enableDualPageSpread : enableDualPageSpread // ignore: cast_nullable_to_non_nullable
+as bool,brightness: null == brightness ? _self.brightness : brightness // ignore: cast_nullable_to_non_nullable
 as double,
   ));
 }
@@ -159,10 +160,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String fontFamily,  double fontSize,  int backgroundColor,  double lineHeight,  double horizontalPadding,  ReadingMode readingMode,  double brightness)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String fontFamily,  double fontSize,  int backgroundColor,  double lineHeight,  double horizontalPadding,  ReadingMode readingMode,  bool enableDualPageSpread,  double brightness)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _ReaderSettings() when $default != null:
-return $default(_that.fontFamily,_that.fontSize,_that.backgroundColor,_that.lineHeight,_that.horizontalPadding,_that.readingMode,_that.brightness);case _:
+return $default(_that.fontFamily,_that.fontSize,_that.backgroundColor,_that.lineHeight,_that.horizontalPadding,_that.readingMode,_that.enableDualPageSpread,_that.brightness);case _:
   return orElse();
 
 }
@@ -180,10 +181,10 @@ return $default(_that.fontFamily,_that.fontSize,_that.backgroundColor,_that.line
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String fontFamily,  double fontSize,  int backgroundColor,  double lineHeight,  double horizontalPadding,  ReadingMode readingMode,  double brightness)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String fontFamily,  double fontSize,  int backgroundColor,  double lineHeight,  double horizontalPadding,  ReadingMode readingMode,  bool enableDualPageSpread,  double brightness)  $default,) {final _that = this;
 switch (_that) {
 case _ReaderSettings():
-return $default(_that.fontFamily,_that.fontSize,_that.backgroundColor,_that.lineHeight,_that.horizontalPadding,_that.readingMode,_that.brightness);case _:
+return $default(_that.fontFamily,_that.fontSize,_that.backgroundColor,_that.lineHeight,_that.horizontalPadding,_that.readingMode,_that.enableDualPageSpread,_that.brightness);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -200,10 +201,10 @@ return $default(_that.fontFamily,_that.fontSize,_that.backgroundColor,_that.line
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String fontFamily,  double fontSize,  int backgroundColor,  double lineHeight,  double horizontalPadding,  ReadingMode readingMode,  double brightness)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String fontFamily,  double fontSize,  int backgroundColor,  double lineHeight,  double horizontalPadding,  ReadingMode readingMode,  bool enableDualPageSpread,  double brightness)?  $default,) {final _that = this;
 switch (_that) {
 case _ReaderSettings() when $default != null:
-return $default(_that.fontFamily,_that.fontSize,_that.backgroundColor,_that.lineHeight,_that.horizontalPadding,_that.readingMode,_that.brightness);case _:
+return $default(_that.fontFamily,_that.fontSize,_that.backgroundColor,_that.lineHeight,_that.horizontalPadding,_that.readingMode,_that.enableDualPageSpread,_that.brightness);case _:
   return null;
 
 }
@@ -215,7 +216,7 @@ return $default(_that.fontFamily,_that.fontSize,_that.backgroundColor,_that.line
 @JsonSerializable()
 
 class _ReaderSettings implements ReaderSettings {
-  const _ReaderSettings({this.fontFamily = 'sans-serif', this.fontSize = 16.0, this.backgroundColor = 0xFF121212, this.lineHeight = 1.5, this.horizontalPadding = 20.0, this.readingMode = ReadingMode.vertical, this.brightness = 1.0});
+  const _ReaderSettings({this.fontFamily = 'sans-serif', this.fontSize = 16.0, this.backgroundColor = 0xFF121212, this.lineHeight = 1.5, this.horizontalPadding = 20.0, this.readingMode = ReadingMode.vertical, this.enableDualPageSpread = true, this.brightness = 1.0});
   factory _ReaderSettings.fromJson(Map<String, dynamic> json) => _$ReaderSettingsFromJson(json);
 
 @override@JsonKey() final  String fontFamily;
@@ -224,6 +225,7 @@ class _ReaderSettings implements ReaderSettings {
 @override@JsonKey() final  double lineHeight;
 @override@JsonKey() final  double horizontalPadding;
 @override@JsonKey() final  ReadingMode readingMode;
+@override@JsonKey() final  bool enableDualPageSpread;
 @override@JsonKey() final  double brightness;
 
 /// Create a copy of ReaderSettings
@@ -239,16 +241,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ReaderSettings&&(identical(other.fontFamily, fontFamily) || other.fontFamily == fontFamily)&&(identical(other.fontSize, fontSize) || other.fontSize == fontSize)&&(identical(other.backgroundColor, backgroundColor) || other.backgroundColor == backgroundColor)&&(identical(other.lineHeight, lineHeight) || other.lineHeight == lineHeight)&&(identical(other.horizontalPadding, horizontalPadding) || other.horizontalPadding == horizontalPadding)&&(identical(other.readingMode, readingMode) || other.readingMode == readingMode)&&(identical(other.brightness, brightness) || other.brightness == brightness));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ReaderSettings&&(identical(other.fontFamily, fontFamily) || other.fontFamily == fontFamily)&&(identical(other.fontSize, fontSize) || other.fontSize == fontSize)&&(identical(other.backgroundColor, backgroundColor) || other.backgroundColor == backgroundColor)&&(identical(other.lineHeight, lineHeight) || other.lineHeight == lineHeight)&&(identical(other.horizontalPadding, horizontalPadding) || other.horizontalPadding == horizontalPadding)&&(identical(other.readingMode, readingMode) || other.readingMode == readingMode)&&(identical(other.enableDualPageSpread, enableDualPageSpread) || other.enableDualPageSpread == enableDualPageSpread)&&(identical(other.brightness, brightness) || other.brightness == brightness));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,fontFamily,fontSize,backgroundColor,lineHeight,horizontalPadding,readingMode,brightness);
+int get hashCode => Object.hash(runtimeType,fontFamily,fontSize,backgroundColor,lineHeight,horizontalPadding,readingMode,enableDualPageSpread,brightness);
 
 @override
 String toString() {
-  return 'ReaderSettings(fontFamily: $fontFamily, fontSize: $fontSize, backgroundColor: $backgroundColor, lineHeight: $lineHeight, horizontalPadding: $horizontalPadding, readingMode: $readingMode, brightness: $brightness)';
+  return 'ReaderSettings(fontFamily: $fontFamily, fontSize: $fontSize, backgroundColor: $backgroundColor, lineHeight: $lineHeight, horizontalPadding: $horizontalPadding, readingMode: $readingMode, enableDualPageSpread: $enableDualPageSpread, brightness: $brightness)';
 }
 
 
@@ -259,7 +261,7 @@ abstract mixin class _$ReaderSettingsCopyWith<$Res> implements $ReaderSettingsCo
   factory _$ReaderSettingsCopyWith(_ReaderSettings value, $Res Function(_ReaderSettings) _then) = __$ReaderSettingsCopyWithImpl;
 @override @useResult
 $Res call({
- String fontFamily, double fontSize, int backgroundColor, double lineHeight, double horizontalPadding, ReadingMode readingMode, double brightness
+ String fontFamily, double fontSize, int backgroundColor, double lineHeight, double horizontalPadding, ReadingMode readingMode, bool enableDualPageSpread, double brightness
 });
 
 
@@ -276,7 +278,7 @@ class __$ReaderSettingsCopyWithImpl<$Res>
 
 /// Create a copy of ReaderSettings
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? fontFamily = null,Object? fontSize = null,Object? backgroundColor = null,Object? lineHeight = null,Object? horizontalPadding = null,Object? readingMode = null,Object? brightness = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? fontFamily = null,Object? fontSize = null,Object? backgroundColor = null,Object? lineHeight = null,Object? horizontalPadding = null,Object? readingMode = null,Object? enableDualPageSpread = null,Object? brightness = null,}) {
   return _then(_ReaderSettings(
 fontFamily: null == fontFamily ? _self.fontFamily : fontFamily // ignore: cast_nullable_to_non_nullable
 as String,fontSize: null == fontSize ? _self.fontSize : fontSize // ignore: cast_nullable_to_non_nullable
@@ -284,7 +286,8 @@ as double,backgroundColor: null == backgroundColor ? _self.backgroundColor : bac
 as int,lineHeight: null == lineHeight ? _self.lineHeight : lineHeight // ignore: cast_nullable_to_non_nullable
 as double,horizontalPadding: null == horizontalPadding ? _self.horizontalPadding : horizontalPadding // ignore: cast_nullable_to_non_nullable
 as double,readingMode: null == readingMode ? _self.readingMode : readingMode // ignore: cast_nullable_to_non_nullable
-as ReadingMode,brightness: null == brightness ? _self.brightness : brightness // ignore: cast_nullable_to_non_nullable
+as ReadingMode,enableDualPageSpread: null == enableDualPageSpread ? _self.enableDualPageSpread : enableDualPageSpread // ignore: cast_nullable_to_non_nullable
+as bool,brightness: null == brightness ? _self.brightness : brightness // ignore: cast_nullable_to_non_nullable
 as double,
   ));
 }

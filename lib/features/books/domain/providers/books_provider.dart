@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -26,6 +27,10 @@ final booksControllerProvider =
     });
 
 class BooksController extends AsyncNotifier<List<BookDto>> {
+  static const _desktopUserAgent =
+      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 '
+      '(KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36';
+
   late final BooksLocalRepository _repository;
 
   @override
@@ -177,23 +182,39 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
     ref.read(downloadNotifierProvider.notifier).setProgress(book.id, -1);
 
     List<String> downloadLinks = [];
+    ZLibraryApi? zLibApi;
+    String? zLibEmail;
+    String? zLibReferer;
 
     if (book.source == SearchResultSource.anna) {
       final annaApi = anna.AnnaApi();
       downloadLinks = await annaApi.getDownloadLinks(book.id);
     } else if (book.source == SearchResultSource.zlibrary) {
       final zLibCreds = ref.read(zLibraryCredentialsProvider);
+      zLibApi = ZLibraryApi(cookies: zLibCreds?.cookies);
+      zLibEmail = zLibCreds?.email;
       final zBook = book.originalObject as ZLibraryBook;
-      if (zBook.downloadUrl != null) {
-        downloadLinks = [zBook.downloadUrl!];
-      } else {
-        // Fallback: fetch book page for download link
-        final zLibApi = ZLibraryApi(cookies: zLibCreds?.cookies);
-        final bookDetails = await zLibApi.fetchBookDetails(zBook);
-        if (bookDetails.downloadUrl != null) {
-          downloadLinks = [bookDetails.downloadUrl!];
-        }
+      final candidateLinks = LinkedHashSet<String>();
+
+      if (zBook.downloadUrl != null && zBook.downloadUrl!.isNotEmpty) {
+        candidateLinks.add(zBook.downloadUrl!);
       }
+
+      try {
+        final bookDetails = await zLibApi.fetchBookDetails(zBook);
+        if (bookDetails.downloadUrl != null &&
+            bookDetails.downloadUrl!.isNotEmpty) {
+          candidateLinks.add(bookDetails.downloadUrl!);
+        }
+        if (bookDetails.url.isNotEmpty) {
+          zLibReferer = bookDetails.url;
+        }
+      } catch (e) {
+        print('ZLibraryApi: Failed to fetch book details for download - $e');
+      }
+
+      zLibReferer ??= zBook.url.isNotEmpty ? zBook.url : null;
+      downloadLinks = candidateLinks.toList().reversed.toList();
     }
 
     if (downloadLinks.isEmpty) {
@@ -217,70 +238,49 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
         .read(downloadNotifierProvider.notifier)
         .startDownload(book.id);
 
-    // For Z-Library downloads, build initial cookies and resolve the browser check via Dio
-    String? zLibCookieHeader;
-    if (book.source == SearchResultSource.zlibrary) {
-      final userCookies = ref.read(zLibraryCredentialsProvider)?.cookies;
-      final cookieMap = <String, String>{};
-      if (userCookies != null) cookieMap.addAll(userCookies);
-
-      // Probe the download URL to solve the JS browser check challenge
-      final probeDio = Dio();
-      for (final link in downloadLinks) {
-        try {
-          final probeResponse = await probeDio.get(
-            link,
-            options: Options(
-              headers: {
-                'User-Agent':
-                    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36',
-                if (cookieMap.isNotEmpty)
-                  'Cookie': cookieMap.entries
-                      .map((e) => '${e.key}=${e.value}')
-                      .join('; '),
-              },
-              validateStatus: (status) => true, // Accept 503
-              responseType: ResponseType.plain,
-              followRedirects: false,
-            ),
-          );
-
-          if (probeResponse.statusCode == 503 &&
-              probeResponse.data.toString().contains('Checking your browser')) {
-            print('ZLibraryApi: Download challenge encountered, solving...');
-            final token = BrowserCheckSolver.solve(
-              probeResponse.data.toString(),
-            );
-            if (token != null) {
-              print('ZLibraryApi: Download challenge solved. c_token=$token');
-              cookieMap['c_token'] = token;
-            }
-          }
-          break; // Only need to probe one link
-        } catch (e) {
-          print('ZLibraryApi: Probe failed for $link - $e');
-        }
-      }
-
-      zLibCookieHeader = cookieMap.entries
-          .map((e) => '${e.key}=${e.value}')
-          .join('; ');
-    }
+    final dio = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 20),
+        sendTimeout: const Duration(seconds: 20),
+        receiveTimeout: const Duration(minutes: 2),
+        headers: {'User-Agent': _desktopUserAgent},
+      ),
+    );
 
     // Try links until one works
     bool success = false;
     for (final link in downloadLinks) {
       try {
+        String? zLibCookieHeader;
+        if (book.source == SearchResultSource.zlibrary && zLibApi != null) {
+          final resolvedCookies = await zLibApi.resolveDownloadCookies(link);
+          zLibCookieHeader = resolvedCookies.entries
+              .map((e) => '${e.key}=${e.value}')
+              .join('; ');
+
+          if (zLibEmail != null) {
+            unawaited(
+              ref
+                  .read(zLibraryCredentialsProvider.notifier)
+                  .saveCredentials(zLibEmail, resolvedCookies),
+            );
+          }
+        }
+
         final options = Options(
-          headers: zLibCookieHeader != null
+          headers: zLibCookieHeader != null && zLibCookieHeader.isNotEmpty
               ? {
-                  'User-Agent':
-                      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36',
                   'Cookie': zLibCookieHeader,
+                  if (zLibReferer != null && zLibReferer.isNotEmpty)
+                    'Referer': zLibReferer,
                 }
               : null,
+          followRedirects: true,
+          receiveDataWhenStatusError: false,
+          validateStatus: (status) =>
+              status != null && status >= 200 && status < 400,
         );
-        await Dio().download(
+        await dio.download(
           link,
           newFilePath,
           options: options,
@@ -349,13 +349,6 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
           }
           coverPath = p.join(coversDir.path, '$bookId.jpg');
           await File(coverPath).writeAsBytes(parsed.coverImage!);
-        } else if (book.imgUrl.isNotEmpty) {
-          // Using cover from API if EPUB has no cover
-          final coversDir = Directory(p.join(appDocDir.path, 'covers'));
-          if (!await coversDir.exists())
-            await coversDir.create(recursive: true);
-          coverPath = p.join(coversDir.path, '$bookId.jpg');
-          await Dio().download(book.imgUrl, coverPath);
         }
       } catch (e) {
         print('Error extracting EPUB metadata: $e');
@@ -393,6 +386,43 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
       }
     }
 
+    if ((coverPath == null || coverPath.isEmpty) && book.imgUrl.isNotEmpty) {
+      final coversDir = Directory(p.join(appDocDir.path, 'covers'));
+      if (!await coversDir.exists()) {
+        await coversDir.create(recursive: true);
+      }
+      final fallbackExtension = extension == 'pdf' ? 'png' : 'jpg';
+      final fallbackCoverPath = p.join(
+        coversDir.path,
+        '$bookId.$fallbackExtension',
+      );
+      final fallbackHeaders = <String, String>{
+        if (book.source == SearchResultSource.anna)
+          'User-Agent': _desktopUserAgent,
+        if (book.source == SearchResultSource.zlibrary &&
+            ref.read(zLibraryCredentialsProvider)?.cookies.isNotEmpty == true)
+          'Cookie': ref
+              .read(zLibraryCredentialsProvider)!
+              .cookies
+              .entries
+              .map((e) => '${e.key}=${e.value}')
+              .join('; '),
+        if (book.source == SearchResultSource.zlibrary &&
+            zLibReferer != null &&
+            zLibReferer.isNotEmpty)
+          'Referer': zLibReferer,
+      };
+      final normalizedCoverUrl = _normalizeCoverUrl(book.imgUrl, zLibReferer);
+      final downloadedCoverPath = await _downloadCoverToPath(
+        normalizedCoverUrl,
+        fallbackCoverPath,
+        headers: fallbackHeaders,
+      );
+      if (downloadedCoverPath != null) {
+        coverPath = downloadedCoverPath;
+      }
+    }
+
     final newBook = BookDto(
       id: bookId,
       title: book.title,
@@ -425,6 +455,51 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
     await _repository.deleteBook(id);
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() => _repository.getAllBooks());
+  }
+
+  Future<String?> _downloadCoverToPath(
+    String imageUrl,
+    String targetPath, {
+    Map<String, String>? headers,
+  }) async {
+    if (imageUrl.isEmpty) return null;
+
+    try {
+      await Dio(
+        BaseOptions(
+          connectTimeout: const Duration(seconds: 15),
+          receiveTimeout: const Duration(seconds: 30),
+          headers: headers,
+        ),
+      ).download(imageUrl, targetPath);
+
+      final file = File(targetPath);
+      if (await file.exists() && await file.length() > 0) {
+        return targetPath;
+      }
+    } catch (e) {
+      print('Error downloading remote cover: $e');
+    }
+
+    return null;
+  }
+
+  String _normalizeCoverUrl(String imageUrl, String? referer) {
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      return imageUrl;
+    }
+    if (imageUrl.startsWith('//')) {
+      return 'https:$imageUrl';
+    }
+
+    final refererUri = referer != null && referer.isNotEmpty
+        ? Uri.tryParse(referer)
+        : null;
+    if (refererUri != null) {
+      return refererUri.resolve(imageUrl).toString();
+    }
+
+    return imageUrl;
   }
 
   /// Encode raw BGRA pixels (from pdfrx) to PNG

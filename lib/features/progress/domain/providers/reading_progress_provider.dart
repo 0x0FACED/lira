@@ -18,10 +18,18 @@ class ReadingProgressController
     extends FamilyAsyncNotifier<ReadingProgressDto?, String> {
   late final ReadingProgressLocalRepository _repository;
   Timer? _debounceTimer;
+  ReadingProgressDto? _pendingProgress;
 
   @override
   FutureOr<ReadingProgressDto?> build(String arg) async {
     _repository = getIt<ReadingProgressLocalRepository>();
+    ref.onDispose(() {
+      _debounceTimer?.cancel();
+      final pendingProgress = _pendingProgress;
+      if (pendingProgress != null) {
+        unawaited(_repository.saveProgress(pendingProgress));
+      }
+    });
     return _repository.getProgress(arg);
   }
 
@@ -30,16 +38,21 @@ class ReadingProgressController
     required double percentage,
   }) async {
     _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(seconds: 1), () async {
-      final progress = ReadingProgressDto(
-        bookId: arg, // arg is the bookId in FamilyAsyncNotifier
-        percentage: percentage,
-        location: location,
-        updatedAt: DateTime.now(),
-      );
+    final progress = ReadingProgressDto(
+      bookId: arg, // arg is the bookId in FamilyAsyncNotifier
+      percentage: percentage,
+      location: location,
+      updatedAt: DateTime.now(),
+    );
+    _pendingProgress = progress;
 
-      await _repository.saveProgress(progress);
-      state = AsyncValue.data(progress);
+    _debounceTimer = Timer(const Duration(seconds: 1), () async {
+      final pendingProgress = _pendingProgress;
+      if (pendingProgress == null) return;
+
+      await _repository.saveProgress(pendingProgress);
+      state = AsyncValue.data(pendingProgress);
+      _pendingProgress = null;
     });
   }
 }

@@ -14,6 +14,8 @@ class EpubLocation {
     String? anchor,
     int charOffset = 0,
     double scrollFraction = 0.0,
+    double? bookScrollOffset,
+    double? bookScrollFraction,
     int? startOffset,
     int? endOffset,
   }) {
@@ -23,6 +25,8 @@ class EpubLocation {
         anchor: anchor,
         charOffset: charOffset,
         scrollFraction: scrollFraction,
+        bookScrollOffset: bookScrollOffset,
+        bookScrollFraction: bookScrollFraction,
         startOffset: startOffset,
         endOffset: endOffset,
       ),
@@ -33,6 +37,8 @@ class EpubLocation {
   String? get anchor => cfi.anchor;
   int get charOffset => cfi.charOffset;
   double get scrollFraction => cfi.scrollFraction;
+  double? get bookScrollOffset => cfi.bookScrollOffset;
+  double? get bookScrollFraction => cfi.bookScrollFraction;
   int? get startOffset => cfi.startOffset;
   int? get endOffset => cfi.endOffset;
 
@@ -44,6 +50,28 @@ class EpubLocation {
     final cfi = EpubCfi.fromJson(data);
     if (cfi == null) return null;
     return EpubLocation(cfi: cfi);
+  }
+
+  EpubLocation copyWith({
+    int? chapterIndex,
+    String? anchor,
+    int? charOffset,
+    double? scrollFraction,
+    double? bookScrollOffset,
+    double? bookScrollFraction,
+    int? startOffset,
+    int? endOffset,
+  }) {
+    return EpubLocation.fromPosition(
+      chapterIndex: chapterIndex ?? this.chapterIndex,
+      anchor: anchor ?? this.anchor,
+      charOffset: charOffset ?? this.charOffset,
+      scrollFraction: scrollFraction ?? this.scrollFraction,
+      bookScrollOffset: bookScrollOffset ?? this.bookScrollOffset,
+      bookScrollFraction: bookScrollFraction ?? this.bookScrollFraction,
+      startOffset: startOffset ?? this.startOffset,
+      endOffset: endOffset ?? this.endOffset,
+    );
   }
 
   @override

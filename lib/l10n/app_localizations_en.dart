@@ -184,6 +184,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Font size, theme, and other settings will be available in a future update.';
 
   @override
+  String get readerTwoPageSpread => 'Two-page spread';
+
+  @override
   String get highlightSaved => 'Highlight saved';
 
   @override

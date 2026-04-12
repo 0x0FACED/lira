@@ -94,6 +94,7 @@
   "tocComingSoon": "Оглавление будет доступно в следующем обновлении.",
   "readerSettings": "Настройки чтения",
   "readerSettingsHint": "Размер шрифта, тема и другие настройки будут доступны в следующем обновлении.",
+  "readerTwoPageSpread": "Разворот на 2 страницы",
   "highlightSaved": "Выделение сохранено",
   "errorLoadingBook": "Ошибка загрузки книги",
   "errorLoadingProgress": "Ошибка загрузки прогресса",

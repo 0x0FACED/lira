@@ -8,7 +8,8 @@ import '../models/book_location.dart';
 
 class EpubBookReaderEngine implements BookReaderEngine {
   ParsedEpub? _epub;
-  final GlobalKey<EpubReaderViewState> _readerKey = GlobalKey<EpubReaderViewState>();
+  final GlobalKey<EpubNativeViewState> _readerKey =
+      GlobalKey<EpubNativeViewState>();
 
   @override
   String get supportedFormat => 'epub';
@@ -52,7 +53,7 @@ class EpubBookReaderEngine implements BookReaderEngine {
       parsedLocation = EpubLocation.fromJson(initialLocation.locator);
     }
 
-    return EpubReaderView(
+    return EpubNativeView(
       key: _readerKey,
       epub: _epub!,
       initialLocation: parsedLocation,
@@ -74,6 +75,12 @@ class EpubBookReaderEngine implements BookReaderEngine {
 
   @override
   Future<void> goToLocation(BookLocation location) async {
+    final parsedLocation = EpubLocation.fromJson(location.locator);
+    if (parsedLocation != null) {
+      _readerKey.currentState?.goToLocation(parsedLocation);
+      return;
+    }
+
     _readerKey.currentState?.scrollToChapter(location.locator);
   }
 

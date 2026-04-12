@@ -58,9 +58,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
     // Format filter
     if (_formatFilter == FormatFilter.epub) {
-      filtered = filtered.where((b) => b.format.toLowerCase() == 'epub').toList();
+      filtered = filtered
+          .where((b) => b.format.toLowerCase() == 'epub')
+          .toList();
     } else if (_formatFilter == FormatFilter.pdf) {
-      filtered = filtered.where((b) => b.format.toLowerCase() == 'pdf').toList();
+      filtered = filtered
+          .where((b) => b.format.toLowerCase() == 'pdf')
+          .toList();
     }
 
     // Sort
@@ -68,11 +72,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       case SortOrder.relevance:
         break; // keep original order
       case SortOrder.titleAsc:
-        filtered = List.of(filtered)..sort((a, b) => a.title.compareTo(b.title));
+        filtered = List.of(filtered)
+          ..sort((a, b) => a.title.compareTo(b.title));
       case SortOrder.titleDesc:
-        filtered = List.of(filtered)..sort((a, b) => b.title.compareTo(a.title));
+        filtered = List.of(filtered)
+          ..sort((a, b) => b.title.compareTo(a.title));
       case SortOrder.authorAsc:
-        filtered = List.of(filtered)..sort((a, b) => a.author.compareTo(b.author));
+        filtered = List.of(filtered)
+          ..sort((a, b) => a.author.compareTo(b.author));
     }
 
     return filtered;
@@ -97,7 +104,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               loaded: (state) => state.books.isNotEmpty
                   ? _buildFiltersRow(theme, state.books.length)
                   : const SizedBox.shrink(),
-              error: (state) => state.partialResults != null && state.partialResults!.isNotEmpty
+              error: (state) =>
+                  state.partialResults != null &&
+                      state.partialResults!.isNotEmpty
                   ? _buildFiltersRow(theme, state.partialResults!.length)
                   : const SizedBox.shrink(),
               orElse: () => const SizedBox.shrink(),
@@ -122,98 +131,113 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   // Search Header
   // ---------------------------------------------------------------------------
 
-  Widget _buildSearchHeader(ThemeData theme, AppLocalizations l10n, SearchSource source) {
+  Widget _buildSearchHeader(
+    ThemeData theme,
+    AppLocalizations l10n,
+    SearchSource source,
+  ) {
     final isDark = theme.brightness == Brightness.dark;
-    final surfaceColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final panelColor = isDark
+        ? const Color(0xFF1A1D22)
+        : const Color(0xFFF7F7F9);
+    final fieldColor = isDark ? const Color(0xFF101317) : Colors.white;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Search field
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            decoration: BoxDecoration(
-              color: surfaceColor,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: _hasFocus
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.outline.withAlpha(40),
-                width: _hasFocus ? 1.5 : 1,
-              ),
-              boxShadow: _hasFocus
-                  ? [
-                      BoxShadow(
-                        color: theme.colorScheme.primary.withAlpha(25),
-                        blurRadius: 12,
-                        spreadRadius: 2,
-                      ),
-                    ]
-                  : [],
-            ),
-            child: Row(
-              children: [
-                const SizedBox(width: 16),
-                Icon(
-                  Icons.search_rounded,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: panelColor,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: theme.colorScheme.outline.withAlpha(24)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              decoration: BoxDecoration(
+                color: fieldColor,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
                   color: _hasFocus
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.onSurface.withAlpha(120),
-                  size: 22,
+                      ? theme.colorScheme.primary.withAlpha(160)
+                      : theme.colorScheme.outline.withAlpha(32),
+                  width: _hasFocus ? 1.4 : 1,
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    focusNode: _focusNode,
-                    decoration: InputDecoration(
-                      hintText: l10n.searchBooks,
-                      hintStyle: TextStyle(
-                        color: theme.colorScheme.onSurface.withAlpha(100),
-                        fontSize: 16,
+                boxShadow: _hasFocus
+                    ? [
+                        BoxShadow(
+                          color: theme.colorScheme.primary.withAlpha(18),
+                          blurRadius: 18,
+                          spreadRadius: 1,
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(width: 16),
+                  Icon(
+                    Icons.search_rounded,
+                    color: _hasFocus
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurface.withAlpha(120),
+                    size: 22,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      focusNode: _focusNode,
+                      decoration: InputDecoration(
+                        hintText: l10n.searchBooks,
+                        hintStyle: TextStyle(
+                          color: theme.colorScheme.onSurface.withAlpha(100),
+                          fontSize: 16,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 14,
+                        ),
+                        isCollapsed: true,
                       ),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                      isCollapsed: true,
+                      style: const TextStyle(fontSize: 16),
+                      textInputAction: TextInputAction.search,
+                      onSubmitted: (_) => _performSearch(),
                     ),
-                    style: const TextStyle(fontSize: 16),
-                    textInputAction: TextInputAction.search,
-                    onSubmitted: (_) => _performSearch(),
                   ),
-                ),
-                if (_searchController.text.isNotEmpty) ...[
+                  if (_searchController.text.isNotEmpty) ...[
+                    _buildHeaderIconButton(
+                      icon: Icons.close_rounded,
+                      onPressed: () {
+                        _searchController.clear();
+                        ref.read(searchProvider.notifier).clear();
+                        setState(() {
+                          _formatFilter = FormatFilter.all;
+                          _sortOrder = SortOrder.relevance;
+                        });
+                      },
+                      color: theme.colorScheme.onSurface.withAlpha(150),
+                    ),
+                  ],
                   _buildHeaderIconButton(
-                    icon: Icons.close_rounded,
-                    onPressed: () {
-                      _searchController.clear();
-                      ref.read(searchProvider.notifier).clear();
-                      setState(() {
-                        _formatFilter = FormatFilter.all;
-                        _sortOrder = SortOrder.relevance;
-                      });
-                    },
-                    color: theme.colorScheme.onSurface.withAlpha(150),
+                    icon: Icons.arrow_forward_rounded,
+                    onPressed: _performSearch,
+                    color: _searchController.text.isNotEmpty
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurface.withAlpha(80),
                   ),
+                  const SizedBox(width: 4),
                 ],
-                _buildHeaderIconButton(
-                  icon: Icons.arrow_forward_rounded,
-                  onPressed: _performSearch,
-                  color: _searchController.text.isNotEmpty
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.onSurface.withAlpha(80),
-                ),
-                const SizedBox(width: 4),
-              ],
+              ),
             ),
-          ),
 
-          const SizedBox(height: 10),
+            const SizedBox(height: 12),
 
-          // Source chips
-          _buildSourceChips(theme, ref.watch(searchSourceProvider)),
-        ],
+            _buildSourceChips(theme, source),
+          ],
+        ),
       ),
     );
   }
@@ -240,17 +264,32 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   // ---------------------------------------------------------------------------
 
   Widget _buildSourceChips(ThemeData theme, SearchSource current) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          _sourceChip(theme, "Anna's Archive", SearchSource.anna, current, Icons.public_rounded),
-          const SizedBox(width: 8),
-          _sourceChip(theme, 'Z-Library', SearchSource.zlibrary, current, Icons.menu_book_rounded),
-          const SizedBox(width: 8),
-          _sourceChip(theme, 'Both', SearchSource.both, current, Icons.merge_rounded),
-        ],
-      ),
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _sourceChip(
+          theme,
+          "Anna's Archive",
+          SearchSource.anna,
+          current,
+          Icons.public_rounded,
+        ),
+        _sourceChip(
+          theme,
+          'Z-Library',
+          SearchSource.zlibrary,
+          current,
+          Icons.menu_book_rounded,
+        ),
+        _sourceChip(
+          theme,
+          'Both',
+          SearchSource.both,
+          current,
+          Icons.merge_rounded,
+        ),
+      ],
     );
   }
 
@@ -264,26 +303,51 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final selected = current == value;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      child: FilterChip(
-        label: Text(label),
-        avatar: Icon(icon, size: 16),
-        selected: selected,
-        onSelected: (_) {
+      child: GestureDetector(
+        onTap: () {
           ref.read(searchSourceProvider.notifier).setSource(value);
           if (_searchController.text.isNotEmpty) {
             _performSearch();
           }
         },
-      selectedColor: theme.colorScheme.primary.withAlpha(40),
-      checkmarkColor: theme.colorScheme.primary,
-      side: BorderSide(
-        color: selected
-            ? theme.colorScheme.primary.withAlpha(80)
-            : theme.colorScheme.outline.withAlpha(40),
-      ),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      visualDensity: VisualDensity.compact,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: selected
+                ? theme.colorScheme.primary.withAlpha(20)
+                : theme.colorScheme.surface.withAlpha(140),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected
+                  ? theme.colorScheme.primary.withAlpha(120)
+                  : theme.colorScheme.outline.withAlpha(32),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: selected
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurface.withAlpha(150),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  color: selected
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurface.withAlpha(180),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -321,20 +385,43 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.sort_rounded, size: 16, color: theme.colorScheme.onSurface.withAlpha(180)),
+                  Icon(
+                    Icons.sort_rounded,
+                    size: 16,
+                    color: theme.colorScheme.onSurface.withAlpha(180),
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     _sortLabel(),
-                    style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface.withAlpha(180)),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurface.withAlpha(180),
+                    ),
                   ),
                 ],
               ),
             ),
             itemBuilder: (context) => [
-              _sortMenuItem(SortOrder.relevance, 'Relevance', Icons.auto_awesome_rounded),
-              _sortMenuItem(SortOrder.titleAsc, 'Title A–Z', Icons.sort_by_alpha_rounded),
-              _sortMenuItem(SortOrder.titleDesc, 'Title Z–A', Icons.sort_by_alpha_rounded),
-              _sortMenuItem(SortOrder.authorAsc, 'Author A–Z', Icons.person_rounded),
+              _sortMenuItem(
+                SortOrder.relevance,
+                'Relevance',
+                Icons.auto_awesome_rounded,
+              ),
+              _sortMenuItem(
+                SortOrder.titleAsc,
+                'Title A–Z',
+                Icons.sort_by_alpha_rounded,
+              ),
+              _sortMenuItem(
+                SortOrder.titleDesc,
+                'Title Z–A',
+                Icons.sort_by_alpha_rounded,
+              ),
+              _sortMenuItem(
+                SortOrder.authorAsc,
+                'Author A–Z',
+                Icons.person_rounded,
+              ),
             ],
           ),
         ],
@@ -342,7 +429,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     );
   }
 
-  PopupMenuItem<SortOrder> _sortMenuItem(SortOrder value, String label, IconData icon) {
+  PopupMenuItem<SortOrder> _sortMenuItem(
+    SortOrder value,
+    String label,
+    IconData icon,
+  ) {
     return PopupMenuItem(
       value: value,
       child: Row(
@@ -352,7 +443,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           Text(label),
           if (_sortOrder == value) ...[
             const Spacer(),
-            Icon(Icons.check_rounded, size: 16, color: Theme.of(context).colorScheme.primary),
+            Icon(
+              Icons.check_rounded,
+              size: 16,
+              color: Theme.of(context).colorScheme.primary,
+            ),
           ],
         ],
       ),
@@ -373,33 +468,33 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
-      onTap: () => setState(() => _formatFilter = filter),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected
-              ? theme.colorScheme.primary.withAlpha(30)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
+        onTap: () => setState(() => _formatFilter = filter),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
             color: selected
-                ? theme.colorScheme.primary.withAlpha(100)
-                : theme.colorScheme.outline.withAlpha(40),
+                ? theme.colorScheme.primary.withAlpha(30)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: selected
+                  ? theme.colorScheme.primary.withAlpha(100)
+                  : theme.colorScheme.outline.withAlpha(40),
+            ),
           ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-            color: selected
-                ? theme.colorScheme.primary
-                : theme.colorScheme.onSurface.withAlpha(160),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+              color: selected
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurface.withAlpha(160),
+            ),
           ),
         ),
       ),
-    ),
     );
   }
 
@@ -407,7 +502,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   // States
   // ---------------------------------------------------------------------------
 
-  Widget _buildInitialState(ThemeData theme, AppLocalizations l10n, SearchSource source) {
+  Widget _buildInitialState(
+    ThemeData theme,
+    AppLocalizations l10n,
+    SearchSource source,
+  ) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(40),
@@ -473,7 +572,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     return switch (source) {
       SearchSource.anna => "Search Anna's Archive for EPUB and PDF books.",
       SearchSource.zlibrary => 'Search Z-Library for EPUB and PDF books.',
-      SearchSource.both => "Search Anna's Archive and Z-Library simultaneously.",
+      SearchSource.both =>
+        "Search Anna's Archive and Z-Library simultaneously.",
     };
   }
 
@@ -510,9 +610,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           const SizedBox(height: 20),
           Text(
             'Searching...',
-            style: TextStyle(
-              color: theme.colorScheme.onSurface.withAlpha(140),
-            ),
+            style: TextStyle(color: theme.colorScheme.onSurface.withAlpha(140)),
           ),
         ],
       ),
@@ -569,7 +667,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         ),
         Expanded(
           child: ListView.builder(
-            padding: EdgeInsets.fromLTRB(16, 0, 16, kBottomNavBarHeight + MediaQuery.of(context).padding.bottom + 16),
+            padding: EdgeInsets.fromLTRB(
+              16,
+              0,
+              16,
+              kBottomNavBarHeight + MediaQuery.of(context).padding.bottom + 16,
+            ),
             itemCount: filtered.length,
             itemBuilder: (context, index) {
               return SearchBookCard(book: filtered[index]);
@@ -597,7 +700,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 20),
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.orange,
+                  size: 20,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -625,7 +732,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           ),
           Expanded(
             child: ListView.builder(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, kBottomNavBarHeight + MediaQuery.of(context).padding.bottom + 16),
+              padding: EdgeInsets.fromLTRB(
+                16,
+                0,
+                16,
+                kBottomNavBarHeight +
+                    MediaQuery.of(context).padding.bottom +
+                    16,
+              ),
               itemCount: filtered.length,
               itemBuilder: (context, index) {
                 return SearchBookCard(book: filtered[index]);
@@ -649,7 +763,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 shape: BoxShape.circle,
                 color: Colors.red.withAlpha(20),
               ),
-              child: const Icon(Icons.cloud_off_rounded, size: 36, color: Colors.red),
+              child: const Icon(
+                Icons.cloud_off_rounded,
+                size: 36,
+                color: Colors.red,
+              ),
             ),
             const SizedBox(height: 20),
             Text(

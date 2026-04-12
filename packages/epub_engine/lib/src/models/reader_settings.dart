@@ -15,6 +15,7 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(1.5) double lineHeight,
     @Default(20.0) double horizontalPadding,
     @Default(ReadingMode.vertical) ReadingMode readingMode,
+    @Default(true) bool enableDualPageSpread,
     @Default(1.0) double brightness,
   }) = _ReaderSettings;
 

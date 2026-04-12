@@ -259,11 +259,17 @@ class EpubReaderViewState extends State<EpubReaderView> {
 
     // Color conversion — compute text color from background luminance
     final bgColor = Color(widget.settings.backgroundColor);
-    final bgColorStr = '#${widget.settings.backgroundColor.toRadixString(16).padLeft(8, '0').substring(2)}';
-    final textColor = bgColor.computeLuminance() > 0.5 ? const Color(0xFF1A1A1A) : const Color(0xFFE0E0E0);
-    final textColorStr = '#${textColor.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}';
+    final bgColorStr =
+        '#${widget.settings.backgroundColor.toRadixString(16).padLeft(8, '0').substring(2)}';
+    final textColor = bgColor.computeLuminance() > 0.5
+        ? const Color(0xFF1A1A1A)
+        : const Color(0xFFE0E0E0);
+    final textColorStr =
+        '#${textColor.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}';
     final linkColor = bgColor.computeLuminance() > 0.5 ? '#6200EE' : '#BB86FC';
-    final divColorStr = bgColor.computeLuminance() > 0.5 ? '#CCCCCC' : '#444444';
+    final divColorStr = bgColor.computeLuminance() > 0.5
+        ? '#CCCCCC'
+        : '#444444';
     final paddingH = widget.settings.horizontalPadding.toInt();
 
     // Define the img replacement regex
@@ -994,9 +1000,14 @@ class EpubReaderViewState extends State<EpubReaderView> {
 
     if (old.backgroundColor != cur.backgroundColor) {
       final bgColor = Color(cur.backgroundColor);
-      final bgStr = '#${cur.backgroundColor.toRadixString(16).padLeft(8, '0').substring(2)}';
-      final textColor = bgColor.computeLuminance() > 0.5 ? '#1A1A1A' : '#E0E0E0';
-      final linkColor = bgColor.computeLuminance() > 0.5 ? '#6200EE' : '#BB86FC';
+      final bgStr =
+          '#${cur.backgroundColor.toRadixString(16).padLeft(8, '0').substring(2)}';
+      final textColor = bgColor.computeLuminance() > 0.5
+          ? '#1A1A1A'
+          : '#E0E0E0';
+      final linkColor = bgColor.computeLuminance() > 0.5
+          ? '#6200EE'
+          : '#BB86FC';
       final divColor = bgColor.computeLuminance() > 0.5 ? '#CCCCCC' : '#444444';
       js.writeln('''
         document.documentElement.style.backgroundColor = '$bgStr';
@@ -1011,7 +1022,9 @@ class EpubReaderViewState extends State<EpubReaderView> {
     }
 
     if (old.fontFamily != cur.fontFamily) {
-      js.writeln("document.body.style.fontFamily = '${cur.fontFamily}, sans-serif';");
+      js.writeln(
+        "document.body.style.fontFamily = '${cur.fontFamily}, sans-serif';",
+      );
     }
 
     if (old.fontSize != cur.fontSize) {
@@ -1042,10 +1055,12 @@ class EpubReaderViewState extends State<EpubReaderView> {
     // In horizontal mode, recalculate pagination after CSS changes
     if (cur.readingMode == ReadingMode.horizontal &&
         (old.fontSize != cur.fontSize ||
-         old.fontFamily != cur.fontFamily ||
-         old.lineHeight != cur.lineHeight ||
-         old.horizontalPadding != cur.horizontalPadding)) {
-      js.writeln('setTimeout(function() { recalcHorizontalPages(); snapToNearestPage(); }, 50);');
+            old.fontFamily != cur.fontFamily ||
+            old.lineHeight != cur.lineHeight ||
+            old.horizontalPadding != cur.horizontalPadding)) {
+      js.writeln(
+        'setTimeout(function() { recalcHorizontalPages(); snapToNearestPage(); }, 50);',
+      );
     }
 
     if (old.brightness != cur.brightness) {
@@ -1062,9 +1077,7 @@ class EpubReaderViewState extends State<EpubReaderView> {
   /// gestures on macOS platform views, so we dim via CSS instead.
   void _applyBrightnessViaJS(double brightness) {
     final b = brightness.clamp(0.0, 1.0);
-    _controller.runJavaScript(
-      "document.body.style.filter = 'brightness($b)';",
-    );
+    _controller.runJavaScript("document.body.style.filter = 'brightness($b)';");
   }
 
   /// Render all saved highlights into the WebView.
@@ -1148,7 +1161,6 @@ class EpubReaderViewState extends State<EpubReaderView> {
 
                 // Brightness is applied via CSS filter inside WebView
                 // (not a Flutter overlay — IgnorePointer blocks trackpad on macOS).
-
                 if (_isLoading)
                   Positioned.fill(
                     child: Container(
