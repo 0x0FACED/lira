@@ -733,6 +733,14 @@ class EpubNativeViewState extends State<EpubNativeView> {
   // ---------------------------------------------------------------------------
 
   void _paginate(double pageWidth, double pageHeight, double paddingH) {
+    if (!pageWidth.isFinite ||
+        !pageHeight.isFinite ||
+        pageWidth <= 0 ||
+        pageHeight <= 0) {
+      _lastPaginationSize = null;
+      return;
+    }
+
     final size = Size(pageWidth, pageHeight);
     if (_lastPaginationSize == size && _paginatedPages.isNotEmpty) return;
 
@@ -768,6 +776,14 @@ class EpubNativeViewState extends State<EpubNativeView> {
     final contentHeight =
         (pageHeight - contentInsets.vertical) *
         0.92; // extra headroom for exact layout
+
+    if (!contentWidth.isFinite ||
+        !contentHeight.isFinite ||
+        contentWidth <= 0 ||
+        contentHeight <= 0) {
+      _lastPaginationSize = null;
+      return;
+    }
 
     var pageIndexCounter = 0;
     for (int ci = 0; ci < widget.epub.chapters.length; ci++) {
@@ -995,6 +1011,10 @@ class EpubNativeViewState extends State<EpubNativeView> {
     double contentWidth, {
     InlineSpan? overrideSpan,
   }) {
+    if (!contentWidth.isFinite || contentWidth <= 0) {
+      return 24.0;
+    }
+
     final span = overrideSpan ?? block.span;
     if (span is! TextSpan) {
       return 24.0;
@@ -1004,7 +1024,7 @@ class EpubNativeViewState extends State<EpubNativeView> {
       text: span,
       textDirection: TextDirection.ltr,
       textScaler: TextScaler.noScaling,
-    )..layout(maxWidth: contentWidth);
+    )..layout(maxWidth: math.max(1.0, contentWidth));
     final textHeight = tp.height;
     tp.dispose();
 
@@ -1195,6 +1215,15 @@ class EpubNativeViewState extends State<EpubNativeView> {
   // ---------------------------------------------------------------------------
 
   Widget _buildHorizontalMode(double paddingH, BoxConstraints constraints) {
+    if (!constraints.hasBoundedWidth ||
+        !constraints.hasBoundedHeight ||
+        !constraints.maxWidth.isFinite ||
+        !constraints.maxHeight.isFinite ||
+        constraints.maxWidth <= 0 ||
+        constraints.maxHeight <= 0) {
+      return const SizedBox.shrink();
+    }
+
     final availableWidth = constraints.maxWidth;
     final availableHeight = constraints.maxHeight;
     _currentPageHeight = availableHeight;
@@ -1211,6 +1240,10 @@ class EpubNativeViewState extends State<EpubNativeView> {
       pageWidth = (availableWidth - gapWidth) / 2;
     } else {
       pageWidth = math.min(availableWidth, 800.0);
+    }
+
+    if (!pageWidth.isFinite || pageWidth <= paddingH * 2) {
+      return const SizedBox.shrink();
     }
 
     _paginate(pageWidth, availableHeight, paddingH);

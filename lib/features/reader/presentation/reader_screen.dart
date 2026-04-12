@@ -36,13 +36,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   late Future<BookReaderEngine> _engineFuture;
   BookReaderEngine? _engine;
   bool _showUi = false;
-  double _readingProgress = 0.0;
-  String _progressLabel = '';
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final ValueNotifier<_ReaderProgressState> _progressNotifier = ValueNotifier(
+    const _ReaderProgressState(fraction: 0, label: ''),
+  );
+  bool _didSeedProgressFromStorage = false;
 
-  // Text selection state
   String? _selectedText;
-  String? _selectedLocation; // EpubCfi JSON
+  String? _selectedLocation;
 
   @override
   void initState() {
@@ -72,6 +73,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   @override
   void dispose() {
     _engine?.dispose();
+    _progressNotifier.dispose();
     super.dispose();
   }
 
@@ -119,12 +121,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           drawer: _buildTocDrawer(engine),
           body: Stack(
             children: [
-              // Reader content — full screen
               Positioned.fill(
                 child: Container(
                   color: Color(settings.backgroundColor),
                   child: progressAsyncValue.when(
                     data: (progress) {
+                      _seedProgressIndicator(progress?.percentage);
                       return engine.buildReaderWidget(
                         context: context,
                         settings: settings,
@@ -135,11 +137,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                         onCenterTapped: _toggleUi,
                         highlights: _buildHighlightsData(highlightsAsync),
                         onProgressChanged: (location, percentage) {
-                          setState(() {
-                            _readingProgress = percentage.clamp(0, 100) / 100;
-                            _progressLabel =
-                                '${percentage.toStringAsFixed(1)}%';
-                          });
+                          _progressNotifier.value =
+                              _progressStateFromPercentage(percentage);
                           ref
                               .read(
                                 readingProgressControllerProvider(
@@ -170,12 +169,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                     loading: () =>
                         const Center(child: CircularProgressIndicator()),
                     error: (e, st) =>
-                        Center(child: Text('Error loading progress')),
+                        const Center(child: Text('Error loading progress')),
                   ),
                 ),
               ),
-
-              // Brightness overlay for non-EPUB (EPUB handles it internally)
               if (settings.brightness < 1.0 && widget.book.format != 'epub')
                 Positioned.fill(
                   child: IgnorePointer(
@@ -186,8 +183,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                     ),
                   ),
                 ),
-
-              // Top bar
               AnimatedPositioned(
                 duration: const Duration(milliseconds: 250),
                 curve: Curves.easeInOut,
@@ -226,8 +221,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                   ),
                 ),
               ),
-
-              // Bottom bar
               AnimatedPositioned(
                 duration: const Duration(milliseconds: 250),
                 curve: Curves.easeInOut,
@@ -238,86 +231,89 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                   color: Colors.black87,
                   child: SafeArea(
                     top: false,
-                    child: Padding(
-                      padding: const EdgeInsets.only(
-                        left: 16,
-                        right: 16,
-                        top: 8,
-                        bottom: 4,
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Progress bar
-                          Row(
+                    child: ValueListenableBuilder<_ReaderProgressState>(
+                      valueListenable: _progressNotifier,
+                      builder: (context, progressState, _) {
+                        return Padding(
+                          padding: const EdgeInsets.only(
+                            left: 16,
+                            right: 16,
+                            top: 8,
+                            bottom: 4,
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Expanded(
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(4),
-                                  child: LinearProgressIndicator(
-                                    value: _readingProgress,
-                                    backgroundColor: Colors.white24,
-                                    minHeight: 4,
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(4),
+                                      child: LinearProgressIndicator(
+                                        value: progressState.fraction,
+                                        backgroundColor: Colors.white24,
+                                        minHeight: 4,
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                  const SizedBox(width: 12),
+                                  SizedBox(
+                                    width: 48,
+                                    child: Text(
+                                      progressState.label,
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 12),
-                              SizedBox(
-                                width: 48,
-                                child: Text(
-                                  _progressLabel,
-                                  style: const TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 12,
+                              const SizedBox(height: 4),
+                              Wrap(
+                                alignment: WrapAlignment.spaceEvenly,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                spacing: 20,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.format_list_bulleted,
+                                      color: Colors.white,
+                                      size: 22,
+                                    ),
+                                    tooltip: 'Table of Contents',
+                                    onPressed: () =>
+                                        _scaffoldKey.currentState?.openDrawer(),
                                   ),
-                                ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.bookmark_outline,
+                                      color: Colors.white,
+                                      size: 22,
+                                    ),
+                                    tooltip: 'Highlights',
+                                    onPressed: () =>
+                                        _showHighlightsPanel(context),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.settings,
+                                      color: Colors.white,
+                                      size: 22,
+                                    ),
+                                    tooltip: 'Settings',
+                                    onPressed: () => _showSettings(context),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                          const SizedBox(height: 4),
-                          // Buttons row
-                          Wrap(
-                            alignment: WrapAlignment.spaceEvenly,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            spacing: 20,
-                            children: [
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.format_list_bulleted,
-                                  color: Colors.white,
-                                  size: 22,
-                                ),
-                                tooltip: 'Table of Contents',
-                                onPressed: () =>
-                                    _scaffoldKey.currentState?.openDrawer(),
-                              ),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.bookmark_outline,
-                                  color: Colors.white,
-                                  size: 22,
-                                ),
-                                tooltip: 'Highlights',
-                                onPressed: () => _showHighlightsPanel(context),
-                              ),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.settings,
-                                  color: Colors.white,
-                                  size: 22,
-                                ),
-                                tooltip: 'Settings',
-                                onPressed: () => _showSettings(context),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                        );
+                      },
                     ),
                   ),
                 ),
               ),
-              // Selection action bar — slides in from the right
               AnimatedPositioned(
                 duration: const Duration(milliseconds: 250),
                 curve: Curves.easeOutCubic,
@@ -342,7 +338,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     );
   }
 
-  /// Convert highlights from provider into the format expected by EpubReaderView.
   List<Map<String, dynamic>> _buildHighlightsData(
     AsyncValue<List<HighlightDto>> highlightsAsync,
   ) {
@@ -362,6 +357,20 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     return result;
   }
 
+  void _seedProgressIndicator(double? percentage) {
+    if (_didSeedProgressFromStorage) return;
+    _progressNotifier.value = _progressStateFromPercentage(percentage);
+    _didSeedProgressFromStorage = true;
+  }
+
+  _ReaderProgressState _progressStateFromPercentage(double? percentage) {
+    final value = (percentage ?? 0).clamp(0.0, 100.0).toDouble();
+    return _ReaderProgressState(
+      fraction: value / 100,
+      label: '${value.toStringAsFixed(1)}%',
+    );
+  }
+
   Widget _buildSelectionBar() {
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -375,7 +384,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Color dots
               for (final color in _highlightColors)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 6),
@@ -393,10 +401,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                   ),
                 ),
               const SizedBox(height: 4),
-              // Note
               _miniButton(Icons.note_add, _addNote),
               const SizedBox(height: 6),
-              // Copy
               _miniButton(Icons.copy, _copySelection),
             ],
           ),
@@ -585,7 +591,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       );
     }
 
-    // Parent item with separate expand arrow
     return _ExpandableTocItem(
       item: item,
       padding: padding,
@@ -608,7 +613,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   }
 }
 
-/// Expandable TOC item with separate navigate/expand controls
+class _ReaderProgressState {
+  final double fraction;
+  final String label;
+
+  const _ReaderProgressState({required this.fraction, required this.label});
+}
+
 class _ExpandableTocItem extends StatefulWidget {
   final TOCItem item;
   final double padding;
@@ -669,7 +680,6 @@ class _ExpandableTocItemState extends State<_ExpandableTocItem> {
         );
       }
 
-      // Nested expandable
       return _ExpandableTocItem(
         item: item,
         padding: widget.padding + 16,
@@ -680,7 +690,6 @@ class _ExpandableTocItemState extends State<_ExpandableTocItem> {
   }
 }
 
-/// Bottom sheet panel listing all highlights for a book.
 class _HighlightsPanel extends ConsumerWidget {
   final String bookId;
   final void Function(String location) onNavigate;
@@ -704,7 +713,6 @@ class _HighlightsPanel extends ConsumerWidget {
           ),
           child: Column(
             children: [
-              // Drag handle
               Padding(
                 padding: const EdgeInsets.only(top: 12, bottom: 8),
                 child: Container(
