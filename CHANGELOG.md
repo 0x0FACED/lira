@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-04-12
+
+### Added
+- Опция отключения двухстраничного разворота в горизонтальном EPUB режиме
+- Скачивание обложек при импорте книг из поиска в библиотеку
+- Более точное сохранение позиции и прогресса в native EPUB reader
+
+### Changed
+- **Версия приложения**: 0.4.0 → 0.5.0
+- Переработан верхний блок экрана поиска и переключатель источников
+- Улучшена навигация жестами и поведение выделения текста в EPUB reader
+
+### Fixed
+- Исправлены скачивания книг из Z-Library
+- Исправлены overflow, неточное позиционирование и ошибки подсветки в EPUB reader
+- Снижена нагрузка native EPUB reader в vertical mode
+
+---
+
 ## [0.4.0] - 2026-04-10
 
 ### Added

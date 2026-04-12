@@ -119,7 +119,7 @@ sudo ln -s /opt/lira/lira /usr/local/bin/lira
 GitHub Actions автоматически собирает билды при создании тега:
 
 ```bash
-git tag v0.3.0
+git tag v0.5.0
 git push origin --tags
 ```
 
@@ -175,7 +175,7 @@ flutter build ios --release
 - ✅ Web: `web/icons/Icon-*.png`
 
 ### Версия
-Текущая версия: **0.3.0+1**
+Текущая версия: **0.5.0+2**
 
 Версия автоматически отображается в настройках приложения через `package_info_plus`.
 
@@ -240,5 +240,5 @@ adb install -r build_dist/lira-release-android.apk
 
 ---
 
-**Последнее обновление:** 2026-03-14  
-**Версия:** 0.3.0+1
+**Последнее обновление:** 2026-04-12  
+**Версия:** 0.5.0+2

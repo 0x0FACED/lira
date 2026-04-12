@@ -23,7 +23,7 @@
 Откройте `pubspec.yaml` и измените версию:
 
 ```yaml
-version: 0.3.0+1  # major.minor.patch+build_number
+version: 0.5.0+2  # major.minor.patch+build_number
 ```
 
 **Версионирование (SemVer):**
@@ -36,15 +36,15 @@ version: 0.3.0+1  # major.minor.patch+build_number
 Создайте или обновите файл `CHANGELOG.md`:
 
 ```markdown
-## [0.3.0] - 2026-03-14
+## [0.5.0] - 2026-04-12
 
 ### Added
-- package_info_plus для автоматического получения версии
-- Скрипты для сборки всех платформ
+- Опция single-page horizontal mode для EPUB
+- Улучшения поиска и импорта обложек
 
 ### Changed
-- Обновлена версия приложения на 0.3.0
-- Обновлён freezed_annotation в epub_engine
+- Обновлена версия приложения на 0.5.0
+- Улучшен native EPUB reader
 
 ### Fixed
 - Исправлены ошибки компиляции Android
@@ -79,8 +79,8 @@ git commit -m "chore: prepare release v0.3.0"
 
 1. Создайте tag:
    ```bash
-   git tag v0.3.0
-   git push origin v0.3.0
+   git tag v0.5.0
+   git push origin v0.5.0
    ```
 
 2. GitHub Actions автоматически:
@@ -102,7 +102,7 @@ git commit -m "chore: prepare release v0.3.0"
 ### Шаблон описания релиза
 
 ```markdown
-## Lira v0.3.0
+## Lira v0.5.0
 
 ### 📱 Что нового
 
@@ -202,7 +202,7 @@ base64 -w 0 lira-release-key.jks > keystore_base64.txt
 
 ```bash
 # Скрипт prepare_release.sh
-VERSION="0.3.0"
+VERSION="0.5.0"
 
 # Обновить версию
 sed -i "s/version: .*/version: ${VERSION}+1/" pubspec.yaml
@@ -228,7 +228,7 @@ git push origin main --tags
 |--------|----------|
 | `0.1.0+1` | Первый альфа-релиз |
 | `0.2.0+1` | Добавлена поддержка EPUB |
-| `0.3.0+1` | Текущий релиз |
+| `0.5.0+2` | Текущий релиз |
 | `1.0.0+1` | Стабильная версия |
 
 **Build number** (`+1`) увеличивается при каждом билде для стора.
