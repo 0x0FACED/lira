@@ -91,6 +91,9 @@ class EpubNativeViewState extends State<EpubNativeView> {
   int _currentPageIndex = 0;
   bool _isDualPage = false;
   Size? _lastPaginationSize;
+  double? _lastVerticalContentWidth;
+  List<double>? _verticalChapterOffsets;
+  List<double>? _verticalChapterHeights;
 
   // Available page height for constraining images in horizontal mode
   double _currentPageHeight = 0;
@@ -141,6 +144,7 @@ class EpubNativeViewState extends State<EpubNativeView> {
 
     if (needsReparse) {
       _parsedChapters.clear();
+      _invalidateVerticalMetrics();
     }
     if (needsRepagination) {
       _paginatedPages.clear();
@@ -149,6 +153,11 @@ class EpubNativeViewState extends State<EpubNativeView> {
       for (final scopeId in staleScopeIds) {
         _selectionScopes.remove(scopeId)?.notifier.dispose();
       }
+    }
+    if (oldWidget.settings.horizontalPadding !=
+            widget.settings.horizontalPadding ||
+        oldWidget.settings.readingMode != widget.settings.readingMode) {
+      _invalidateVerticalMetrics();
     }
     if (oldWidget.epub != widget.epub ||
         oldWidget.initialLocation?.toJson() !=
@@ -564,9 +573,9 @@ class EpubNativeViewState extends State<EpubNativeView> {
   // ---------------------------------------------------------------------------
 
   void scrollToChapter(String fileName) {
-    final index = _findChapterIndex(fileName);
-    if (index == null) return;
-    _jumpToLocation(EpubLocation.fromPosition(chapterIndex: index));
+    final location = _locationFromLocator(fileName);
+    if (location == null) return;
+    _jumpToLocation(location);
   }
 
   void goToLocation(EpubLocation location) {
@@ -590,6 +599,12 @@ class EpubNativeViewState extends State<EpubNativeView> {
       double targetOffset;
       if (location.bookScrollOffset != null) {
         targetOffset = location.bookScrollOffset!;
+      } else if (_currentVerticalContentWidth() case final contentWidth?
+          when contentWidth > 0) {
+        targetOffset = _estimateVerticalOffsetForLocation(
+          location,
+          contentWidth,
+        );
       } else {
         final targetBookFraction =
             location.bookScrollFraction ??
@@ -696,6 +711,173 @@ class EpubNativeViewState extends State<EpubNativeView> {
       }
     }
     return null;
+  }
+
+  EpubLocation? _locationFromLocator(String locator) {
+    final chapterIndex = _findChapterIndex(locator);
+    if (chapterIndex == null) return null;
+
+    final chapterFraction = _estimateLocatorFraction(locator, chapterIndex);
+    final chapterWeight = _chapterWeight(chapterIndex);
+    return EpubLocation.fromPosition(
+      chapterIndex: chapterIndex,
+      charOffset: (chapterWeight * chapterFraction).round(),
+      scrollFraction: chapterFraction,
+    );
+  }
+
+  double _estimateLocatorFraction(String locator, int chapterIndex) {
+    final fragmentIndex = locator.indexOf('#');
+    if (fragmentIndex < 0 || fragmentIndex == locator.length - 1) {
+      return 0.0;
+    }
+
+    final rawFragment = locator.substring(fragmentIndex + 1).trim();
+    if (rawFragment.isEmpty) return 0.0;
+
+    String fragment = rawFragment;
+    try {
+      fragment = Uri.decodeComponent(rawFragment);
+    } catch (_) {}
+
+    final html = widget.epub.chapters[chapterIndex].htmlContent;
+    if (html.isEmpty) return 0.0;
+
+    final patterns = [
+      RegExp(
+        'id\\s*=\\s*["\']${RegExp.escape(fragment)}["\']',
+        caseSensitive: false,
+      ),
+      RegExp(
+        'name\\s*=\\s*["\']${RegExp.escape(fragment)}["\']',
+        caseSensitive: false,
+      ),
+    ];
+
+    for (final pattern in patterns) {
+      final match = pattern.firstMatch(html);
+      if (match != null) {
+        return (match.start / html.length).clamp(0.0, 1.0);
+      }
+    }
+
+    return 0.0;
+  }
+
+  void _invalidateVerticalMetrics() {
+    _lastVerticalContentWidth = null;
+    _verticalChapterOffsets = null;
+    _verticalChapterHeights = null;
+  }
+
+  double? _currentVerticalContentWidth() {
+    final availableWidth = context.size?.width;
+    if (availableWidth == null ||
+        !availableWidth.isFinite ||
+        availableWidth <= 0) {
+      return null;
+    }
+
+    final maxContentWidth = math.min(availableWidth, 800.0);
+    final contentWidth =
+        maxContentWidth - widget.settings.horizontalPadding * 2;
+    if (!contentWidth.isFinite || contentWidth <= 0) {
+      return null;
+    }
+    return contentWidth;
+  }
+
+  double _estimateVerticalOffsetForLocation(
+    EpubLocation location,
+    double contentWidth,
+  ) {
+    _ensureVerticalMetrics(contentWidth);
+
+    final offsets = _verticalChapterOffsets;
+    final heights = _verticalChapterHeights;
+    if (offsets == null ||
+        heights == null ||
+        offsets.isEmpty ||
+        heights.isEmpty) {
+      final targetBookFraction =
+          location.bookScrollFraction ??
+          _computeBookFraction(
+            location.chapterIndex,
+            _extractChapterFraction(location),
+          );
+      return _scrollController.position.maxScrollExtent *
+          targetBookFraction.clamp(0.0, 1.0);
+    }
+
+    final chapterIndex = location.chapterIndex.clamp(0, offsets.length - 1);
+    final chapterStart = offsets[chapterIndex];
+    final chapterHeight = heights[chapterIndex];
+    final chapterFraction = _extractChapterFraction(location);
+    return chapterStart + chapterHeight * chapterFraction.clamp(0.0, 1.0);
+  }
+
+  void _ensureVerticalMetrics(double contentWidth) {
+    if (_lastVerticalContentWidth == contentWidth &&
+        _verticalChapterOffsets != null &&
+        _verticalChapterHeights != null &&
+        _verticalChapterOffsets!.length == widget.epub.chapters.length &&
+        _verticalChapterHeights!.length == widget.epub.chapters.length) {
+      return;
+    }
+
+    final topInset = _contentInsets().top;
+    final offsets = List<double>.filled(widget.epub.chapters.length, 0.0);
+    final heights = List<double>.filled(widget.epub.chapters.length, 0.0);
+
+    var accumulated = topInset;
+    for (
+      int chapterIndex = 0;
+      chapterIndex < widget.epub.chapters.length;
+      chapterIndex++
+    ) {
+      offsets[chapterIndex] = accumulated;
+      _parseChapter(chapterIndex);
+      final elements =
+          _parsedChapters[chapterIndex] ?? const <ContentElement>[];
+      final height = _estimateVerticalChapterHeight(elements, contentWidth);
+      heights[chapterIndex] = height;
+      accumulated += height;
+    }
+
+    _lastVerticalContentWidth = contentWidth;
+    _verticalChapterOffsets = offsets;
+    _verticalChapterHeights = heights;
+  }
+
+  double _estimateVerticalChapterHeight(
+    List<ContentElement> elements,
+    double contentWidth,
+  ) {
+    if (elements.isEmpty) {
+      return 48.0;
+    }
+
+    var total = 0.0;
+    for (final element in elements) {
+      total += _measureVerticalElementHeight(element, contentWidth);
+    }
+    return total;
+  }
+
+  double _measureVerticalElementHeight(
+    ContentElement element,
+    double contentWidth,
+  ) {
+    if (element is TextBlock) {
+      return _measureTextBlockHeight(element, contentWidth);
+    }
+    if (element is DividerBlock) {
+      return 49.0;
+    }
+    if (element is ImageBlock) {
+      return math.min(contentWidth * 0.75, 360.0) + 24.0;
+    }
+    return 0.0;
   }
 
   // ---------------------------------------------------------------------------
