@@ -1,18 +1,53 @@
+import 'package:epub_engine/epub_engine.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:epub_engine/epub_engine.dart';
+
 import '../../../l10n/app_localizations.dart';
 import '../data/settings_provider.dart';
 
-class SettingsPanel extends ConsumerWidget {
+const _readerFontOptions = [
+  _ReaderFontOption(label: 'Sans Serif', family: 'sans-serif'),
+  _ReaderFontOption(label: 'Serif', family: 'serif'),
+  _ReaderFontOption(label: 'Roboto', family: 'Roboto'),
+  _ReaderFontOption(label: 'Georgia', family: 'Georgia'),
+  _ReaderFontOption(label: 'Monospace', family: 'monospace'),
+];
+
+class SettingsPanel extends ConsumerStatefulWidget {
   const SettingsPanel({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsPanel> createState() => _SettingsPanelState();
+}
+
+class _SettingsPanelState extends ConsumerState<SettingsPanel> {
+  late double _fontSize;
+  late double _lineHeight;
+  late double _horizontalPadding;
+  late double _brightness;
+
+  @override
+  void initState() {
+    super.initState();
+    final settings = ref.read(readerSettingsProvider);
+    _fontSize = settings.fontSize;
+    _lineHeight = settings.lineHeight;
+    _horizontalPadding = settings.horizontalPadding;
+    _brightness = settings.brightness;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final settings = ref.watch(readerSettingsProvider);
     final notifier = ref.read(readerSettingsProvider.notifier);
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
+    final media = MediaQuery.of(context);
+    final isPhone =
+        (defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS) &&
+        media.size.shortestSide < 600;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
@@ -23,7 +58,6 @@ class SettingsPanel extends ConsumerWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Drag handle
           Container(
             width: 36,
             height: 4,
@@ -33,19 +67,17 @@ class SettingsPanel extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
-
-          // Reading Mode toggle
           SegmentedButton<ReadingMode>(
-            segments: const [
+            segments: [
               ButtonSegment(
                 value: ReadingMode.vertical,
-                icon: Icon(Icons.swap_vert, size: 18),
-                label: Text('Vertical'),
+                icon: const Icon(Icons.swap_vert, size: 18),
+                label: Text(l10n.readerVertical),
               ),
               ButtonSegment(
                 value: ReadingMode.horizontal,
-                icon: Icon(Icons.swap_horiz, size: 18),
-                label: Text('Horizontal'),
+                icon: const Icon(Icons.swap_horiz, size: 18),
+                label: Text(l10n.readerHorizontal),
               ),
             ],
             selected: {settings.readingMode},
@@ -57,8 +89,7 @@ class SettingsPanel extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 14),
-
-          if (settings.readingMode == ReadingMode.horizontal) ...[
+          if (settings.readingMode == ReadingMode.horizontal && !isPhone) ...[
             SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,
               dense: true,
@@ -74,75 +105,84 @@ class SettingsPanel extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
           ],
-
-          // Font family chips
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _fontChip(
-                  theme,
-                  'Sans Serif',
-                  'sans-serif',
-                  settings,
-                  notifier,
-                ),
-                _fontChip(theme, 'Serif', 'serif', settings, notifier),
-                _fontChip(theme, 'Mono', 'monospace', settings, notifier),
-              ],
+          DropdownButtonFormField<String>(
+            key: ValueKey(settings.fontFamily),
+            initialValue: settings.fontFamily,
+            isExpanded: true,
+            menuMaxHeight: 280,
+            decoration: InputDecoration(
+              isDense: true,
+              labelText: l10n.readerFont,
+              prefixIcon: const Icon(Icons.font_download_outlined, size: 18),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
             ),
+            items: _readerFontOptions
+                .map(
+                  (option) => DropdownMenuItem<String>(
+                    value: option.family,
+                    child: Text(
+                      option.label,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontFamily: option.family, fontSize: 14),
+                    ),
+                  ),
+                )
+                .toList(growable: false),
+            onChanged: (value) {
+              if (value == null) return;
+              notifier.updateSettings(settings.copyWith(fontFamily: value));
+            },
           ),
           const SizedBox(height: 10),
-
-          // Font size
           _sliderRow(
             icon: Icons.text_fields,
-            value: settings.fontSize,
+            value: _fontSize,
             min: 12,
             max: 32,
             divisions: 10,
-            label: '${settings.fontSize.round()}',
-            onChanged: (v) =>
+            label: '${_fontSize.round()}',
+            onChanged: (v) => setState(() => _fontSize = v),
+            onChangeEnd: (v) =>
                 notifier.updateSettings(settings.copyWith(fontSize: v)),
           ),
-
-          // Line height
           _sliderRow(
             icon: Icons.format_line_spacing,
-            value: settings.lineHeight,
+            value: _lineHeight,
             min: 1.0,
             max: 2.5,
-            label: settings.lineHeight.toStringAsFixed(1),
-            onChanged: (v) =>
+            label: _lineHeight.toStringAsFixed(1),
+            onChanged: (v) => setState(() => _lineHeight = v),
+            onChangeEnd: (v) =>
                 notifier.updateSettings(settings.copyWith(lineHeight: v)),
           ),
-
-          // Horizontal padding
           _sliderRow(
             icon: Icons.horizontal_distribute,
-            value: settings.horizontalPadding,
+            value: _horizontalPadding,
             min: 8,
             max: 64,
-            label: '${settings.horizontalPadding.round()}',
-            onChanged: (v) => notifier.updateSettings(
+            label: '${_horizontalPadding.round()}',
+            onChanged: (v) => setState(() => _horizontalPadding = v),
+            onChangeEnd: (v) => notifier.updateSettings(
               settings.copyWith(horizontalPadding: v),
             ),
           ),
-
-          // Brightness
           _sliderRow(
             icon: Icons.brightness_6_rounded,
-            value: settings.brightness,
+            value: _brightness,
             min: 0.2,
             max: 1.0,
-            label: '${(settings.brightness * 100).round()}%',
-            onChanged: (v) =>
+            label: '${(_brightness * 100).round()}%',
+            onChanged: (v) => setState(() => _brightness = v),
+            onChangeEnd: (v) =>
                 notifier.updateSettings(settings.copyWith(brightness: v)),
           ),
-
           const SizedBox(height: 8),
-
-          // Background colors
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
@@ -164,33 +204,6 @@ class SettingsPanel extends ConsumerWidget {
     );
   }
 
-  Widget _fontChip(
-    ThemeData theme,
-    String label,
-    String family,
-    ReaderSettings settings,
-    ReaderSettingsNotifier notifier,
-  ) {
-    final selected = settings.fontFamily == family;
-    return Padding(
-      padding: const EdgeInsets.only(right: 6),
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: ChoiceChip(
-          label: Text(
-            label,
-            style: TextStyle(fontFamily: family, fontSize: 12),
-          ),
-          selected: selected,
-          onSelected: (_) =>
-              notifier.updateSettings(settings.copyWith(fontFamily: family)),
-          visualDensity: VisualDensity.compact,
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-        ),
-      ),
-    );
-  }
-
   Widget _sliderRow({
     required IconData icon,
     required double value,
@@ -199,6 +212,7 @@ class SettingsPanel extends ConsumerWidget {
     int? divisions,
     required String label,
     required ValueChanged<double> onChanged,
+    ValueChanged<double>? onChangeEnd,
   }) {
     return SizedBox(
       height: 36,
@@ -218,11 +232,12 @@ class SettingsPanel extends ConsumerWidget {
                 max: max,
                 divisions: divisions,
                 onChanged: onChanged,
+                onChangeEnd: onChangeEnd,
               ),
             ),
           ),
           SizedBox(
-            width: 36,
+            width: 42,
             child: Text(
               label,
               style: const TextStyle(fontSize: 11, color: Colors.grey),
@@ -243,6 +258,13 @@ class SettingsPanel extends ConsumerWidget {
   }) {
     final selected = settings.backgroundColor == colorValue;
     final color = Color(colorValue);
+    final borderColor = _resolveSwatchBorderColor(
+      theme: theme,
+      swatchColor: color,
+      selected: selected,
+      explicitBorder: border,
+    );
+
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
@@ -255,12 +277,7 @@ class SettingsPanel extends ConsumerWidget {
           decoration: BoxDecoration(
             color: color,
             shape: BoxShape.circle,
-            border: Border.all(
-              color: selected
-                  ? theme.colorScheme.primary
-                  : (border ?? Colors.transparent),
-              width: selected ? 2.5 : 1,
-            ),
+            border: Border.all(color: borderColor, width: selected ? 2.5 : 1.5),
             boxShadow: selected
                 ? [
                     BoxShadow(
@@ -284,4 +301,31 @@ class SettingsPanel extends ConsumerWidget {
       ),
     );
   }
+
+  Color _resolveSwatchBorderColor({
+    required ThemeData theme,
+    required Color swatchColor,
+    required bool selected,
+    Color? explicitBorder,
+  }) {
+    if (selected) return theme.colorScheme.primary;
+    if (explicitBorder != null) return explicitBorder;
+
+    final surfaceLuminance = theme.colorScheme.surface.computeLuminance();
+    final swatchLuminance = swatchColor.computeLuminance();
+    final luminanceDelta = (surfaceLuminance - swatchLuminance).abs();
+
+    if (luminanceDelta < 0.08) {
+      return theme.colorScheme.outline.withAlpha(220);
+    }
+
+    return swatchLuminance < 0.35 ? Colors.white24 : Colors.black12;
+  }
+}
+
+class _ReaderFontOption {
+  final String label;
+  final String family;
+
+  const _ReaderFontOption({required this.label, required this.family});
 }

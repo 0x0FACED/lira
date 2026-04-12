@@ -440,6 +440,24 @@ abstract class AppLocalizations {
   /// **'Font size, theme, and other settings will be available in a future update.'**
   String get readerSettingsHint;
 
+  /// No description provided for @readerVertical.
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical'**
+  String get readerVertical;
+
+  /// No description provided for @readerHorizontal.
+  ///
+  /// In en, this message translates to:
+  /// **'Horizontal'**
+  String get readerHorizontal;
+
+  /// No description provided for @readerFont.
+  ///
+  /// In en, this message translates to:
+  /// **'Font'**
+  String get readerFont;
+
   /// No description provided for @readerTwoPageSpread.
   ///
   /// In en, this message translates to:

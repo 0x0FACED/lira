@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
+import 'package:xml/xml.dart' as xml;
 
 /// Sealed class representing a content element parsed from XHTML.
 sealed class ContentElement {
@@ -93,6 +94,14 @@ class XhtmlParser {
 
   /// Parse the XHTML and return a list of ContentElement.
   List<ContentElement> parse() {
+    _charOffset = 0;
+
+    final xmlElements = _parseXmlDocument();
+    if (xmlElements != null && xmlElements.isNotEmpty) {
+      return xmlElements;
+    }
+
+    _charOffset = 0;
     final document = html_parser.parse(html);
     final body = document.body;
     if (body == null) return [];
@@ -100,6 +109,235 @@ class XhtmlParser {
     final elements = <ContentElement>[];
     _parseNode(body, elements, currentStyle: baseStyle);
     return elements;
+  }
+
+  List<ContentElement>? _parseXmlDocument() {
+    try {
+      final document = xml.XmlDocument.parse(html);
+      final body = _firstXmlDescendantByLocalName(document, 'body');
+      if (body == null) return null;
+
+      final elements = <ContentElement>[];
+      _parseXmlNode(body, elements, currentStyle: baseStyle);
+      return elements;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _parseXmlNode(
+    xml.XmlNode node,
+    List<ContentElement> elements, {
+    required TextStyle currentStyle,
+  }) {
+    if (node is xml.XmlText || node is xml.XmlCDATA) {
+      final text = node.value ?? '';
+      if (text.trim().isEmpty) return;
+      _charOffset += text.length;
+      return;
+    }
+
+    if (node is! xml.XmlElement) return;
+
+    final tag = node.name.local.toLowerCase();
+    final effectiveStyle = _resolveXmlElementStyle(node, currentStyle);
+
+    switch (tag) {
+      case 'p':
+        _parseXmlTextBlock(
+          node,
+          elements,
+          type: TextBlockType.paragraph,
+          style: effectiveStyle,
+        );
+        break;
+      case 'h1':
+        _parseXmlTextBlock(
+          node,
+          elements,
+          type: TextBlockType.h1,
+          style: effectiveStyle.copyWith(
+            fontSize: (effectiveStyle.fontSize ?? 16) * 2.0,
+            fontWeight: FontWeight.bold,
+          ),
+        );
+        break;
+      case 'h2':
+        _parseXmlTextBlock(
+          node,
+          elements,
+          type: TextBlockType.h2,
+          style: effectiveStyle.copyWith(
+            fontSize: (effectiveStyle.fontSize ?? 16) * 1.5,
+            fontWeight: FontWeight.bold,
+          ),
+        );
+        break;
+      case 'h3':
+        _parseXmlTextBlock(
+          node,
+          elements,
+          type: TextBlockType.h3,
+          style: effectiveStyle.copyWith(
+            fontSize: (effectiveStyle.fontSize ?? 16) * 1.25,
+            fontWeight: FontWeight.bold,
+          ),
+        );
+        break;
+      case 'h4':
+        _parseXmlTextBlock(
+          node,
+          elements,
+          type: TextBlockType.h4,
+          style: effectiveStyle.copyWith(
+            fontSize: (effectiveStyle.fontSize ?? 16) * 1.1,
+            fontWeight: FontWeight.bold,
+          ),
+        );
+        break;
+      case 'h5':
+        _parseXmlTextBlock(
+          node,
+          elements,
+          type: TextBlockType.h5,
+          style: effectiveStyle.copyWith(
+            fontSize: effectiveStyle.fontSize,
+            fontWeight: FontWeight.bold,
+          ),
+        );
+        break;
+      case 'h6':
+        _parseXmlTextBlock(
+          node,
+          elements,
+          type: TextBlockType.h6,
+          style: effectiveStyle.copyWith(
+            fontSize: effectiveStyle.fontSize,
+            fontWeight: FontWeight.bold,
+            color: effectiveStyle.color?.withAlpha(180),
+          ),
+        );
+        break;
+      case 'blockquote':
+        _parseXmlTextBlock(
+          node,
+          elements,
+          type: TextBlockType.blockquote,
+          style: effectiveStyle.copyWith(fontStyle: FontStyle.italic),
+        );
+        break;
+      case 'pre':
+        _parseXmlTextBlock(
+          node,
+          elements,
+          type: TextBlockType.pre,
+          style: effectiveStyle.copyWith(fontFamily: 'monospace'),
+        );
+        break;
+      case 'code':
+        _parseXmlTextBlock(
+          node,
+          elements,
+          type: TextBlockType.code,
+          style: effectiveStyle.copyWith(fontFamily: 'monospace'),
+        );
+        break;
+      case 'ul':
+        int idx = 0;
+        for (final child in node.childElements) {
+          if (child.name.local.toLowerCase() == 'li') {
+            _parseXmlTextBlock(
+              child,
+              elements,
+              type: TextBlockType.listItem,
+              style: effectiveStyle,
+              listIndex: idx,
+            );
+            idx++;
+          } else {
+            _parseXmlNode(child, elements, currentStyle: effectiveStyle);
+          }
+        }
+        break;
+      case 'ol':
+        int idx = 1;
+        for (final child in node.childElements) {
+          if (child.name.local.toLowerCase() == 'li') {
+            _parseXmlTextBlock(
+              child,
+              elements,
+              type: TextBlockType.listItem,
+              style: effectiveStyle,
+              listIndex: idx,
+            );
+            idx++;
+          } else {
+            _parseXmlNode(child, elements, currentStyle: effectiveStyle);
+          }
+        }
+        break;
+      case 'li':
+        _parseXmlTextBlock(
+          node,
+          elements,
+          type: TextBlockType.listItem,
+          style: effectiveStyle,
+        );
+        break;
+      case 'hr':
+        final start = _charOffset;
+        _charOffset += 1;
+        elements.add(DividerBlock(charStart: start, charEnd: _charOffset));
+        break;
+      case 'img':
+        _parseXmlImage(node, elements);
+        break;
+      case 'br':
+        _charOffset += 1;
+        break;
+      case 'span':
+      case 'body':
+      case 'div':
+      case 'section':
+      case 'article':
+      case 'main':
+      case 'header':
+      case 'footer':
+      case 'figure':
+      case 'figcaption':
+        if (_shouldPromoteXmlContainerToParagraph(node)) {
+          _parseXmlTextBlock(
+            node,
+            elements,
+            type: TextBlockType.paragraph,
+            style: effectiveStyle,
+          );
+        } else {
+          for (final child in node.children) {
+            _parseXmlNode(child, elements, currentStyle: effectiveStyle);
+          }
+        }
+        break;
+      case 'head':
+      case 'script':
+      case 'style':
+      case 'meta':
+      case 'link':
+        break;
+      default:
+        if (_shouldPromoteXmlContainerToParagraph(node)) {
+          _parseXmlTextBlock(
+            node,
+            elements,
+            type: TextBlockType.paragraph,
+            style: effectiveStyle,
+          );
+        } else {
+          for (final child in node.children) {
+            _parseXmlNode(child, elements, currentStyle: effectiveStyle);
+          }
+        }
+    }
   }
 
   void _parseNode(
@@ -117,46 +355,122 @@ class XhtmlParser {
     if (node is! dom.Element) return;
 
     final tag = node.localName?.toLowerCase() ?? '';
+    final effectiveStyle = _resolveElementStyle(node, currentStyle);
 
     switch (tag) {
       case 'p':
-        _parseTextBlock(node, elements, type: TextBlockType.paragraph, style: currentStyle);
+        _parseTextBlock(
+          node,
+          elements,
+          type: TextBlockType.paragraph,
+          style: effectiveStyle,
+        );
         break;
       case 'h1':
-        _parseTextBlock(node, elements, type: TextBlockType.h1, style: currentStyle.copyWith(fontSize: (currentStyle.fontSize ?? 16) * 2.0, fontWeight: FontWeight.bold));
+        _parseTextBlock(
+          node,
+          elements,
+          type: TextBlockType.h1,
+          style: effectiveStyle.copyWith(
+            fontSize: (effectiveStyle.fontSize ?? 16) * 2.0,
+            fontWeight: FontWeight.bold,
+          ),
+        );
         break;
       case 'h2':
-        _parseTextBlock(node, elements, type: TextBlockType.h2, style: currentStyle.copyWith(fontSize: (currentStyle.fontSize ?? 16) * 1.5, fontWeight: FontWeight.bold));
+        _parseTextBlock(
+          node,
+          elements,
+          type: TextBlockType.h2,
+          style: effectiveStyle.copyWith(
+            fontSize: (effectiveStyle.fontSize ?? 16) * 1.5,
+            fontWeight: FontWeight.bold,
+          ),
+        );
         break;
       case 'h3':
-        _parseTextBlock(node, elements, type: TextBlockType.h3, style: currentStyle.copyWith(fontSize: (currentStyle.fontSize ?? 16) * 1.25, fontWeight: FontWeight.bold));
+        _parseTextBlock(
+          node,
+          elements,
+          type: TextBlockType.h3,
+          style: effectiveStyle.copyWith(
+            fontSize: (effectiveStyle.fontSize ?? 16) * 1.25,
+            fontWeight: FontWeight.bold,
+          ),
+        );
         break;
       case 'h4':
-        _parseTextBlock(node, elements, type: TextBlockType.h4, style: currentStyle.copyWith(fontSize: (currentStyle.fontSize ?? 16) * 1.1, fontWeight: FontWeight.bold));
+        _parseTextBlock(
+          node,
+          elements,
+          type: TextBlockType.h4,
+          style: effectiveStyle.copyWith(
+            fontSize: (effectiveStyle.fontSize ?? 16) * 1.1,
+            fontWeight: FontWeight.bold,
+          ),
+        );
         break;
       case 'h5':
-        _parseTextBlock(node, elements, type: TextBlockType.h5, style: currentStyle.copyWith(fontSize: currentStyle.fontSize, fontWeight: FontWeight.bold));
+        _parseTextBlock(
+          node,
+          elements,
+          type: TextBlockType.h5,
+          style: effectiveStyle.copyWith(
+            fontSize: effectiveStyle.fontSize,
+            fontWeight: FontWeight.bold,
+          ),
+        );
         break;
       case 'h6':
-        _parseTextBlock(node, elements, type: TextBlockType.h6, style: currentStyle.copyWith(fontSize: currentStyle.fontSize, fontWeight: FontWeight.bold, color: currentStyle.color?.withAlpha(180)));
+        _parseTextBlock(
+          node,
+          elements,
+          type: TextBlockType.h6,
+          style: effectiveStyle.copyWith(
+            fontSize: effectiveStyle.fontSize,
+            fontWeight: FontWeight.bold,
+            color: effectiveStyle.color?.withAlpha(180),
+          ),
+        );
         break;
       case 'blockquote':
-        _parseTextBlock(node, elements, type: TextBlockType.blockquote, style: currentStyle.copyWith(fontStyle: FontStyle.italic));
+        _parseTextBlock(
+          node,
+          elements,
+          type: TextBlockType.blockquote,
+          style: effectiveStyle.copyWith(fontStyle: FontStyle.italic),
+        );
         break;
       case 'pre':
-        _parseTextBlock(node, elements, type: TextBlockType.pre, style: currentStyle.copyWith(fontFamily: 'monospace'));
+        _parseTextBlock(
+          node,
+          elements,
+          type: TextBlockType.pre,
+          style: effectiveStyle.copyWith(fontFamily: 'monospace'),
+        );
         break;
       case 'code':
-        _parseTextBlock(node, elements, type: TextBlockType.code, style: currentStyle.copyWith(fontFamily: 'monospace'));
+        _parseTextBlock(
+          node,
+          elements,
+          type: TextBlockType.code,
+          style: effectiveStyle.copyWith(fontFamily: 'monospace'),
+        );
         break;
       case 'ul':
         int idx = 0;
         for (final child in node.children) {
           if (child.localName?.toLowerCase() == 'li') {
-            _parseTextBlock(child, elements, type: TextBlockType.listItem, style: currentStyle, listIndex: idx);
+            _parseTextBlock(
+              child,
+              elements,
+              type: TextBlockType.listItem,
+              style: effectiveStyle,
+              listIndex: idx,
+            );
             idx++;
           } else {
-            _parseNode(child, elements, currentStyle: currentStyle);
+            _parseNode(child, elements, currentStyle: effectiveStyle);
           }
         }
         break;
@@ -164,15 +478,26 @@ class XhtmlParser {
         int idx = 1;
         for (final child in node.children) {
           if (child.localName?.toLowerCase() == 'li') {
-            _parseTextBlock(child, elements, type: TextBlockType.listItem, style: currentStyle, listIndex: idx);
+            _parseTextBlock(
+              child,
+              elements,
+              type: TextBlockType.listItem,
+              style: effectiveStyle,
+              listIndex: idx,
+            );
             idx++;
           } else {
-            _parseNode(child, elements, currentStyle: currentStyle);
+            _parseNode(child, elements, currentStyle: effectiveStyle);
           }
         }
         break;
       case 'li':
-        _parseTextBlock(node, elements, type: TextBlockType.listItem, style: currentStyle);
+        _parseTextBlock(
+          node,
+          elements,
+          type: TextBlockType.listItem,
+          style: effectiveStyle,
+        );
         break;
       case 'hr':
         final start = _charOffset;
@@ -185,6 +510,7 @@ class XhtmlParser {
       case 'br':
         _charOffset += 1;
         break;
+      case 'span':
       case 'body':
       case 'div':
       case 'section':
@@ -194,9 +520,17 @@ class XhtmlParser {
       case 'footer':
       case 'figure':
       case 'figcaption':
-        // Container elements — recurse into children
-        for (final child in node.nodes) {
-          _parseNode(child, elements, currentStyle: currentStyle);
+        if (_shouldPromoteContainerToParagraph(node)) {
+          _parseTextBlock(
+            node,
+            elements,
+            type: TextBlockType.paragraph,
+            style: effectiveStyle,
+          );
+        } else {
+          for (final child in node.nodes) {
+            _parseNode(child, elements, currentStyle: effectiveStyle);
+          }
         }
         break;
       case 'head':
@@ -207,12 +541,16 @@ class XhtmlParser {
         // Skip these
         break;
       default:
-        // Unknown element — try to parse as text block or recurse
-        if (_hasTextContent(node)) {
-          _parseTextBlock(node, elements, type: TextBlockType.paragraph, style: currentStyle);
+        if (_shouldPromoteContainerToParagraph(node)) {
+          _parseTextBlock(
+            node,
+            elements,
+            type: TextBlockType.paragraph,
+            style: effectiveStyle,
+          );
         } else {
           for (final child in node.nodes) {
-            _parseNode(child, elements, currentStyle: currentStyle);
+            _parseNode(child, elements, currentStyle: effectiveStyle);
           }
         }
     }
@@ -227,6 +565,93 @@ class XhtmlParser {
     return false;
   }
 
+  bool _hasXmlTextContent(xml.XmlNode node) {
+    if (node is xml.XmlText || node is xml.XmlCDATA) {
+      return (node.value ?? '').trim().isNotEmpty;
+    }
+    if (node is! xml.XmlElement) return false;
+    for (final child in node.children) {
+      if (_hasXmlTextContent(child)) return true;
+    }
+    return false;
+  }
+
+  bool _shouldPromoteContainerToParagraph(dom.Element element) {
+    if (!_hasTextContent(element)) return false;
+    return !_containsBlockDescendant(element);
+  }
+
+  bool _shouldPromoteXmlContainerToParagraph(xml.XmlElement element) {
+    if (!_hasXmlTextContent(element)) return false;
+    return !_containsXmlBlockDescendant(element);
+  }
+
+  bool _containsBlockDescendant(dom.Element element) {
+    for (final child in element.children) {
+      final tag = child.localName?.toLowerCase() ?? '';
+      if (_isBlockLikeTag(tag)) {
+        return true;
+      }
+      if (_containsBlockDescendant(child)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool _containsXmlBlockDescendant(xml.XmlElement element) {
+    for (final child in element.childElements) {
+      final tag = child.name.local.toLowerCase();
+      if (_isBlockLikeTag(tag)) {
+        return true;
+      }
+      if (_containsXmlBlockDescendant(child)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool _isBlockLikeTag(String tag) {
+    switch (tag) {
+      case 'p':
+      case 'div':
+      case 'section':
+      case 'article':
+      case 'main':
+      case 'header':
+      case 'footer':
+      case 'figure':
+      case 'figcaption':
+      case 'blockquote':
+      case 'pre':
+      case 'ul':
+      case 'ol':
+      case 'li':
+      case 'h1':
+      case 'h2':
+      case 'h3':
+      case 'h4':
+      case 'h5':
+      case 'h6':
+      case 'table':
+      case 'thead':
+      case 'tbody':
+      case 'tfoot':
+      case 'tr':
+      case 'td':
+      case 'th':
+      case 'dl':
+      case 'dt':
+      case 'dd':
+      case 'hr':
+      case 'img':
+        return true;
+      default:
+        return false;
+    }
+  }
+
   void _parseTextBlock(
     dom.Element element,
     List<ContentElement> elements, {
@@ -239,7 +664,9 @@ class XhtmlParser {
 
     // Add list marker if needed
     if (listIndex != null) {
-      final marker = type == TextBlockType.listItem && listIndex > 0 ? '$listIndex. ' : '• ';
+      final marker = type == TextBlockType.listItem && listIndex > 0
+          ? '$listIndex. '
+          : '• ';
       spans.add(TextSpan(text: marker, style: style));
       _charOffset += marker.length;
     }
@@ -250,19 +677,74 @@ class XhtmlParser {
     if (spans.isEmpty) return;
 
     // Apply highlights to the combined span
-    final combinedSpan = spans.length == 1 ? spans.first : TextSpan(children: spans);
-    final highlightedSpan = _applyHighlightsToSpan(combinedSpan, startOffset, endOffset);
+    final combinedSpan = spans.length == 1
+        ? spans.first
+        : TextSpan(children: spans);
+    final highlightedSpan = _applyHighlightsToSpan(
+      combinedSpan,
+      startOffset,
+      endOffset,
+    );
 
-    elements.add(TextBlock(
-      span: highlightedSpan,
-      type: type,
-      listIndex: listIndex,
-      charStart: startOffset,
-      charEnd: endOffset,
-    ));
+    elements.add(
+      TextBlock(
+        span: highlightedSpan,
+        type: type,
+        listIndex: listIndex,
+        charStart: startOffset,
+        charEnd: endOffset,
+      ),
+    );
   }
 
-  void _buildSpans(dom.Node node, List<InlineSpan> spans, TextStyle parentStyle) {
+  void _parseXmlTextBlock(
+    xml.XmlElement element,
+    List<ContentElement> elements, {
+    required TextBlockType type,
+    required TextStyle style,
+    int? listIndex,
+  }) {
+    final startOffset = _charOffset;
+    final spans = <InlineSpan>[];
+
+    if (listIndex != null) {
+      final marker = type == TextBlockType.listItem && listIndex > 0
+          ? '$listIndex. '
+          : '• ';
+      spans.add(TextSpan(text: marker, style: style));
+      _charOffset += marker.length;
+    }
+
+    _buildXmlSpans(element, spans, style);
+
+    final endOffset = _charOffset;
+    if (spans.isEmpty) return;
+
+    final combinedSpan = spans.length == 1
+        ? spans.first
+        : TextSpan(children: spans);
+    final highlightedSpan = _applyHighlightsToSpan(
+      combinedSpan,
+      startOffset,
+      endOffset,
+    );
+
+    elements.add(
+      TextBlock(
+        span: highlightedSpan,
+        type: type,
+        listIndex: listIndex,
+        charStart: startOffset,
+        charEnd: endOffset,
+      ),
+    );
+  }
+
+  void _buildSpans(
+    dom.Node node,
+    List<InlineSpan> spans,
+    TextStyle parentStyle,
+  ) {
     if (node is dom.Text) {
       final text = node.text;
       if (text.isEmpty) return;
@@ -274,73 +756,194 @@ class XhtmlParser {
     if (node is! dom.Element) return;
 
     final tag = node.localName?.toLowerCase() ?? '';
+    if (tag == 'br') {
+      _charOffset += 1;
+      spans.add(TextSpan(text: '\n', style: parentStyle));
+      return;
+    }
+
+    if (tag == 'img') return;
+
+    final style = _resolveElementStyle(node, parentStyle);
+
+    for (final child in node.nodes) {
+      _buildSpans(child, spans, style);
+    }
+  }
+
+  void _buildXmlSpans(
+    xml.XmlNode node,
+    List<InlineSpan> spans,
+    TextStyle parentStyle,
+  ) {
+    if (node is xml.XmlText || node is xml.XmlCDATA) {
+      final text = node.value ?? '';
+      if (text.isEmpty) return;
+      _charOffset += text.length;
+      spans.add(TextSpan(text: text, style: parentStyle));
+      return;
+    }
+
+    if (node is! xml.XmlElement) return;
+
+    final tag = node.name.local.toLowerCase();
+    if (tag == 'br') {
+      _charOffset += 1;
+      spans.add(TextSpan(text: '\n', style: parentStyle));
+      return;
+    }
+
+    if (tag == 'img') return;
+
+    final style = _resolveXmlElementStyle(node, parentStyle);
+    for (final child in node.children) {
+      _buildXmlSpans(child, spans, style);
+    }
+  }
+
+  TextStyle _resolveElementStyle(dom.Element node, TextStyle parentStyle) {
+    final tag = node.localName?.toLowerCase() ?? '';
     var style = parentStyle;
 
     switch (tag) {
       case 'b':
       case 'strong':
-        style = parentStyle.copyWith(fontWeight: FontWeight.bold);
+        style = style.copyWith(fontWeight: FontWeight.bold);
         break;
       case 'i':
       case 'em':
-        style = parentStyle.copyWith(fontStyle: FontStyle.italic);
+        style = style.copyWith(fontStyle: FontStyle.italic);
         break;
       case 'u':
-        style = parentStyle.copyWith(decoration: TextDecoration.underline);
+        style = style.copyWith(decoration: TextDecoration.underline);
         break;
       case 's':
       case 'strike':
       case 'del':
-        style = parentStyle.copyWith(decoration: TextDecoration.lineThrough);
+        style = style.copyWith(decoration: TextDecoration.lineThrough);
         break;
       case 'sup':
-        style = parentStyle.copyWith(
-          fontSize: (parentStyle.fontSize ?? 16) * 0.75,
+        style = style.copyWith(
+          fontSize: (style.fontSize ?? 16) * 0.75,
           fontFeatures: [const FontFeature.superscripts()],
         );
         break;
       case 'sub':
-        style = parentStyle.copyWith(
-          fontSize: (parentStyle.fontSize ?? 16) * 0.75,
+        style = style.copyWith(
+          fontSize: (style.fontSize ?? 16) * 0.75,
           fontFeatures: [const FontFeature.subscripts()],
         );
         break;
       case 'small':
-        style = parentStyle.copyWith(fontSize: (parentStyle.fontSize ?? 16) * 0.85);
+        style = style.copyWith(fontSize: (style.fontSize ?? 16) * 0.85);
         break;
       case 'big':
-        style = parentStyle.copyWith(fontSize: (parentStyle.fontSize ?? 16) * 1.2);
+        style = style.copyWith(fontSize: (style.fontSize ?? 16) * 1.2);
         break;
       case 'a':
         final href = node.attributes['href'] ?? '';
         if (href.isNotEmpty) {
-          style = parentStyle.copyWith(
-            color: parentStyle.color?.withAlpha(200),
+          style = style.copyWith(
+            color: style.color?.withAlpha(200),
             decoration: TextDecoration.underline,
           );
         }
-        break;
-      case 'span':
-        // Check for inline styles
-        final inlineStyle = node.attributes['style'] ?? '';
-        style = _parseInlineStyle(inlineStyle, parentStyle);
         break;
       case 'font':
         final color = node.attributes['color'];
         final size = node.attributes['size'];
         if (color != null) {
-          style = parentStyle.copyWith(color: _parseColor(color));
+          style = style.copyWith(color: _parseColor(color));
         }
         if (size != null) {
           final multiplier = double.tryParse(size) ?? 1.0;
-          style = parentStyle.copyWith(fontSize: (parentStyle.fontSize ?? 16) * multiplier / 3.0);
+          style = style.copyWith(
+            fontSize: (style.fontSize ?? 16) * multiplier / 3.0,
+          );
         }
         break;
     }
 
-    for (final child in node.nodes) {
-      _buildSpans(child, spans, style);
+    final inlineStyle = node.attributes['style'] ?? '';
+    if (inlineStyle.trim().isNotEmpty) {
+      style = _parseInlineStyle(inlineStyle, style);
     }
+
+    return style;
+  }
+
+  TextStyle _resolveXmlElementStyle(
+    xml.XmlElement node,
+    TextStyle parentStyle,
+  ) {
+    final tag = node.name.local.toLowerCase();
+    var style = parentStyle;
+
+    switch (tag) {
+      case 'b':
+      case 'strong':
+        style = style.copyWith(fontWeight: FontWeight.bold);
+        break;
+      case 'i':
+      case 'em':
+        style = style.copyWith(fontStyle: FontStyle.italic);
+        break;
+      case 'u':
+        style = style.copyWith(decoration: TextDecoration.underline);
+        break;
+      case 's':
+      case 'strike':
+      case 'del':
+        style = style.copyWith(decoration: TextDecoration.lineThrough);
+        break;
+      case 'sup':
+        style = style.copyWith(
+          fontSize: (style.fontSize ?? 16) * 0.75,
+          fontFeatures: [const FontFeature.superscripts()],
+        );
+        break;
+      case 'sub':
+        style = style.copyWith(
+          fontSize: (style.fontSize ?? 16) * 0.75,
+          fontFeatures: [const FontFeature.subscripts()],
+        );
+        break;
+      case 'small':
+        style = style.copyWith(fontSize: (style.fontSize ?? 16) * 0.85);
+        break;
+      case 'big':
+        style = style.copyWith(fontSize: (style.fontSize ?? 16) * 1.2);
+        break;
+      case 'a':
+        final href = _xmlAttribute(node, 'href') ?? '';
+        if (href.isNotEmpty) {
+          style = style.copyWith(
+            color: style.color?.withAlpha(200),
+            decoration: TextDecoration.underline,
+          );
+        }
+        break;
+      case 'font':
+        final color = _xmlAttribute(node, 'color');
+        final size = _xmlAttribute(node, 'size');
+        if (color != null) {
+          style = style.copyWith(color: _parseColor(color));
+        }
+        if (size != null) {
+          final multiplier = double.tryParse(size) ?? 1.0;
+          style = style.copyWith(
+            fontSize: (style.fontSize ?? 16) * multiplier / 3.0,
+          );
+        }
+        break;
+    }
+
+    final inlineStyle = _xmlAttribute(node, 'style') ?? '';
+    if (inlineStyle.trim().isNotEmpty) {
+      style = _parseInlineStyle(inlineStyle, style);
+    }
+
+    return style;
   }
 
   TextStyle _parseInlineStyle(String cssStyle, TextStyle base) {
@@ -397,7 +1000,8 @@ class XhtmlParser {
       final pt = double.tryParse(value.substring(0, value.length - 2)) ?? 12.0;
       return pt * 1.333; // pt to px
     } else if (value.endsWith('%')) {
-      final pct = double.tryParse(value.substring(0, value.length - 1)) ?? 100.0;
+      final pct =
+          double.tryParse(value.substring(0, value.length - 1)) ?? 100.0;
       return baseSize * pct / 100.0;
     }
     return double.tryParse(value) ?? baseSize;
@@ -448,7 +1052,8 @@ class XhtmlParser {
   }
 
   void _parseImage(dom.Element element, List<ContentElement> elements) {
-    final src = element.attributes['src'] ?? element.attributes['data-src'] ?? '';
+    final src =
+        element.attributes['src'] ?? element.attributes['data-src'] ?? '';
     final alt = element.attributes['alt'];
     if (src.isEmpty) return;
 
@@ -466,20 +1071,82 @@ class XhtmlParser {
 
     final start = _charOffset;
     _charOffset += 1; // Count image as 1 char for offset tracking
-    elements.add(ImageBlock(
-      bytes: imgBytes,
-      alt: alt,
-      charStart: start,
-      charEnd: _charOffset,
-    ));
+    elements.add(
+      ImageBlock(
+        bytes: imgBytes,
+        alt: alt,
+        charStart: start,
+        charEnd: _charOffset,
+      ),
+    );
+  }
+
+  void _parseXmlImage(xml.XmlElement element, List<ContentElement> elements) {
+    final src =
+        _xmlAttribute(element, 'src') ??
+        _xmlAttribute(element, 'data-src') ??
+        '';
+    final alt = _xmlAttribute(element, 'alt');
+    if (src.isEmpty) return;
+
+    final filename = src.split('/').last;
+    Uint8List? imgBytes;
+    for (final entry in images.entries) {
+      if (entry.key.endsWith(filename)) {
+        imgBytes = entry.value;
+        break;
+      }
+    }
+
+    if (imgBytes == null) return;
+
+    final start = _charOffset;
+    _charOffset += 1;
+    elements.add(
+      ImageBlock(
+        bytes: imgBytes,
+        alt: alt,
+        charStart: start,
+        charEnd: _charOffset,
+      ),
+    );
+  }
+
+  xml.XmlElement? _firstXmlDescendantByLocalName(
+    xml.XmlNode root,
+    String name,
+  ) {
+    final normalized = name.toLowerCase();
+    for (final node in root.descendants.whereType<xml.XmlElement>()) {
+      if (node.name.local.toLowerCase() == normalized) {
+        return node;
+      }
+    }
+    return null;
+  }
+
+  String? _xmlAttribute(xml.XmlElement element, String attributeName) {
+    final normalized = attributeName.toLowerCase();
+    for (final attribute in element.attributes) {
+      final local = attribute.name.local.toLowerCase();
+      final qualified = attribute.name.qualified.toLowerCase();
+      if (local == normalized || qualified == normalized) {
+        return attribute.value;
+      }
+    }
+    return null;
   }
 
   /// Apply highlights to a span tree based on character offsets.
-  InlineSpan _applyHighlightsToSpan(InlineSpan span, int blockStart, int blockEnd) {
+  InlineSpan _applyHighlightsToSpan(
+    InlineSpan span,
+    int blockStart,
+    int blockEnd,
+  ) {
     // Find highlights that overlap with this block
-    final relevant = highlights.where((h) =>
-      h.startOffset < blockEnd && h.endOffset > blockStart
-    ).toList();
+    final relevant = highlights
+        .where((h) => h.startOffset < blockEnd && h.endOffset > blockStart)
+        .toList();
 
     if (relevant.isEmpty) return span;
 
@@ -497,7 +1164,11 @@ class XhtmlParser {
       final newChildren = <InlineSpan>[];
       var childOffset = blockStart;
       for (final child in span.children!) {
-        final childSpan = _applyHighlightsToSpan(child, childOffset, childOffset + (child is TextSpan ? (child.text?.length ?? 0) : 0));
+        final childSpan = _applyHighlightsToSpan(
+          child,
+          childOffset,
+          childOffset + (child is TextSpan ? (child.text?.length ?? 0) : 0),
+        );
         newChildren.add(childSpan);
         childOffset += child is TextSpan ? (child.text?.length ?? 0) : 0;
       }
@@ -526,7 +1197,9 @@ class XhtmlParser {
 
     return TextSpan(
       text: text,
-      style: span.style?.copyWith(backgroundColor: bgColor) ?? TextStyle(backgroundColor: bgColor),
+      style:
+          span.style?.copyWith(backgroundColor: bgColor) ??
+          TextStyle(backgroundColor: bgColor),
       recognizer: span.recognizer,
     );
   }

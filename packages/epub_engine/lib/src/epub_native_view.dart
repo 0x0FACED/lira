@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart'
@@ -123,15 +124,31 @@ class EpubNativeViewState extends State<EpubNativeView> {
   @override
   void didUpdateWidget(covariant EpubNativeView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.settings != widget.settings ||
-        oldWidget.epub != widget.epub) {
+    final needsReparse =
+        oldWidget.epub != widget.epub ||
+        oldWidget.settings.fontFamily != widget.settings.fontFamily ||
+        oldWidget.settings.fontSize != widget.settings.fontSize ||
+        oldWidget.settings.lineHeight != widget.settings.lineHeight ||
+        oldWidget.settings.backgroundColor != widget.settings.backgroundColor;
+    final needsRepagination =
+        needsReparse ||
+        oldWidget.epub != widget.epub ||
+        oldWidget.settings.horizontalPadding !=
+            widget.settings.horizontalPadding ||
+        oldWidget.settings.readingMode != widget.settings.readingMode ||
+        oldWidget.settings.enableDualPageSpread !=
+            widget.settings.enableDualPageSpread;
+
+    if (needsReparse) {
       _parsedChapters.clear();
+    }
+    if (needsRepagination) {
       _paginatedPages.clear();
       _lastPaginationSize = null;
-      for (final scope in _selectionScopes.values) {
-        scope.notifier.dispose();
+      final staleScopeIds = _selectionScopes.keys.toList(growable: false);
+      for (final scopeId in staleScopeIds) {
+        _selectionScopes.remove(scopeId)?.notifier.dispose();
       }
-      _selectionScopes.clear();
     }
     if (oldWidget.epub != widget.epub ||
         oldWidget.initialLocation?.toJson() !=
@@ -1227,11 +1244,20 @@ class EpubNativeViewState extends State<EpubNativeView> {
     final availableWidth = constraints.maxWidth;
     final availableHeight = constraints.maxHeight;
     _currentPageHeight = availableHeight;
+    final mediaQuery = MediaQuery.maybeOf(context);
+    final shortestSide =
+        mediaQuery?.size.shortestSide ??
+        math.min(availableWidth, availableHeight);
+    final isMobilePhone =
+        (defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS) &&
+        shortestSide < 600;
 
     final minPageWidth = 400.0;
     final gapFraction = 0.04;
     final gapWidth = availableWidth * gapFraction;
     _isDualPage =
+        !isMobilePhone &&
         widget.settings.enableDualPageSpread &&
         (availableWidth - gapWidth) / 2 >= minPageWidth;
 

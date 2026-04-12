@@ -186,6 +186,15 @@ class AppLocalizationsRu extends AppLocalizations {
       'Размер шрифта, тема и другие настройки будут доступны в следующем обновлении.';
 
   @override
+  String get readerVertical => 'Вертикально';
+
+  @override
+  String get readerHorizontal => 'Горизонтально';
+
+  @override
+  String get readerFont => 'Шрифт';
+
+  @override
   String get readerTwoPageSpread => 'Разворот на 2 страницы';
 
   @override

@@ -173,7 +173,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                   ),
                 ),
               ),
-              if (settings.brightness < 1.0 && widget.book.format != 'epub')
+              if (settings.brightness < 1.0)
                 Positioned.fill(
                   child: IgnorePointer(
                     child: Container(
