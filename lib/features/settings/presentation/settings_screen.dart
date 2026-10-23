@@ -4,463 +4,445 @@ import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:zlibrary_api/zlibrary_api.dart';
 
-import '../../../l10n/app_localizations.dart';
 import '../../../core/providers/preferences_provider.dart';
+import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/app_components.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../auth/domain/providers/auth_provider.dart';
-import '../../books/presentation/library_screen.dart' show kBottomNavBarHeight;
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
-
-  void _showZLibraryLoginDialog(BuildContext context, WidgetRef ref) {
-    final emailController = TextEditingController();
-    final passwordController = TextEditingController();
-    bool isLoading = false;
-    String? error;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        final l10n = AppLocalizations.of(context)!;
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: Text(l10n.zLibraryLogin),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: emailController,
-                    decoration: InputDecoration(labelText: l10n.zLibraryEmail),
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                  TextField(
-                    controller: passwordController,
-                    decoration: InputDecoration(labelText: l10n.zLibraryPassword),
-                    obscureText: true,
-                  ),
-                  if (error != null) ...[
-                    const SizedBox(height: 8),
-                    Text(error!, style: const TextStyle(color: Colors.red)),
-                  ],
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: isLoading ? null : () => Navigator.pop(context),
-                  child: Text(l10n.cancel),
-                ),
-                ElevatedButton(
-                  onPressed: isLoading
-                      ? null
-                      : () async {
-                          setState(() {
-                            isLoading = true;
-                            error = null;
-                          });
-                          try {
-                            final api = ZLibraryApi();
-                            await api.login(
-                              emailController.text,
-                              passwordController.text,
-                            );
-                            await ref.read(zLibraryCredentialsProvider.notifier).saveCredentials(
-                              emailController.text,
-                              api.cookies,
-                            );
-                            if (context.mounted) {
-                              Navigator.pop(context);
-                            }
-                          } catch (e) {
-                            setState(() {
-                              error = e.toString();
-                              isLoading = false;
-                            });
-                          }
-                        },
-                  child: isLoading
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(l10n.signIn),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authProvider);
     final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final themeMode = ref.watch(themeModeProvider);
     final locale = ref.watch(localeProvider);
+    final zLibCredentials = ref.watch(zLibraryCredentialsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.settings), centerTitle: true),
-      body: ListView(
-        padding: EdgeInsets.only(
-          bottom: kBottomNavBarHeight + MediaQuery.of(context).padding.bottom + 16,
+      body: SafeArea(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: SizedBox(
+            width: AppLayout.formMaxWidth,
+            child: ListView(
+              padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+              children: [
+                AppPageHeader(title: l10n.settings),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      AppSection(
+                        title: l10n.profile,
+                        children: [
+                          ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: auth.isLoggedIn
+                                  ? colors.primaryContainer
+                                  : colors.surfaceContainerHighest,
+                              foregroundColor: auth.isLoggedIn
+                                  ? colors.onPrimaryContainer
+                                  : colors.onSurfaceVariant,
+                              child: auth.isLoggedIn
+                                  ? Text(
+                                      (auth.username ?? 'U')[0].toUpperCase(),
+                                    )
+                                  : const Icon(Icons.person_outline),
+                            ),
+                            title: Text(
+                              auth.isLoggedIn
+                                  ? auth.username ?? 'User'
+                                  : auth.isGuest
+                                  ? l10n.guest
+                                  : l10n.notSignedIn,
+                            ),
+                            subtitle: auth.isLoggedIn
+                                ? Text(l10n.signedIn)
+                                : auth.isGuest
+                                ? Text(l10n.guestSyncHint)
+                                : null,
+                          ),
+                        ],
+                      ),
+                      AppSection(
+                        title: l10n.account,
+                        children: [
+                          if (!auth.isLoggedIn)
+                            ListTile(
+                              leading: const Icon(Icons.login),
+                              title: Text(l10n.signIn),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () => context.push('/login'),
+                            )
+                          else
+                            ListTile(
+                              leading: Icon(Icons.logout, color: colors.error),
+                              title: Text(
+                                l10n.logout,
+                                style: TextStyle(color: colors.error),
+                              ),
+                              onTap: () async {
+                                await ref.read(authProvider.notifier).logout();
+                              },
+                            ),
+                        ],
+                      ),
+                      AppSection(
+                        title: l10n.zLibrary,
+                        children: [
+                          ListTile(
+                            leading: Icon(
+                              Icons.library_books_outlined,
+                              color: zLibCredentials != null
+                                  ? colors.secondary
+                                  : colors.onSurfaceVariant,
+                            ),
+                            title: Text(
+                              zLibCredentials != null
+                                  ? l10n.zLibraryLoggedIn(zLibCredentials.email)
+                                  : l10n.zLibraryNotLoggedIn,
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                              AppSpacing.md,
+                              AppSpacing.sm,
+                              AppSpacing.md,
+                              AppSpacing.sm,
+                            ),
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: zLibCredentials != null
+                                  ? OutlinedButton.icon(
+                                      onPressed: () {
+                                        ref
+                                            .read(
+                                              zLibraryCredentialsProvider
+                                                  .notifier,
+                                            )
+                                            .clearCredentials();
+                                      },
+                                      icon: const Icon(Icons.logout),
+                                      label: Text(l10n.zLibraryLogout),
+                                    )
+                                  : FilledButton(
+                                      onPressed: () => showAppDialog<void>(
+                                        context: context,
+                                        builder: (_) =>
+                                            const _ZLibraryLoginDialog(),
+                                      ),
+                                      child: Text(l10n.signIn),
+                                    ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      AppSection(
+                        title: l10n.appearance,
+                        children: [
+                          SwitchListTile(
+                            secondary: Icon(
+                              themeMode == ThemeMode.dark
+                                  ? Icons.dark_mode_outlined
+                                  : Icons.light_mode_outlined,
+                            ),
+                            title: Text(l10n.theme),
+                            subtitle: Text(
+                              themeMode == ThemeMode.dark
+                                  ? l10n.themeDark
+                                  : l10n.themeLight,
+                            ),
+                            value: themeMode == ThemeMode.dark,
+                            onChanged: (_) {
+                              ref.read(themeModeProvider.notifier).toggle();
+                            },
+                          ),
+                          const Divider(),
+                          ListTile(
+                            leading: const Icon(Icons.language),
+                            title: Text(l10n.language),
+                            subtitle: Text(
+                              locale.languageCode == 'ru'
+                                  ? 'Русский'
+                                  : 'English',
+                            ),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => showAppDialog<void>(
+                              context: context,
+                              builder: (dialogContext) => SimpleDialog(
+                                title: Text(l10n.language),
+                                insetPadding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.md,
+                                  vertical: AppSpacing.lg,
+                                ),
+                                children: [
+                                  for (final language in const [
+                                    ('en', 'English'),
+                                    ('ru', 'Русский'),
+                                  ])
+                                    ListTile(
+                                      leading: Icon(
+                                        locale.languageCode == language.$1
+                                            ? Icons.radio_button_checked
+                                            : Icons.radio_button_unchecked,
+                                      ),
+                                      title: Text(language.$2),
+                                      onTap: () {
+                                        ref
+                                            .read(localeProvider.notifier)
+                                            .setLocale(language.$1);
+                                        Navigator.pop(dialogContext);
+                                      },
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      _buildProxySection(context, ref),
+                      AppSection(
+                        title: l10n.about,
+                        children: [
+                          FutureBuilder<PackageInfo>(
+                            future: PackageInfo.fromPlatform(),
+                            builder: (context, snapshot) => ListTile(
+                              leading: const Icon(Icons.info_outline),
+                              title: Text(l10n.version),
+                              subtitle: Text(snapshot.data?.version ?? '—'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-        children: [
-          _buildSection(
-            context,
-            title: l10n.profile,
-            children: [
-              if (auth.isLoggedIn)
-                ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: theme.colorScheme.primary,
-                    child: Text(
-                      (auth.username ?? 'U')[0].toUpperCase(),
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  ),
-                  title: Text(auth.username ?? 'User'),
-                  subtitle: Text(l10n.signedIn),
-                )
-              else if (auth.isGuest)
-                ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.grey[700],
-                    child: const Icon(
-                      Icons.person_outline,
-                      color: Colors.white,
-                    ),
-                  ),
-                  title: Text(l10n.guest),
-                  subtitle: Text(l10n.guestSyncHint),
-                )
-              else
-                ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.grey[700],
-                    child: const Icon(
-                      Icons.person_outline,
-                      color: Colors.white,
-                    ),
-                  ),
-                  title: Text(l10n.notSignedIn),
-                ),
-            ],
-          ),
-
-          _buildSection(
-            context,
-            title: l10n.account,
-            children: [
-              if (!auth.isLoggedIn)
-                ListTile(
-                  leading: const Icon(Icons.login),
-                  title: Text(l10n.signIn),
-                  onTap: () => context.push('/login'),
-                ),
-              if (auth.isLoggedIn)
-                ListTile(
-                  leading: const Icon(Icons.logout, color: Colors.red),
-                  title: Text(
-                    l10n.logout,
-                    style: const TextStyle(color: Colors.red),
-                  ),
-                  onTap: () async {
-                    await ref.read(authProvider.notifier).logout();
-                  },
-                ),
-            ],
-          ),
-
-          _buildSection(
-            context,
-            title: l10n.zLibrary,
-            children: [
-              Consumer(
-                builder: (context, ref, child) {
-                  final zLibCreds = ref.watch(zLibraryCredentialsProvider);
-                  
-                  if (zLibCreds != null) {
-                    return ListTile(
-                      leading: const Icon(Icons.library_books, color: Colors.green),
-                      title: Text(l10n.zLibraryLoggedIn(zLibCreds.email)),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.logout, color: Colors.red),
-                        onPressed: () {
-                          ref.read(zLibraryCredentialsProvider.notifier).clearCredentials();
-                        },
-                      ),
-                    );
-                  } else {
-                    return ListTile(
-                      leading: const Icon(Icons.library_books),
-                      title: Text(l10n.zLibraryNotLoggedIn),
-                      trailing: ElevatedButton(
-                        onPressed: () => _showZLibraryLoginDialog(context, ref),
-                        child: Text(l10n.signIn),
-                      ),
-                    );
-                  }
-                },
-              ),
-            ],
-          ),
-
-          _buildSection(
-            context,
-            title: l10n.appearance,
-            children: [
-              ListTile(
-                leading: Icon(
-                  themeMode == ThemeMode.dark
-                      ? Icons.dark_mode
-                      : Icons.light_mode,
-                ),
-                title: Text(l10n.theme),
-                subtitle: Text(
-                  themeMode == ThemeMode.dark ? l10n.themeDark : 'Light',
-                ),
-                trailing: Switch(
-                  value: themeMode == ThemeMode.dark,
-                  onChanged: (_) {
-                    ref.read(themeModeProvider.notifier).toggle();
-                  },
-                ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.language),
-                title: Text(l10n.language),
-                subtitle: Text(
-                  locale.languageCode == 'ru' ? 'Русский' : 'English',
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  showDialog(
-                    context: context,
-                    builder: (ctx) => SimpleDialog(
-                      title: Text(l10n.language),
-                      children: [
-                        ListTile(
-                          leading: Icon(
-                            locale.languageCode == 'en'
-                                ? Icons.radio_button_checked
-                                : Icons.radio_button_unchecked,
-                          ),
-                          title: const Text('English'),
-                          onTap: () {
-                            ref.read(localeProvider.notifier).setLocale('en');
-                            Navigator.pop(ctx);
-                          },
-                        ),
-                        ListTile(
-                          leading: Icon(
-                            locale.languageCode == 'ru'
-                                ? Icons.radio_button_checked
-                                : Icons.radio_button_unchecked,
-                          ),
-                          title: const Text('Русский'),
-                          onTap: () {
-                            ref.read(localeProvider.notifier).setLocale('ru');
-                            Navigator.pop(ctx);
-                          },
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-
-          _buildProxySection(context, ref),
-
-          _buildSection(
-            context,
-            title: l10n.about,
-            children: [
-              FutureBuilder<PackageInfo>(
-                future: PackageInfo.fromPlatform(),
-                builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '—';
-                  return ListTile(
-                    leading: const Icon(Icons.info_outline),
-                    title: Text(l10n.version),
-                    subtitle: Text(version),
-                  );
-                },
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
 
   Widget _buildProxySection(BuildContext context, WidgetRef ref) {
     final proxyConfig = ref.watch(socks5ConfigProvider);
-    final theme = Theme.of(context);
+    final colors = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
 
-    return _buildSection(
-      context,
+    return AppSection(
       title: 'SOCKS5 Proxy',
       children: [
-        ListTile(
-          leading: Icon(
-            Icons.vpn_lock_rounded,
-            color: proxyConfig.enabled ? Colors.green : null,
+        SwitchListTile(
+          secondary: Icon(
+            Icons.vpn_lock_outlined,
+            color: proxyConfig.enabled
+                ? colors.secondary
+                : colors.onSurfaceVariant,
           ),
           title: const Text('SOCKS5 Proxy'),
           subtitle: Text(
             proxyConfig.enabled
                 ? '${proxyConfig.host}:${proxyConfig.port}'
-                : 'Disabled',
+                : l10n.proxyDisabled,
           ),
-          trailing: Switch.adaptive(
-            value: proxyConfig.enabled,
-            activeTrackColor: theme.colorScheme.primary.withAlpha(120),
-            activeThumbColor: theme.colorScheme.primary,
-            onChanged: (value) {
-              ref.read(socks5ConfigProvider.notifier).setEnabled(value);
-            },
-          ),
+          value: proxyConfig.enabled,
+          onChanged: (value) {
+            ref.read(socks5ConfigProvider.notifier).setEnabled(value);
+          },
         ),
-        // Host & Port fields (only visible when toggled on)
-        AnimatedCrossFade(
-          duration: const Duration(milliseconds: 200),
-          crossFadeState: proxyConfig.enabled
-              ? CrossFadeState.showFirst
-              : CrossFadeState.showSecond,
-          secondChild: const SizedBox.shrink(),
-          firstChild: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: _ProxyTextField(
-                    label: 'Host',
-                    initialValue: proxyConfig.host,
-                    onChanged: (value) {
-                      if (value.isNotEmpty) {
-                        ref.read(socks5ConfigProvider.notifier).setHost(value);
-                      }
-                    },
+        AppStateTransition(
+          child: proxyConfig.enabled
+              ? Padding(
+                  key: const ValueKey('proxy-fields'),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.md,
+                    AppSpacing.sm,
+                    AppSpacing.md,
+                    AppSpacing.sm,
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 1,
-                  child: _ProxyTextField(
-                    label: 'Port',
-                    initialValue: proxyConfig.port.toString(),
-                    keyboardType: TextInputType.number,
-                    onChanged: (value) {
-                      final port = int.tryParse(value);
-                      if (port != null && port > 0 && port <= 65535) {
-                        ref.read(socks5ConfigProvider.notifier).setPort(port);
-                      }
-                    },
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        initialValue: proxyConfig.host,
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        textInputAction: TextInputAction.next,
+                        decoration: InputDecoration(labelText: l10n.proxyHost),
+                        onChanged: (value) {
+                          if (value.isNotEmpty) {
+                            ref
+                                .read(socks5ConfigProvider.notifier)
+                                .setHost(value);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      TextFormField(
+                        initialValue: proxyConfig.port.toString(),
+                        keyboardType: TextInputType.number,
+                        textInputAction: TextInputAction.done,
+                        decoration: InputDecoration(labelText: l10n.proxyPort),
+                        onChanged: (value) {
+                          final port = int.tryParse(value);
+                          if (port != null && port > 0 && port <= 65535) {
+                            ref
+                                .read(socks5ConfigProvider.notifier)
+                                .setPort(port);
+                          }
+                        },
+                      ),
+                    ],
                   ),
+                )
+              : const SizedBox(
+                  key: ValueKey('proxy-disabled'),
+                  width: double.infinity,
                 ),
-              ],
-            ),
-          ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildSection(
-    BuildContext context, {
-    required String title,
-    required List<Widget> children,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-          child: Text(
-            title,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        ...children,
-        const Divider(height: 1),
       ],
     );
   }
 }
 
-/// Compact text field for proxy host/port input.
-class _ProxyTextField extends StatefulWidget {
-  final String label;
-  final String initialValue;
-  final TextInputType? keyboardType;
-  final ValueChanged<String> onChanged;
-
-  const _ProxyTextField({
-    required this.label,
-    required this.initialValue,
-    required this.onChanged,
-    this.keyboardType,
-  });
+class _ZLibraryLoginDialog extends ConsumerStatefulWidget {
+  const _ZLibraryLoginDialog();
 
   @override
-  State<_ProxyTextField> createState() => _ProxyTextFieldState();
+  ConsumerState<_ZLibraryLoginDialog> createState() =>
+      _ZLibraryLoginDialogState();
 }
 
-class _ProxyTextFieldState extends State<_ProxyTextField> {
-  late final TextEditingController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.initialValue);
-  }
+class _ZLibraryLoginDialogState extends ConsumerState<_ZLibraryLoginDialog> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _isLoading = false;
+  String? _error;
 
   @override
   void dispose() {
-    _controller.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _login() async {
+    final email = _emailController.text;
+    final password = _passwordController.text;
+    final credentials = ref.read(zLibraryCredentialsProvider.notifier);
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final api = ZLibraryApi();
+      await api.login(email, password);
+      await credentials.saveCredentials(email, api.cookies);
+      if (mounted) Navigator.pop(context);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.toString();
+        _isLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
-    return TextField(
-      controller: _controller,
-      keyboardType: widget.keyboardType,
-      style: const TextStyle(fontSize: 14),
-      decoration: InputDecoration(
-        labelText: widget.label,
-        labelStyle: TextStyle(fontSize: 13, color: theme.colorScheme.onSurface.withAlpha(140)),
-        filled: true,
-        fillColor: isDark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(8),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: theme.colorScheme.outline.withAlpha(40)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: theme.colorScheme.outline.withAlpha(40)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: theme.colorScheme.primary),
-        ),
-        isDense: true,
+    return AlertDialog(
+      scrollable: true,
+      insetPadding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.lg,
       ),
-      onChanged: widget.onChanged,
+      title: Text(l10n.zLibraryLogin),
+      content: SizedBox(
+        width: AppLayout.formMaxWidth,
+        child: AutofillGroup(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                autofillHints: const [AutofillHints.username],
+                textInputAction: TextInputAction.next,
+                autocorrect: false,
+                decoration: InputDecoration(labelText: l10n.zLibraryEmail),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextField(
+                controller: _passwordController,
+                autofillHints: const [AutofillHints.password],
+                textInputAction: TextInputAction.done,
+                decoration: InputDecoration(labelText: l10n.zLibraryPassword),
+                obscureText: true,
+                onSubmitted: (_) {
+                  if (!_isLoading) _login();
+                },
+              ),
+              AppStateTransition(
+                child: _error != null
+                    ? Padding(
+                        key: ValueKey(_error),
+                        padding: const EdgeInsets.only(top: AppSpacing.md),
+                        child: Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            _error!,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.error,
+                            ),
+                          ),
+                        ),
+                      )
+                    : const SizedBox(key: ValueKey('zlibrary-no-error')),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isLoading ? null : () => Navigator.pop(context),
+          child: Text(l10n.cancel),
+        ),
+        FilledButton(
+          onPressed: _isLoading ? null : _login,
+          child: AppStateTransition(
+            child: _isLoading
+                ? SizedBox(
+                    key: const ValueKey('zlibrary-loading'),
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      semanticsLabel: l10n.signIn,
+                    ),
+                  )
+                : Text(
+                    l10n.signIn,
+                    key: const ValueKey('zlibrary-sign-in'),
+                    textAlign: TextAlign.center,
+                  ),
+          ),
+        ),
+      ],
     );
   }
 }

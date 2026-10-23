@@ -240,4 +240,181 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get zLibraryLogout => 'Выйти';
+
+  @override
+  String get themeLight => 'Светлая';
+
+  @override
+  String get proxyHost => 'Хост';
+
+  @override
+  String get proxyPort => 'Порт';
+
+  @override
+  String get proxyDisabled => 'Выключен';
+
+  @override
+  String get searchBothSources => 'Оба источника';
+
+  @override
+  String get searchAllFormats => 'Все форматы';
+
+  @override
+  String get searchSort => 'Сортировка';
+
+  @override
+  String get searchSortRelevance => 'По релевантности';
+
+  @override
+  String get searchSortTitleAsc => 'Название: А—Я';
+
+  @override
+  String get searchSortTitleDesc => 'Название: Я—А';
+
+  @override
+  String get searchSortAuthorAsc => 'Автор: А—Я';
+
+  @override
+  String get searchLoading => 'Ищем на книжных полках…';
+
+  @override
+  String get searchNoResults => 'Книги не найдены';
+
+  @override
+  String get searchNoFilterResults => 'Нет книг с такими фильтрами';
+
+  @override
+  String get searchResetFilters => 'Сбросить фильтры';
+
+  @override
+  String get searchFailed => 'Поиск недоступен';
+
+  @override
+  String get searchRetry => 'Попробовать снова';
+
+  @override
+  String get searchSourcesPartialFailure =>
+      'Часть источников недоступна. Показываем то, что удалось найти.';
+
+  @override
+  String get cancelDownload => 'Отменить загрузку';
+
+  @override
+  String get downloadBook => 'Скачать книгу';
+
+  @override
+  String get searchAnnaDescription =>
+      'Ищите книги по названию, автору или ISBN в Anna’s Archive.';
+
+  @override
+  String get searchZLibraryDescription =>
+      'Найдите следующую книгу в Z-Library. Для загрузки войдите в аккаунт в настройках.';
+
+  @override
+  String get searchBothDescription =>
+      'Поиск одновременно в Anna’s Archive и Z-Library.';
+
+  @override
+  String searchResultsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count книги',
+      many: '$count книг',
+      few: '$count книги',
+      one: '$count книга',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get highlights => 'Выделения';
+
+  @override
+  String get highlightsEmpty => 'Выделений пока нет';
+
+  @override
+  String get highlightsEmptyHint =>
+      'Выделите текст в книге, чтобы сохранить выделение или заметку.';
+
+  @override
+  String get highlightsLoadError => 'Не удалось загрузить выделения';
+
+  @override
+  String get addNote => 'Добавить заметку';
+
+  @override
+  String get editNote => 'Изменить заметку';
+
+  @override
+  String get noteHint => 'Ваша заметка…';
+
+  @override
+  String get copyText => 'Копировать';
+
+  @override
+  String get copied => 'Скопировано';
+
+  @override
+  String get highlightText => 'Выделить';
+
+  @override
+  String get tableOfContentsUnavailable => 'Оглавление недоступно';
+
+  @override
+  String get readerSansSerif => 'Без засечек';
+
+  @override
+  String get readerSerif => 'С засечками';
+
+  @override
+  String get readerMonospace => 'Моноширинный';
+
+  @override
+  String get readerFontSize => 'Размер шрифта';
+
+  @override
+  String get readerLineHeight => 'Межстрочный интервал';
+
+  @override
+  String get readerPageMargins => 'Отступы страницы';
+
+  @override
+  String get readerBrightness => 'Яркость';
+
+  @override
+  String get readerBackground => 'Фон страницы';
+
+  @override
+  String get readerPaper => 'Тёплая бумага';
+
+  @override
+  String get readerNight => 'Ночь';
+
+  @override
+  String get readerCharcoal => 'Уголь';
+
+  @override
+  String get readerGraphite => 'Графит';
+
+  @override
+  String get readerWhite => 'Белый';
+
+  @override
+  String get readerSepia => 'Сепия';
+
+  @override
+  String readerSavePositionError(String error) {
+    return 'Не удалось сохранить позицию чтения: $error';
+  }
+
+  @override
+  String highlightSaveError(String error) {
+    return 'Не удалось сохранить выделение: $error';
+  }
+
+  @override
+  String bookDownloaded(String title) {
+    return '«$title» добавлена в библиотеку';
+  }
 }

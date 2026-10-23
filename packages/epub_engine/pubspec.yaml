@@ -10,9 +10,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_svg: ^2.3.0
   scrollable_positioned_list: ^0.3.8
   archive: ^3.6.1
   html: ^0.15.5
+  csslib: ^1.0.2
   xml: ^6.5.0
   freezed_annotation: ^3.1.0
   json_annotation: ^4.9.0

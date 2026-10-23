@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:xml/xml.dart';
 
+import 'epub_paths.dart';
+
 /// Parsed EPUB content ready for rendering
 class ParsedEpub {
   final String title;
@@ -12,6 +14,7 @@ class ParsedEpub {
   final List<EpubChapter> chapters;
   final List<TOCItem> toc;
   final Map<String, Uint8List> images;
+  final Map<String, String> stylesheets;
 
   ParsedEpub({
     required this.title,
@@ -20,6 +23,7 @@ class ParsedEpub {
     required this.chapters,
     required this.toc,
     required this.images,
+    this.stylesheets = const {},
   });
 }
 
@@ -39,6 +43,8 @@ class EpubChapter {
 /// Item in the Table of Contents
 class TOCItem {
   final String title;
+
+  /// Package-relative URI locator; its path remains URI-escaped.
   final String fileName;
   final List<TOCItem> subItems;
 
@@ -69,21 +75,13 @@ class EpubParser {
   static ParsedEpub _parseWithArchive(Uint8List data) {
     final archive = ZipDecoder().decodeBytes(data, verify: false);
     final fileByPath = <String, ArchiveFile>{};
-    final aliasToActualPath = <String, String>{};
 
     for (final file in archive.files.where((file) => file.isFile)) {
-      final normalized = _normalizePath(file.name);
-      fileByPath[normalized] = file;
-      for (final alias in _pathAliases(normalized)) {
-        aliasToActualPath.putIfAbsent(alias, () => normalized);
-      }
+      fileByPath[normalizeEpubArchivePath(file.name)] = file;
     }
 
-    final containerPath = _findArchivePath(
-      'META-INF/container.xml',
-      aliasToActualPath,
-    );
-    if (containerPath == null) {
+    const containerPath = 'META-INF/container.xml';
+    if (!fileByPath.containsKey(containerPath)) {
       throw Exception('EPUB container.xml not found');
     }
 
@@ -99,7 +97,7 @@ class EpubParser {
       throw Exception('EPUB rootfile full-path is missing');
     }
 
-    final opfPath = _findArchivePath(opfRelativePath, aliasToActualPath);
+    final opfPath = _locateArchivePath(fileByPath, '', opfRelativePath);
     if (opfPath == null) {
       throw Exception('OPF package file not found: $opfRelativePath');
     }
@@ -107,7 +105,6 @@ class EpubParser {
     final opfDocument = XmlDocument.parse(
       _decodeTextFile(fileByPath[opfPath]!),
     );
-    final opfDir = _dirname(opfPath);
     final metadataNode = _firstDescendantByLocalName(opfDocument, 'metadata');
     final manifestNode = _firstDescendantByLocalName(opfDocument, 'manifest');
     final spineNode = _firstDescendantByLocalName(opfDocument, 'spine');
@@ -130,10 +127,12 @@ class EpubParser {
       final mediaType = _attributeValue(itemNode, 'media-type');
       if (id == null || href == null || mediaType == null) continue;
 
-      final resolvedPath = _resolveRelativePath(opfDir, href);
+      final resolvedPath = resolveEpubPath(opfPath, href);
+      if (resolvedPath == null) continue;
       final manifestItem = _ManifestItem(
         id: id,
-        href: href,
+        archivePath:
+            _locateArchivePath(fileByPath, opfPath, href) ?? resolvedPath,
         resolvedPath: resolvedPath,
         mediaType: mediaType,
         properties: _attributeValue(itemNode, 'properties') ?? '',
@@ -143,15 +142,16 @@ class EpubParser {
     }
 
     final images = <String, Uint8List>{};
+    final stylesheets = <String, String>{};
     for (final item in manifestItems) {
-      if (!item.mediaType.toLowerCase().startsWith('image/')) continue;
-      final actualPath = _findArchivePath(item.resolvedPath, aliasToActualPath);
-      if (actualPath == null) continue;
-      _registerBinaryAliases(
-        images,
-        item.resolvedPath,
-        _fileBytes(fileByPath[actualPath]!),
-      );
+      final file = fileByPath[item.archivePath];
+      if (file == null) continue;
+      final mediaType = item.mediaType.toLowerCase();
+      if (mediaType.startsWith('image/')) {
+        images[item.resolvedPath] = _fileBytes(file);
+      } else if (mediaType == 'text/css') {
+        stylesheets[item.resolvedPath] = _decodeTextFile(file);
+      }
     }
 
     Uint8List? coverImage;
@@ -161,20 +161,13 @@ class EpubParser {
       manifestById,
     );
     if (coverItem != null) {
-      final coverPath = _findArchivePath(
-        coverItem.resolvedPath,
-        aliasToActualPath,
-      );
-      if (coverPath != null) {
-        coverImage = _fileBytes(fileByPath[coverPath]!);
+      final coverFile = fileByPath[coverItem.archivePath];
+      if (coverFile != null) {
+        coverImage = _fileBytes(coverFile);
       }
     }
 
-    final toc = _parseToc(
-      manifestItems: manifestItems,
-      fileByPath: fileByPath,
-      aliasToActualPath: aliasToActualPath,
-    );
+    final toc = _parseToc(manifestItems: manifestItems, fileByPath: fileByPath);
 
     final tocTitlesByPath = <String, String>{};
     _flattenTocTitles(toc, tocTitlesByPath);
@@ -184,8 +177,8 @@ class EpubParser {
 
     void addChapter(_ManifestItem item, {bool requiredBySpine = false}) {
       if (!_isHtmlManifestItem(item)) return;
-      final actualPath = _findArchivePath(item.resolvedPath, aliasToActualPath);
-      if (actualPath == null) {
+      final actualPath = item.archivePath;
+      if (!fileByPath.containsKey(actualPath)) {
         if (requiredBySpine) {
           throw FormatException(
             'EPUB spine document not found: ${item.resolvedPath}',
@@ -253,8 +246,12 @@ class EpubParser {
         ? toc
         : flatChapters
               .map(
-                (chapter) =>
-                    TOCItem(title: chapter.title, fileName: chapter.fileName),
+                (chapter) => TOCItem(
+                  title: chapter.title,
+                  fileName: Uri(
+                    pathSegments: chapter.fileName.split('/'),
+                  ).toString(),
+                ),
               )
               .toList(growable: false);
 
@@ -265,6 +262,7 @@ class EpubParser {
       chapters: flatChapters,
       toc: normalizedToc,
       images: images,
+      stylesheets: stylesheets,
     );
   }
 
@@ -310,15 +308,14 @@ class EpubParser {
   static List<TOCItem> _parseToc({
     required List<_ManifestItem> manifestItems,
     required Map<String, ArchiveFile> fileByPath,
-    required Map<String, String> aliasToActualPath,
   }) {
     final navItem = manifestItems.firstWhere(
       (item) => item.properties.toLowerCase().contains('nav'),
       orElse: () => _ManifestItem.empty,
     );
     if (navItem != _ManifestItem.empty) {
-      final navPath = _findArchivePath(navItem.resolvedPath, aliasToActualPath);
-      if (navPath != null) {
+      final navPath = navItem.archivePath;
+      if (fileByPath.containsKey(navPath)) {
         try {
           return _parseNavDocument(
             _decodeTextFile(fileByPath[navPath]!),
@@ -335,8 +332,8 @@ class EpubParser {
       orElse: () => _ManifestItem.empty,
     );
     if (ncxItem != _ManifestItem.empty) {
-      final ncxPath = _findArchivePath(ncxItem.resolvedPath, aliasToActualPath);
-      if (ncxPath != null) {
+      final ncxPath = ncxItem.archivePath;
+      if (fileByPath.containsKey(ncxPath)) {
         try {
           return _parseNcxDocument(
             _decodeTextFile(fileByPath[ncxPath]!),
@@ -456,8 +453,8 @@ class EpubParser {
 
   static void _flattenTocTitles(List<TOCItem> items, Map<String, String> sink) {
     for (final item in items) {
-      final path = item.fileName.split('#').first;
-      if (path.isNotEmpty && item.title.isNotEmpty) {
+      final path = resolveEpubPath('', item.fileName);
+      if (path != null && path.isNotEmpty && item.title.isNotEmpty) {
         sink.putIfAbsent(path, () => item.title);
       }
       if (item.subItems.isNotEmpty) {
@@ -529,64 +526,20 @@ class EpubParser {
     return String.fromCharCodes(units);
   }
 
-  static String? _findArchivePath(
-    String requestedPath,
-    Map<String, String> aliasToActualPath,
+  static String? _locateArchivePath(
+    Map<String, ArchiveFile> files,
+    String documentPath,
+    String href,
   ) {
-    final normalized = _normalizePath(requestedPath);
-    for (final alias in _pathAliases(normalized)) {
-      final match = aliasToActualPath[alias];
-      if (match != null) return match;
-    }
-    return null;
-  }
+    final canonical = resolveEpubPath(documentPath, href);
+    if (canonical == null) return null;
+    if (files.containsKey(canonical)) return canonical;
 
-  static Iterable<String> _pathAliases(String path) sync* {
-    final normalized = _normalizePath(path);
-    if (normalized.isEmpty) return;
-    yield normalized;
-
-    final decoded = _decodePercentLenient(normalized);
-    if (decoded != normalized) {
-      yield decoded;
-    }
-
-    final lower = normalized.toLowerCase();
-    if (lower != normalized) {
-      yield lower;
-    }
-
-    final decodedLower = decoded.toLowerCase();
-    if (decodedLower != decoded && decodedLower != lower) {
-      yield decodedLower;
-    }
-  }
-
-  static void _registerBinaryAliases(
-    Map<String, Uint8List> sink,
-    String path,
-    List<int> bytes,
-  ) {
-    final data = bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
-    final normalized = _normalizePath(path);
-    final baseName = normalized.split('/').isNotEmpty
-        ? normalized.split('/').last
-        : normalized;
-
-    sink.putIfAbsent(normalized, () => data);
-
-    final decoded = _decodePercentLenient(normalized);
-    if (decoded != normalized) {
-      sink.putIfAbsent(decoded, () => data);
-    }
-
-    if (baseName.isNotEmpty) {
-      sink.putIfAbsent(baseName, () => data);
-      final decodedBaseName = _decodePercentLenient(baseName);
-      if (decodedBaseName != baseName) {
-        sink.putIfAbsent(decodedBaseName, () => data);
-      }
-    }
+    // Some publishers put URI-escaped names literally into the ZIP. Preserve
+    // that exact spelling only when the correctly decoded target is absent;
+    // never let a fallback alias shadow a distinct physical archive entry.
+    final literal = resolveEpubPath(documentPath, href.replaceAll('%', '%25'));
+    return literal != null && files.containsKey(literal) ? literal : null;
   }
 
   static String? _attributeValue(XmlElement? element, String attributeName) {
@@ -634,105 +587,37 @@ class EpubParser {
     final pathPart = fragmentIndex >= 0
         ? href.substring(0, fragmentIndex)
         : href;
-    final fragment = fragmentIndex >= 0
+    var fragment = fragmentIndex >= 0
         ? href.substring(fragmentIndex + 1)
         : null;
-    final resolvedPath = _resolveRelativePath(_dirname(basePath), pathPart);
-    if (fragment == null || fragment.isEmpty) {
-      return resolvedPath;
-    }
-    return '$resolvedPath#$fragment';
-  }
-
-  static String _resolveRelativePath(String baseDir, String href) {
-    final trimmed = href.trim().replaceAll('\\', '/');
-    if (trimmed.isEmpty) return _normalizePath(baseDir);
-    if (trimmed.startsWith('/')) {
-      return _normalizePath(trimmed.substring(1));
-    }
-    return _normalizePath(baseDir.isEmpty ? trimmed : '$baseDir/$trimmed');
-  }
-
-  static String _dirname(String path) {
-    final normalized = _normalizePath(path);
-    if (normalized.isEmpty || !normalized.contains('/')) {
-      return '';
-    }
-    return normalized.substring(0, normalized.lastIndexOf('/'));
-  }
-
-  static String _normalizePath(String path) {
-    final source = path.replaceAll('\\', '/');
-    final segments = <String>[];
-
-    for (final segment in source.split('/')) {
-      if (segment.isEmpty || segment == '.') continue;
-      if (segment == '..') {
-        if (segments.isNotEmpty) {
-          segments.removeLast();
-        }
-        continue;
+    final resolvedPath = resolveEpubPath(basePath, pathPart);
+    if (resolvedPath == null) return '';
+    if (fragment != null) {
+      try {
+        fragment = Uri.decodeComponent(fragment);
+      } on FormatException {
+        // Preserve a literal percent sign in legacy fragment identifiers.
       }
-      segments.add(segment);
     }
-
-    return segments.join('/');
-  }
-
-  static String _decodePercentLenient(String input) {
-    final output = StringBuffer();
-    final bytes = <int>[];
-
-    void flushBytes() {
-      if (bytes.isEmpty) return;
-      output.write(utf8.decode(bytes, allowMalformed: true));
-      bytes.clear();
-    }
-
-    int? hexValue(String char) {
-      if (char.codeUnitAt(0) >= 48 && char.codeUnitAt(0) <= 57) {
-        return char.codeUnitAt(0) - 48;
-      }
-      final lower = char.toLowerCase().codeUnitAt(0);
-      if (lower >= 97 && lower <= 102) {
-        return lower - 87;
-      }
-      return null;
-    }
-
-    var index = 0;
-    while (index < input.length) {
-      final char = input[index];
-      if (char == '%' && index + 2 < input.length) {
-        final hi = hexValue(input[index + 1]);
-        final lo = hexValue(input[index + 2]);
-        if (hi != null && lo != null) {
-          bytes.add((hi << 4) + lo);
-          index += 3;
-          continue;
-        }
-      }
-
-      flushBytes();
-      output.write(char);
-      index++;
-    }
-
-    flushBytes();
-    return output.toString();
+    final path = Uri(pathSegments: resolvedPath.split('/')).toString();
+    return fragment == null || fragment.isEmpty
+        ? path
+        : '$path#${Uri.encodeComponent(fragment)}';
   }
 }
 
 class _ManifestItem {
   final String id;
-  final String href;
+  // Physical ZIP key; differs from resolvedPath only for legacy escaped names.
+  final String archivePath;
+  // URI-resolved resource key used by chapter content and navigation.
   final String resolvedPath;
   final String mediaType;
   final String properties;
 
   const _ManifestItem({
     required this.id,
-    required this.href,
+    required this.archivePath,
     required this.resolvedPath,
     required this.mediaType,
     required this.properties,
@@ -740,7 +625,7 @@ class _ManifestItem {
 
   static const empty = _ManifestItem(
     id: '',
-    href: '',
+    archivePath: '',
     resolvedPath: '',
     mediaType: '',
     properties: '',

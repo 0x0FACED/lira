@@ -1,11 +1,14 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'l10n/app_localizations.dart';
 import 'core/di/injection.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/app_tokens.dart';
 import 'core/providers/preferences_provider.dart';
 import 'core/network/proxy_http_overrides.dart';
 import 'features/settings/data/settings_provider.dart' show sharedPrefs;
@@ -17,6 +20,14 @@ void main() async {
   // Load SharedPreferences before runApp so all providers
   // can read persisted state synchronously (no async race conditions).
   sharedPrefs = await SharedPreferences.getInstance();
+
+  for (final family in const ['Inter', 'Lora']) {
+    LicenseRegistry.addLicense(() async* {
+      yield LicenseEntryWithLineBreaks([
+        family,
+      ], await rootBundle.loadString('assets/fonts/$family-OFL.txt'));
+    });
+  }
 
   configureDependencies();
   runApp(const ProviderScope(child: LiraApp()));
@@ -40,6 +51,8 @@ class LiraApp extends ConsumerWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
+      themeAnimationDuration: AppMotion.duration(context),
+      themeAnimationCurve: AppMotion.curve,
       locale: locale,
       routerConfig: router,
       localizationsDelegates: AppLocalizations.localizationsDelegates,

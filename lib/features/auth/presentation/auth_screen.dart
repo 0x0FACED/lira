@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/app_components.dart';
 import '../../../l10n/app_localizations.dart';
 import '../domain/providers/auth_provider.dart';
 
@@ -31,9 +33,17 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     final password = _passwordController.text.trim();
 
     if (username.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.fillAllFields)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Theme.of(context).colorScheme.errorContainer,
+          content: Text(
+            l10n.fillAllFields,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onErrorContainer,
+            ),
+          ),
+        ),
+      );
       return;
     }
 
@@ -52,9 +62,17 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       if (mounted) context.go('/');
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Theme.of(context).colorScheme.errorContainer,
+            content: Text(
+              'Error: $e',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onErrorContainer,
+              ),
+            ),
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -69,111 +87,145 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(32),
+            padding: const EdgeInsets.all(AppSpacing.lg),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
+              constraints: const BoxConstraints(
+                maxWidth: AppLayout.formMaxWidth,
+              ),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.auto_stories,
-                    size: 72,
-                    color: theme.colorScheme.primary,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    l10n.appTitle,
-                    style: theme.textTheme.headlineLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.primary,
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: colors.primaryContainer,
+                      borderRadius: BorderRadius.circular(AppRadius.lg),
+                    ),
+                    child: Icon(
+                      Icons.auto_stories_outlined,
+                      size: 32,
+                      color: colors.onPrimaryContainer,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.lg),
+                  Text(l10n.appTitle, style: theme.textTheme.displaySmall),
+                  const SizedBox(height: AppSpacing.sm),
                   Text(
                     l10n.yourLibrary,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: colors.onSurfaceVariant,
                     ),
                   ),
-                  const SizedBox(height: 48),
-
-                  TextField(
-                    controller: _usernameController,
-                    decoration: InputDecoration(
-                      labelText: l10n.username,
-                      prefixIcon: const Icon(Icons.person_outline),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  const SizedBox(height: AppSpacing.xl),
+                  AppSurface(
+                    child: AutofillGroup(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          AppStateTransition(
+                            child: Align(
+                              key: ValueKey(_isLogin ? 'login' : 'register'),
+                              alignment: AlignmentDirectional.centerStart,
+                              child: Text(
+                                _isLogin ? l10n.signIn : l10n.register,
+                                style: theme.textTheme.headlineSmall,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          TextField(
+                            controller: _usernameController,
+                            autofillHints: const [AutofillHints.username],
+                            textInputAction: TextInputAction.next,
+                            decoration: InputDecoration(
+                              labelText: l10n.username,
+                              prefixIcon: const Icon(Icons.person_outline),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          TextField(
+                            controller: _passwordController,
+                            autofillHints: [
+                              _isLogin
+                                  ? AutofillHints.password
+                                  : AutofillHints.newPassword,
+                            ],
+                            obscureText: true,
+                            textInputAction: TextInputAction.done,
+                            decoration: InputDecoration(
+                              labelText: l10n.password,
+                              prefixIcon: const Icon(Icons.lock_outline),
+                            ),
+                            onSubmitted: (_) => _handleAuth(),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          FilledButton(
+                            onPressed: _isLoading ? null : _handleAuth,
+                            child: AppStateTransition(
+                              child: _isLoading
+                                  ? SizedBox(
+                                      key: const ValueKey('auth-loading'),
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        semanticsLabel: _isLogin
+                                            ? l10n.signIn
+                                            : l10n.register,
+                                      ),
+                                    )
+                                  : Text(
+                                      key: ValueKey(
+                                        _isLogin ? 'sign-in' : 'register',
+                                      ),
+                                      _isLogin ? l10n.signIn : l10n.register,
+                                      textAlign: TextAlign.center,
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          TextButton(
+                            onPressed: () =>
+                                setState(() => _isLogin = !_isLogin),
+                            child: Text(
+                              _isLogin
+                                  ? l10n.noAccountRegister
+                                  : l10n.haveAccountSignIn,
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(
+                              vertical: AppSpacing.md,
+                            ),
+                            child: Divider(),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: _handleGuest,
+                            icon: const Icon(Icons.visibility_off_outlined),
+                            label: Text(
+                              l10n.continueAsGuest,
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.compact),
+                          Text(
+                            l10n.guestLocalOnly,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colors.onSurfaceVariant,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  TextField(
-                    controller: _passwordController,
-                    obscureText: true,
-                    decoration: InputDecoration(
-                      labelText: l10n.password,
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onSubmitted: (_) => _handleAuth(),
-                  ),
-                  const SizedBox(height: 24),
-
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: FilledButton(
-                      onPressed: _isLoading ? null : _handleAuth,
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text(_isLogin ? l10n.signIn : l10n.register),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  TextButton(
-                    onPressed: () => setState(() => _isLogin = !_isLogin),
-                    child: Text(
-                      _isLogin
-                          ? l10n.noAccountRegister
-                          : l10n.haveAccountSignIn,
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-                  const Divider(),
-                  const SizedBox(height: 16),
-
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: OutlinedButton.icon(
-                      onPressed: _handleGuest,
-                      icon: const Icon(Icons.visibility_off_outlined),
-                      label: Text(l10n.continueAsGuest),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    l10n.guestLocalOnly,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: Colors.grey,
-                    ),
-                    textAlign: TextAlign.center,
                   ),
                 ],
               ),

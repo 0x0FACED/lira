@@ -9,7 +9,7 @@ Cross-platform (Android / iOS / Windows / Linux / macOS) offline book reader for
 - **Reader** — native Flutter EPUB rendering and PDF viewing via `pdfrx`, behind a shared engine interface
 - **Reading progress** — debounced Drift (SQLite) persistence, flushed on close/suspend and restored on re-open
 - **Highlights** — EPUB text ranges and PDF page geometry saved locally, with notes and navigation back to the selection
-- **Dark theme** — `#121212` background, `#BB86FC` accent
+- **Light and dark themes** — warm paper/terracotta light theme and warm graphite dark theme, with shared components and motion
 - **Localization** — English + Russian (l10n)
 
 ## Architecture
@@ -32,6 +32,8 @@ packages/
 **Stack:** Flutter, Riverpod, Drift, GoRouter, Dio + Retrofit, Freezed, Injectable/GetIt
 
 Reader architecture, stored location formats and regression commands: [`READER.md`](READER.md).
+
+UI tokens, components, typography, responsive navigation and motion rules: [`UI.md`](UI.md).
 
 Release automation for all five native platforms is described in [`RELEASE.md`](RELEASE.md). Pushing a `v*` tag builds APK/AAB, an unsigned iOS IPA, Windows/Linux ZIPs and a macOS DMG, then publishes one GitHub Release only after every build succeeds. The iOS IPA requires signing before installation; the macOS DMG is not notarized.
 

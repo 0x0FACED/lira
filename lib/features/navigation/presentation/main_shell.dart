@@ -1,7 +1,6 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_tokens.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../books/presentation/library_screen.dart';
 import '../../search/presentation/search_screen.dart';
@@ -14,143 +13,205 @@ class MainShell extends StatefulWidget {
   State<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class _MainShellState extends State<MainShell>
+    with SingleTickerProviderStateMixin {
   int _currentIndex = 0;
-
   final _screens = const [LibraryScreen(), SearchScreen(), SettingsScreen()];
+  late final AnimationController _transition;
+  late final Animation<double> _opacity;
+  late final Animation<Offset> _position;
+
+  @override
+  void initState() {
+    super.initState();
+    _transition = AnimationController(
+      vsync: this,
+      value: 1,
+      duration: AppMotion.normal,
+    );
+    final curve = CurveTween(curve: AppMotion.curve);
+    _opacity = _transition.drive(curve);
+    _position = _transition.drive(
+      Tween<Offset>(
+        begin: const Offset(0, 0.015),
+        end: Offset.zero,
+      ).chain(curve),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _transition.duration = AppMotion.duration(context);
+    if (_transition.duration == Duration.zero) _transition.value = 1;
+  }
+
+  @override
+  void dispose() {
+    _transition.dispose();
+    super.dispose();
+  }
+
+  void _selectTab(int index) {
+    if (index == _currentIndex) return;
+    setState(() => _currentIndex = index);
+    if (AppMotion.duration(context) == Duration.zero) {
+      _transition.value = 1;
+    } else {
+      _transition.forward(from: 0);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final colors = theme.colorScheme;
+    final l10n = AppLocalizations.of(context)!;
 
-    // Nav bar total height: content + safe area
-    const navBarHeight = 64.0;
-    final totalBarHeight = navBarHeight + bottomPadding;
-
-    return Scaffold(
-      // No bottomNavigationBar — we overlay it with blur
-      body: Stack(
-        children: [
-          // Content extends behind the nav bar (no clipping)
-          Positioned.fill(
-            child: IndexedStack(index: _currentIndex, children: _screens),
-          ),
-
-          // Glass bottom nav bar
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: totalBarHeight,
-            child: ClipRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? const Color(0xFF1E1E1E).withAlpha(180)
-                        : Colors.white.withAlpha(200),
-                    border: Border(
-                      top: BorderSide(
-                        color: isDark
-                            ? Colors.white.withAlpha(15)
-                            : Colors.black.withAlpha(15),
-                      ),
-                    ),
-                  ),
-                  child: SafeArea(
-                    top: false,
-                    child: SizedBox(
-                      height: navBarHeight,
-                      child: Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final desktop = constraints.maxWidth >= AppLayout.desktopBreakpoint;
+        return Scaffold(
+          body: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (desktop) ...[
+                SizedBox(
+                  width: 220,
+                  child: ColoredBox(
+                    color: colors.surface,
+                    child: SafeArea(
+                      right: false,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _buildNavItem(
-                            index: 0,
-                            icon: Icons.library_books_outlined,
-                            selectedIcon: Icons.library_books,
-                            label: l10n.library,
-                            theme: theme,
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                              AppSpacing.lg,
+                              AppSpacing.xl,
+                              AppSpacing.md,
+                              AppSpacing.xl,
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(AppSpacing.sm),
+                                  decoration: BoxDecoration(
+                                    color: colors.primaryContainer,
+                                    borderRadius: BorderRadius.circular(
+                                      AppRadius.md,
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    Icons.auto_stories_outlined,
+                                    color: colors.primary,
+                                    size: 22,
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.compact),
+                                Text(
+                                  l10n.appTitle,
+                                  style: theme.textTheme.headlineMedium,
+                                ),
+                              ],
+                            ),
                           ),
-                          _buildNavItem(
-                            index: 1,
-                            icon: Icons.search_outlined,
-                            selectedIcon: Icons.search,
-                            label: l10n.search,
-                            theme: theme,
-                          ),
-                          _buildNavItem(
-                            index: 2,
-                            icon: Icons.settings_outlined,
-                            selectedIcon: Icons.settings,
-                            label: l10n.settings,
-                            theme: theme,
+                          Expanded(
+                            child: NavigationRail(
+                              extended: true,
+                              minExtendedWidth: 220,
+                              selectedIndex: _currentIndex,
+                              onDestinationSelected: _selectTab,
+                              destinations: [
+                                NavigationRailDestination(
+                                  icon: const Icon(
+                                    Icons.library_books_outlined,
+                                  ),
+                                  selectedIcon: const Icon(
+                                    Icons.library_books_rounded,
+                                  ),
+                                  label: Text(l10n.library),
+                                ),
+                                NavigationRailDestination(
+                                  icon: const Icon(Icons.search_outlined),
+                                  selectedIcon: const Icon(
+                                    Icons.search_rounded,
+                                  ),
+                                  label: Text(l10n.search),
+                                ),
+                                NavigationRailDestination(
+                                  icon: const Icon(Icons.tune_outlined),
+                                  selectedIcon: const Icon(Icons.tune_rounded),
+                                  label: Text(l10n.settings),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
                     ),
                   ),
                 ),
+                const VerticalDivider(width: 1),
+              ],
+              Expanded(
+                key: const ValueKey('tab-content'),
+                child: FadeTransition(
+                  opacity: _opacity,
+                  child: SlideTransition(
+                    position: _position,
+                    child: IndexedStack(
+                      index: _currentIndex,
+                      children: [
+                        for (var index = 0; index < _screens.length; index++)
+                          TickerMode(
+                            enabled: index == _currentIndex,
+                            child: _screens[index],
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNavItem({
-    required int index,
-    required IconData icon,
-    required IconData selectedIcon,
-    required String label,
-    required ThemeData theme,
-  }) {
-    final selected = _currentIndex == index;
-
-    return Expanded(
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => setState(() => _currentIndex = index),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              decoration: BoxDecoration(
-                color: selected
-                    ? theme.colorScheme.primary.withAlpha(30)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Icon(
-                selected ? selectedIcon : icon,
-                size: 24,
-                color: selected
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurface.withAlpha(140),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-                color: selected
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurface.withAlpha(140),
-              ),
-            ),
-          ],
-        ),
-      ),
-      ),
+          bottomNavigationBar: desktop
+              ? null
+              : DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: colors.surface,
+                    border: Border(
+                      top: BorderSide(color: colors.outlineVariant),
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 1),
+                    child: NavigationBar(
+                      animationDuration: AppMotion.duration(context),
+                      selectedIndex: _currentIndex,
+                      onDestinationSelected: _selectTab,
+                      destinations: [
+                        NavigationDestination(
+                          icon: const Icon(Icons.library_books_outlined),
+                          selectedIcon: const Icon(Icons.library_books_rounded),
+                          label: l10n.library,
+                        ),
+                        NavigationDestination(
+                          icon: const Icon(Icons.search_outlined),
+                          selectedIcon: const Icon(Icons.search_rounded),
+                          label: l10n.search,
+                        ),
+                        NavigationDestination(
+                          icon: const Icon(Icons.tune_outlined),
+                          selectedIcon: const Icon(Icons.tune_rounded),
+                          label: l10n.settings,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+        );
+      },
     );
   }
 }

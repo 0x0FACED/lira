@@ -4,12 +4,25 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart'
-    show RenderObject, RenderParagraph, SelectedContent, SelectedContentRange;
+    show
+        MatrixUtils,
+        RenderObject,
+        RenderParagraph,
+        Selectable,
+        SelectionRegistrar,
+        SelectedContent,
+        SelectedContentRange,
+        SelectionEdgeUpdateEvent,
+        SelectionEvent,
+        SelectionEventType,
+        SelectionResult;
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'epub_parser.dart';
+import 'epub_paths.dart';
 import 'models/reader_settings.dart';
 import 'models/epub_location.dart';
 import 'xhtml_parser.dart';
@@ -32,13 +45,201 @@ class _PageInfo {
   int get charEnd => elements.last.charEnd;
 }
 
+class _TableLayout {
+  final double width;
+  final double imageExtent;
+  final List<double> rowOffsets;
+
+  const _TableLayout(this.width, this.imageExtent, this.rowOffsets);
+
+  double get height => rowOffsets.last;
+}
+
+/// Positioned cells still copy/select in XHTML order, not geometric order.
+class _SourceOrderSelectionDelegate extends StaticSelectionContainerDelegate {
+  final Map<Selectable, (int, int)> _order = {};
+  int _nextOrder = 0;
+  final Set<Selectable> _receivedStart = {};
+  final Set<Selectable> _receivedEnd = {};
+  Offset? _startPosition;
+  Offset? _endPosition;
+  Selectable? _startTarget;
+  Selectable? _endTarget;
+
+  void addAt(Selectable selectable, int offset) {
+    _order[selectable] = (offset, _nextOrder++);
+    super.add(selectable);
+  }
+
+  @override
+  void remove(Selectable selectable) {
+    super.remove(selectable);
+    _order.remove(selectable);
+    if (identical(_startTarget, selectable)) _startTarget = null;
+    if (identical(_endTarget, selectable)) _endTarget = null;
+  }
+
+  @override
+  Comparator<Selectable> get compareOrder => (a, b) {
+    final first = _order[a]!;
+    final second = _order[b]!;
+    final offsetOrder = first.$1.compareTo(second.$1);
+    return offsetOrder != 0 ? offsetOrder : first.$2.compareTo(second.$2);
+  };
+
+  Selectable? _targetAt(Offset position) {
+    for (final selectable in selectables) {
+      final transform = selectable.getTransformTo(null);
+      if (selectable.boundingBoxes.any(
+        (box) => MatrixUtils.transformRect(transform, box).contains(position),
+      )) {
+        return selectable;
+      }
+    }
+    return null;
+  }
+
+  @override
+  void updateLastSelectionEdgeLocation({
+    required Offset globalSelectionEdgeLocation,
+    required bool forEnd,
+  }) {
+    super.updateLastSelectionEdgeLocation(
+      globalSelectionEdgeLocation: globalSelectionEdgeLocation,
+      forEnd: forEnd,
+    );
+    if (forEnd) {
+      _endPosition = globalSelectionEdgeLocation;
+      _endTarget = _targetAt(globalSelectionEdgeLocation);
+    } else {
+      _startPosition = globalSelectionEdgeLocation;
+      _startTarget = _targetAt(globalSelectionEdgeLocation);
+    }
+  }
+
+  SelectionEdgeUpdateEvent _eventForChild(
+    Selectable selectable,
+    SelectionEdgeUpdateEvent event,
+  ) {
+    final forEnd = event.type == SelectionEventType.endEdgeUpdate;
+    final target = forEnd ? _endTarget : _startTarget;
+    if (target == null || identical(target, selectable)) return event;
+    final boxes = selectable.boundingBoxes;
+    if (boxes.isEmpty) return event;
+    final bounds = boxes.reduce((a, b) => a.expandToInclude(b));
+    // Routing is geometric, but every other fragment's edge is before/after
+    // it in XHTML order. Its screen y coordinate need not have that order.
+    final local = compareOrder(selectable, target) < 0
+        ? bounds.bottomRight + const Offset(1, 1)
+        : bounds.topLeft - const Offset(1, 1);
+    final global = MatrixUtils.transformPoint(
+      selectable.getTransformTo(null),
+      local,
+    );
+    return forEnd
+        ? SelectionEdgeUpdateEvent.forEnd(
+            globalPosition: global,
+            granularity: event.granularity,
+          )
+        : SelectionEdgeUpdateEvent.forStart(
+            globalPosition: global,
+            granularity: event.granularity,
+          );
+  }
+
+  @override
+  void didReceiveSelectionEventFor({
+    required Selectable selectable,
+    bool? forEnd,
+  }) {
+    super.didReceiveSelectionEventFor(selectable: selectable, forEnd: forEnd);
+    if (forEnd != true) _receivedStart.add(selectable);
+    if (forEnd != false) _receivedEnd.add(selectable);
+  }
+
+  @override
+  void clearInternalSelectionStateForSelectable(Selectable selectable) {
+    super.clearInternalSelectionStateForSelectable(selectable);
+    _receivedStart.remove(selectable);
+    _receivedEnd.remove(selectable);
+  }
+
+  @override
+  void clearInternalSelectionState() {
+    super.clearInternalSelectionState();
+    _startPosition = _endPosition = null;
+    _startTarget = _endTarget = null;
+  }
+
+  @override
+  void ensureChildUpdated(Selectable selectable) {
+    if (_endPosition case final position?) {
+      if (_receivedEnd.add(selectable)) {
+        final event = SelectionEdgeUpdateEvent.forEnd(globalPosition: position);
+        if (currentSelectionEndIndex == -1) handleSelectionEdgeUpdate(event);
+        selectable.dispatchSelectionEvent(_eventForChild(selectable, event));
+      }
+    }
+    if (_startPosition case final position?) {
+      if (_receivedStart.add(selectable)) {
+        final event = SelectionEdgeUpdateEvent.forStart(
+          globalPosition: position,
+        );
+        if (currentSelectionStartIndex == -1) handleSelectionEdgeUpdate(event);
+        selectable.dispatchSelectionEvent(_eventForChild(selectable, event));
+      }
+    }
+  }
+
+  @override
+  SelectionResult dispatchSelectionEventToChild(
+    Selectable selectable,
+    SelectionEvent event,
+  ) {
+    final result = super.dispatchSelectionEventToChild(
+      selectable,
+      event is SelectionEdgeUpdateEvent
+          ? _eventForChild(selectable, event)
+          : event,
+    );
+    if (event is SelectionEdgeUpdateEvent) {
+      final target = event.type == SelectionEventType.endEdgeUpdate
+          ? _endTarget
+          : _startTarget;
+      // A caret at the first/last glyph can report previous/next. Geometry
+      // already identified its cell; don't route that edge into a neighbor.
+      if (identical(target, selectable) && result != SelectionResult.pending) {
+        return SelectionResult.end;
+      }
+    }
+    return result;
+  }
+}
+
+class _SourceOrderRegistrar implements SelectionRegistrar {
+  final _SourceOrderSelectionDelegate delegate;
+  final int offset;
+
+  const _SourceOrderRegistrar(this.delegate, this.offset);
+
+  @override
+  void add(Selectable selectable) => delegate.addAt(selectable, offset);
+
+  @override
+  void remove(Selectable selectable) => delegate.remove(selectable);
+}
+
 class _SelectionScopeData {
   final SelectionListenerNotifier notifier;
   int chapterIndex;
   List<ContentElement> elements;
   final Map<int, GlobalKey> textKeys = {};
+  final Map<int, GlobalKey> imageKeys = {};
   final Map<int, GlobalKey> elementKeys = {};
   final Map<int, int> textEnds = {};
+  final selectionDelegate = _SourceOrderSelectionDelegate();
+  ScrollController? pageScrollController;
+  GlobalKey? pageScrollKey;
 
   _SelectionScopeData({
     required this.notifier,
@@ -89,6 +290,7 @@ class _MountedContentScopeState extends State<_MountedContentScope> {
         !identical(oldWidget.elements, widget.elements)) {
       scope.textKeys.clear();
       scope.elementKeys.clear();
+      scope.imageKeys.clear();
       scope.textEnds.clear();
     }
     scope.chapterIndex = widget.chapterIndex;
@@ -99,11 +301,30 @@ class _MountedContentScopeState extends State<_MountedContentScope> {
   void dispose() {
     widget.onUnmount(scope);
     scope.notifier.dispose();
+    scope.selectionDelegate.dispose();
+    scope.pageScrollController?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) => widget.builder(scope);
+}
+
+class _RasterImageData {
+  final MemoryImage provider;
+  ImageStream? stream;
+  ImageStreamListener? listener;
+  double? aspectRatio;
+  bool layoutPending = false;
+
+  _RasterImageData(Uint8List bytes) : provider = MemoryImage(bytes);
+
+  void stopListening() {
+    final listener = this.listener;
+    if (listener != null) stream?.removeListener(listener);
+    this.listener = null;
+    stream = null;
+  }
 }
 
 /// Native Flutter EPUB reader view — no WebView.
@@ -148,6 +369,9 @@ class EpubNativeViewState extends State<EpubNativeView> {
 
   // Parsed content per chapter (lazy, cached)
   final Map<int, List<ContentElement>> _parsedChapters = {};
+  final Map<TableBlock, _TableLayout> _tableLayouts = {};
+  final Map<Uint8List, _RasterImageData> _rasterImages = Map.identity();
+  bool _imageLayoutScheduled = false;
 
   final ItemScrollController _itemScrollController = ItemScrollController();
   final ScrollOffsetController _scrollOffsetController =
@@ -225,6 +449,10 @@ class EpubNativeViewState extends State<EpubNativeView> {
             widget.settings.enableDualPageSpread;
 
     if (oldWidget.epub != widget.epub) {
+      for (final image in _rasterImages.values) {
+        image.stopListening();
+      }
+      _rasterImages.clear();
       _bookOffsets = null;
       _logicalLocation = null;
       _pendingRestore =
@@ -242,10 +470,19 @@ class EpubNativeViewState extends State<EpubNativeView> {
     }
     if (needsRepagination) {
       _hasActiveSelection = false;
+      _tableLayouts.clear();
       _paginatedPages.clear();
       _lastPaginationSize = null;
       _layoutGeneration++;
     }
+  }
+
+  @override
+  void dispose() {
+    for (final image in _rasterImages.values) {
+      image.stopListening();
+    }
+    super.dispose();
   }
 
   void _readHighlights() {
@@ -323,6 +560,37 @@ class EpubNativeViewState extends State<EpubNativeView> {
             ),
           );
           if (boxes.any((box) => box.toRect().contains(local))) {
+            _pointerDownLink = link;
+            _pointerDownLinkChapter = scope.chapterIndex;
+            return;
+          }
+        }
+      }
+      for (final leaf in contentLeaves(
+        scope.elements,
+      ).whereType<ImageBlock>()) {
+        final render = scope.imageKeys[leaf.charStart]?.currentContext
+            ?.findRenderObject();
+        if (render is! RenderBox || !render.hasSize || !render.attached) {
+          continue;
+        }
+        final ratio = _imageAspectRatio(leaf, painted: true);
+        final fitted = ratio == null
+            ? render.size
+            : applyBoxFit(
+                BoxFit.contain,
+                Size(ratio, 1),
+                render.size,
+              ).destination;
+        final painted = Alignment.center.inscribe(
+          fitted,
+          Offset.zero & render.size,
+        );
+        if (!painted.contains(render.globalToLocal(e.position))) continue;
+        for (final link
+            in _chapterLinks[scope.chapterIndex] ?? const <ContentLink>[]) {
+          if (link.startOffset < leaf.charEnd &&
+              link.endOffset > leaf.charStart) {
             _pointerDownLink = link;
             _pointerDownLinkChapter = scope.chapterIndex;
             return;
@@ -413,6 +681,10 @@ class EpubNativeViewState extends State<EpubNativeView> {
   void _onPointerSignal(PointerSignalEvent event) {
     if (widget.settings.readingMode != ReadingMode.horizontal) return;
     if (event is PointerScrollEvent) {
+      if (event.scrollDelta.dy.abs() >= event.scrollDelta.dx.abs() &&
+          _scrollablePageAt(event.position)) {
+        return;
+      }
       final delta = event.scrollDelta.dx.abs() > event.scrollDelta.dy.abs()
           ? event.scrollDelta.dx
           : event.scrollDelta.dy;
@@ -422,10 +694,33 @@ class EpubNativeViewState extends State<EpubNativeView> {
 
   void _onPointerPanZoomUpdate(PointerPanZoomUpdateEvent event) {
     if (widget.settings.readingMode != ReadingMode.horizontal) return;
+    if (event.panDelta.dy.abs() >= event.panDelta.dx.abs() &&
+        _scrollablePageAt(event.position)) {
+      return;
+    }
     final delta = event.panDelta.dx.abs() > event.panDelta.dy.abs()
         ? event.panDelta.dx
         : event.panDelta.dy;
     _consumeTrackpadDelta(delta);
+  }
+
+  bool _scrollablePageAt(Offset position) {
+    for (final scope in _selectionScopes) {
+      final controller = scope.pageScrollController;
+      final render = scope.pageScrollKey?.currentContext?.findRenderObject();
+      if (controller == null ||
+          !controller.hasClients ||
+          controller.position.maxScrollExtent <= 0 ||
+          render is! RenderBox) {
+        continue;
+      }
+      if ((Offset.zero & render.size).contains(
+        render.globalToLocal(position),
+      )) {
+        return true;
+      }
+    }
+    return false;
   }
 
   void _consumeTrackpadDelta(double delta) {
@@ -534,6 +829,36 @@ class EpubNativeViewState extends State<EpubNativeView> {
     WidgetsBinding.instance.ensureVisualUpdate();
   }
 
+  void _onHorizontalPageScroll(_SelectionScopeData scope) {
+    if (widget.settings.readingMode != ReadingMode.horizontal ||
+        _restoring ||
+        _pendingRestore != null ||
+        _scrollReportScheduled) {
+      return;
+    }
+    final generation = _layoutGeneration;
+    _scrollReportScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollReportScheduled = false;
+      if (!mounted ||
+          generation != _layoutGeneration ||
+          !_selectionScopes.contains(scope) ||
+          widget.settings.readingMode != ReadingMode.horizontal ||
+          _restoring ||
+          _pendingRestore != null) {
+        return;
+      }
+      final viewport = scope.pageScrollKey?.currentContext?.findRenderObject();
+      if (viewport is! RenderBox || !viewport.hasSize) return;
+      final top = viewport.localToGlobal(Offset.zero).dy;
+      _logicalLocation =
+          _captureVisibleLocation([scope], top, top + viewport.size.height) ??
+          _logicalLocation;
+      _reportProgress();
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
   EpubLocation _captureLocation(ReadingMode mode) {
     if (_logicalLocation != null) return _logicalLocation!;
     if (mode == ReadingMode.vertical) {
@@ -559,10 +884,18 @@ class EpubNativeViewState extends State<EpubNativeView> {
     final top = viewport.localToGlobal(Offset.zero).dy + _contentInsets().top;
     final bottom =
         viewport.localToGlobal(Offset.zero).dy + viewport.size.height;
+    return _captureVisibleLocation(_selectionScopes, top, bottom);
+  }
+
+  EpubLocation? _captureVisibleLocation(
+    Iterable<_SelectionScopeData> scopes,
+    double top,
+    double bottom,
+  ) {
     _SelectionScopeData? firstScope;
     int? firstStart;
     var firstTop = double.infinity;
-    for (final scope in _selectionScopes) {
+    for (final scope in scopes) {
       for (final entry in scope.elementKeys.entries) {
         final render = entry.value.currentContext?.findRenderObject();
         if (render is! RenderBox || !render.hasSize || !render.attached)
@@ -744,6 +1077,8 @@ class EpubNativeViewState extends State<EpubNativeView> {
     final parser = XhtmlParser(
       html: chapter.htmlContent,
       images: widget.epub.images,
+      documentPath: chapter.fileName,
+      stylesheets: widget.epub.stylesheets,
       highlights: const [],
       baseStyle: baseStyle,
       lineHeight: widget.settings.lineHeight,
@@ -843,6 +1178,21 @@ class EpubNativeViewState extends State<EpubNativeView> {
           _currentPageIndex = _isDualPage ? (page ~/ 2) * 2 : page;
           _logicalLocation = resolvedTarget;
         });
+        final generation = _layoutGeneration;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted ||
+              generation != _layoutGeneration ||
+              _pendingRestore != null ||
+              !identical(_logicalLocation, resolvedTarget)) {
+            return;
+          }
+          _restoring = true;
+          try {
+            _revealHorizontalPosition(resolvedTarget);
+          } finally {
+            _restoring = false;
+          }
+        });
         _reportProgress();
         return;
       }
@@ -860,7 +1210,7 @@ class EpubNativeViewState extends State<EpubNativeView> {
         }
         final elements = _parsedChapters[chapter]!;
         ContentElement? element;
-        for (final candidate in elements) {
+        for (final candidate in contentLeaves(elements)) {
           element = candidate;
           if (candidate.charEnd > target.charOffset) break;
         }
@@ -929,22 +1279,59 @@ class EpubNativeViewState extends State<EpubNativeView> {
     WidgetsBinding.instance.ensureVisualUpdate();
   }
 
-  String _normalizePath(String path) {
-    final segments = <String>[];
-    try {
-      path = Uri.decodeComponent(path);
-    } on FormatException {
-      // Legacy manifests can contain a literal, unescaped percent sign.
-    }
-    for (final segment in path.replaceAll('\\', '/').split('/')) {
-      if (segment.isEmpty || segment == '.') continue;
-      if (segment == '..') {
-        if (segments.isNotEmpty) segments.removeLast();
-      } else {
-        segments.add(segment);
+  void _revealHorizontalPosition(EpubLocation target) {
+    for (final scope in _selectionScopes) {
+      final controller = scope.pageScrollController;
+      final viewport = scope.pageScrollKey?.currentContext?.findRenderObject();
+      if (scope.chapterIndex != target.chapterIndex ||
+          controller == null ||
+          !controller.hasClients ||
+          viewport is! RenderBox) {
+        continue;
       }
+      ContentElement? targetLeaf;
+      for (final leaf in contentLeaves(scope.elements)) {
+        targetLeaf = leaf;
+        if (target.charOffset < leaf.charEnd) break;
+      }
+      if (targetLeaf == null ||
+          target.charOffset < targetLeaf.charStart ||
+          target.charOffset > targetLeaf.charEnd) {
+        continue;
+      }
+      if (target.charOffset == targetLeaf.charEnd &&
+          target.charOffset != _chapterWeight(target.chapterIndex)) {
+        continue;
+      }
+      final paragraph = _paragraphForKey(scope.textKeys[targetLeaf.charStart]);
+      final render =
+          paragraph ??
+          scope.elementKeys[targetLeaf.charStart]?.currentContext
+              ?.findRenderObject();
+      if (render is! RenderBox) return;
+      final caret =
+          paragraph?.getOffsetForCaret(
+            TextPosition(offset: target.charOffset - targetLeaf.charStart),
+            Rect.zero,
+          ) ??
+          Offset(
+            0,
+            target.charOffset == targetLeaf.charEnd ? render.size.height : 0,
+          );
+      final targetY = render.localToGlobal(caret).dy;
+      final viewportY = viewport.localToGlobal(Offset.zero).dy;
+      if (targetY >= viewportY && targetY < viewportY + viewport.size.height) {
+        return;
+      }
+      final delta = targetY - viewportY;
+      controller.jumpTo(
+        (controller.offset + delta).clamp(
+          controller.position.minScrollExtent,
+          controller.position.maxScrollExtent,
+        ),
+      );
+      return;
     }
-    return segments.join('/');
   }
 
   EpubLocation? _locationFromLocator(String locator, {int? fromChapter}) {
@@ -960,16 +1347,17 @@ class EpubNativeViewState extends State<EpubNativeView> {
     if (path.isEmpty) {
       chapterIndex = source;
     } else {
-      final current = _normalizePath(widget.epub.chapters[source].fileName);
-      final relative = Uri(path: current).resolveUri(uri).path;
+      final current = widget.epub.chapters[source].fileName;
+      final relative = resolveEpubPath(current, locator);
+      final packaged = resolveEpubPath('', locator);
       final candidates = {
-        if (fromChapter != null) _normalizePath(relative),
-        _normalizePath(path),
-        if (fromChapter == null) _normalizePath(relative),
+        if (fromChapter != null && relative != null) relative,
+        if (packaged != null) packaged,
+        if (fromChapter == null && relative != null) relative,
       };
       for (final candidate in candidates) {
         final index = widget.epub.chapters.indexWhere(
-          (chapter) => _normalizePath(chapter.fileName) == candidate,
+          (chapter) => normalizeEpubArchivePath(chapter.fileName) == candidate,
         );
         if (index >= 0) {
           chapterIndex = index;
@@ -1080,6 +1468,7 @@ class EpubNativeViewState extends State<EpubNativeView> {
     _hasActiveSelection = false;
 
     _paginatedPages = [];
+    _tableLayouts.clear();
     final contentWidth = pageWidth - paddingH * 2;
     final contentInsets = _contentInsets();
     final contentHeight = pageHeight - contentInsets.vertical;
@@ -1155,12 +1544,17 @@ class EpubNativeViewState extends State<EpubNativeView> {
   double _measureElementHeight(
     ContentElement element,
     double contentWidth,
-    double pageHeight,
-  ) {
+    double pageHeight, {
+    bool inTable = false,
+  }) {
     if (element is TextBlock) {
       return _measureTextBlockHeight(element, contentWidth);
+    } else if (element is TableBlock) {
+      return _layoutTable(element, contentWidth).height;
     } else if (element is ImageBlock) {
-      return pageHeight;
+      return inTable
+          ? _tableImageHeight(element, contentWidth, pageHeight)
+          : pageHeight;
     } else if (element is DividerBlock) {
       return 49.0;
     }
@@ -1172,6 +1566,9 @@ class EpubNativeViewState extends State<EpubNativeView> {
     double contentWidth,
     double contentHeight,
   ) {
+    if (element is TableBlock) {
+      return _splitTableForPagination(element, contentWidth, contentHeight);
+    }
     if (element is! TextBlock) {
       return [element];
     }
@@ -1254,6 +1651,9 @@ class EpubNativeViewState extends State<EpubNativeView> {
           span: chunkSpan,
           type: block.type,
           listIndex: block.listIndex,
+          indent: block.indent,
+          textAlign: block.textAlign,
+          margin: block.margin,
           charStart: block.charStart + localStart,
           charEnd: block.charStart + bestEnd,
         ),
@@ -1282,21 +1682,181 @@ class EpubNativeViewState extends State<EpubNativeView> {
       return 24.0;
     }
 
-    final tp = TextPainter(
-      text: TextSpan(style: _baseTextStyle, children: [span]),
-      textDirection: TextDirection.ltr,
-      textScaler: TextScaler.noScaling,
-      textHeightBehavior: const TextHeightBehavior(),
-      textAlign: block.type == TextBlockType.blockquote
-          ? TextAlign.justify
-          : TextAlign.start,
-    )..layout(maxWidth: math.max(1.0, contentWidth));
+    final tp =
+        TextPainter(
+          text: TextSpan(style: _baseTextStyle, children: [span]),
+          textDirection: TextDirection.ltr,
+          textScaler: TextScaler.noScaling,
+          textHeightBehavior: const TextHeightBehavior(),
+          textAlign: block.textAlign,
+        )..layout(
+          maxWidth: math.max(
+            1.0,
+            contentWidth - _textBlockInsets(block).horizontal,
+          ),
+        );
     final textHeight = tp.height;
     tp.dispose();
 
-    final topPad = block.type == TextBlockType.h1 ? 24.0 : 4.0;
-    final bottomPad = block.type == TextBlockType.paragraph ? 12.0 : 8.0;
-    return textHeight + topPad + bottomPad;
+    return textHeight + _textBlockInsets(block).vertical;
+  }
+
+  EdgeInsets _textBlockInsets(TextBlock block) {
+    final margin =
+        block.margin ??
+        EdgeInsets.only(
+          top: block.type == TextBlockType.h1 ? 24 : 4,
+          bottom: block.type == TextBlockType.paragraph ? 12 : 8,
+        );
+    return margin + EdgeInsets.only(left: block.indent);
+  }
+
+  static const _tableCellInsets = EdgeInsets.all(8);
+
+  _TableLayout _layoutTable(TableBlock table, double contentWidth) {
+    final width = math.max(1.0, contentWidth - table.indent);
+    final imageExtent = widget.settings.readingMode == ReadingMode.horizontal
+        ? math.max(24.0, _currentPageHeight - _contentInsets().vertical)
+        : width;
+    final cached = _tableLayouts[table];
+    if (cached != null &&
+        cached.width == width &&
+        cached.imageExtent == imageExtent) {
+      return cached;
+    }
+    final heights = List<double>.filled(
+      table.rowCount,
+      _tableCellInsets.vertical,
+    );
+    final columnWidth = width / math.max(1, table.columnCount);
+    final cellHeights = <double>[];
+    for (final cell in table.cells) {
+      final innerWidth = math.max(
+        1.0,
+        columnWidth * cell.columnSpan - _tableCellInsets.horizontal,
+      );
+      var height = _tableCellInsets.vertical;
+      for (final element in cell.elements) {
+        height += _measureElementHeight(
+          element,
+          innerWidth,
+          imageExtent,
+          inTable: true,
+        );
+      }
+      cellHeights.add(height);
+      if (cell.rowSpan == 1) {
+        heights[cell.row] = math.max(heights[cell.row], height);
+      }
+    }
+    for (var index = 0; index < table.cells.length; index++) {
+      final cell = table.cells[index];
+      if (cell.rowSpan == 1) continue;
+      var available = 0.0;
+      for (var row = cell.row; row < cell.row + cell.rowSpan; row++) {
+        available += heights[row];
+      }
+      final extra = (cellHeights[index] - available) / cell.rowSpan;
+      if (extra > 0) {
+        for (var row = cell.row; row < cell.row + cell.rowSpan; row++) {
+          heights[row] += extra;
+        }
+      }
+    }
+    final offsets = <double>[0];
+    for (final height in heights) {
+      offsets.add(offsets.last + height);
+    }
+    final layout = _TableLayout(width, imageExtent, offsets);
+    _tableLayouts[table] = layout;
+    return layout;
+  }
+
+  List<ContentElement> _splitTableForPagination(
+    TableBlock table,
+    double contentWidth,
+    double contentHeight,
+  ) {
+    final layout = _layoutTable(table, contentWidth);
+    if (layout.height <= contentHeight || table.rowCount == 0) return [table];
+    final chunks = <ContentElement>[];
+    final rowEnds = List<int>.generate(table.rowCount, (row) => row + 1);
+    for (final cell in table.cells) {
+      rowEnds[cell.row] = math.max(rowEnds[cell.row], cell.row + cell.rowSpan);
+    }
+    final cellStarts = List<int>.filled(table.rowCount + 1, 0);
+    var nextCell = 0;
+    for (var row = 0; row <= table.rowCount; row++) {
+      while (nextCell < table.cells.length && table.cells[nextCell].row < row) {
+        nextCell++;
+      }
+      cellStarts[row] = nextCell;
+    }
+    var chunkStart = 0;
+    var groupStart = 0;
+    while (groupStart < table.rowCount) {
+      var groupEnd = groupStart + 1;
+      // Extending the boundary can encounter another spanning cell.
+      for (var row = groupStart; row < groupEnd; row++) {
+        groupEnd = math.max(groupEnd, rowEnds[row]);
+      }
+      if (groupStart > chunkStart &&
+          layout.rowOffsets[groupEnd] - layout.rowOffsets[chunkStart] >
+              contentHeight) {
+        chunks.add(
+          _tableRowSlice(table, chunkStart, groupStart, layout, cellStarts),
+        );
+        chunkStart = groupStart;
+      }
+      groupStart = groupEnd;
+    }
+    chunks.add(
+      _tableRowSlice(table, chunkStart, table.rowCount, layout, cellStarts),
+    );
+    return chunks;
+  }
+
+  TableBlock _tableRowSlice(
+    TableBlock table,
+    int start,
+    int end,
+    _TableLayout layout,
+    List<int> cellStarts,
+  ) {
+    final cells = <TableCellContent>[
+      for (final cell in table.cells.getRange(
+        cellStarts[start],
+        cellStarts[end],
+      ))
+        TableCellContent(
+          row: cell.row - start,
+          column: cell.column,
+          rowSpan: cell.rowSpan,
+          columnSpan: cell.columnSpan,
+          elements: cell.elements,
+        ),
+    ];
+    ContentElement? first;
+    ContentElement? last;
+    for (final cell in cells) {
+      for (final element in cell.elements) {
+        first ??= element;
+        last = element;
+      }
+    }
+    final chunk = TableBlock(
+      rowCount: end - start,
+      columnCount: table.columnCount,
+      cells: cells,
+      indent: table.indent,
+      charStart: first?.charStart ?? table.charStart,
+      charEnd: last?.charEnd ?? table.charStart,
+    );
+    _tableLayouts[chunk] = _TableLayout(layout.width, layout.imageExtent, [
+      for (var row = start; row <= end; row++)
+        layout.rowOffsets[row] - layout.rowOffsets[start],
+    ]);
+    return chunk;
   }
 
   InlineSpan? _sliceInlineSpan(InlineSpan span, int start, int end) {
@@ -1602,6 +2162,7 @@ class EpubNativeViewState extends State<EpubNativeView> {
   Widget _buildPageWidget(_PageInfo page, double paddingH) {
     final contentInsets = _contentInsets();
     return ClipRect(
+      key: ValueKey((_layoutGeneration, page.pageIndex)),
       child: Padding(
         padding: EdgeInsets.fromLTRB(
           paddingH,
@@ -1613,14 +2174,23 @@ class EpubNativeViewState extends State<EpubNativeView> {
           chapterIndex: page.chapterIndex,
           elements: page.elements,
           ownSelectionArea: true,
-          builder: (scope) => SingleChildScrollView(
-            primary: false,
-            child: _buildChapterContent(
-              page.elements,
-              page.chapterIndex,
-              scope,
-            ),
-          ),
+          builder: (scope) {
+            if (scope.pageScrollController == null) {
+              scope.pageScrollController = ScrollController()
+                ..addListener(() => _onHorizontalPageScroll(scope));
+            }
+            scope.pageScrollKey ??= GlobalKey();
+            return SingleChildScrollView(
+              key: scope.pageScrollKey,
+              controller: scope.pageScrollController,
+              primary: false,
+              child: _buildChapterContent(
+                page.elements,
+                page.chapterIndex,
+                scope,
+              ),
+            );
+          },
         ),
       ),
     );
@@ -1699,31 +2269,100 @@ class EpubNativeViewState extends State<EpubNativeView> {
       );
     }
 
-    final children = <Widget>[];
-    for (final element in elements) {
-      final Widget child;
-      if (element is TextBlock) {
-        child = _buildTextBlock(element, chapterIndex, scope);
-      } else if (element is ImageBlock) {
-        child = _buildImageBlock(element);
-      } else {
-        child = _buildDividerBlock();
-      }
-      children.add(
-        KeyedSubtree(
-          key: scope.elementKeys.putIfAbsent(
-            element.charStart,
-            () => GlobalKey(),
-          ),
-          child: child,
-        ),
-      );
-    }
+    return SelectionContainer(
+      delegate: scope.selectionDelegate,
+      child: _buildElements(elements, chapterIndex, scope),
+    );
+  }
 
+  Widget _buildElements(
+    List<ContentElement> elements,
+    int chapterIndex,
+    _SelectionScopeData scope, {
+    double? imageExtent,
+  }) {
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: children,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final element in elements)
+          _buildElement(element, chapterIndex, scope, imageExtent: imageExtent),
+      ],
+    );
+  }
+
+  Widget _buildElement(
+    ContentElement element,
+    int chapterIndex,
+    _SelectionScopeData scope, {
+    double? imageExtent,
+  }) {
+    // A table and its first cell share an offset; only leaves own render keys.
+    if (element is TableBlock) {
+      return _buildTable(element, chapterIndex, scope);
+    }
+    final Widget child;
+    if (element is TextBlock) {
+      child = _buildTextBlock(element, chapterIndex, scope);
+    } else if (element is ImageBlock) {
+      child = _buildImageBlock(element, scope, imageExtent: imageExtent);
+    } else {
+      child = _buildDividerBlock();
+    }
+    return KeyedSubtree(
+      key: scope.elementKeys.putIfAbsent(element.charStart, () => GlobalKey()),
+      child: child,
+    );
+  }
+
+  Widget _buildTable(
+    TableBlock table,
+    int chapterIndex,
+    _SelectionScopeData scope,
+  ) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final layout = _layoutTable(table, constraints.maxWidth);
+        final columnWidth = layout.width / math.max(1, table.columnCount);
+        final borderColor = _computeTextColor(
+          widget.settings.backgroundColor,
+        ).withAlpha(100);
+        return Padding(
+          padding: EdgeInsets.only(left: table.indent),
+          child: SizedBox(
+            width: layout.width,
+            height: layout.height,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                for (final cell in table.cells)
+                  Positioned(
+                    left: cell.column * columnWidth,
+                    top: layout.rowOffsets[cell.row],
+                    width: cell.columnSpan * columnWidth,
+                    height:
+                        layout.rowOffsets[cell.row + cell.rowSpan] -
+                        layout.rowOffsets[cell.row],
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: borderColor, width: 0.5),
+                      ),
+                      child: Padding(
+                        padding: _tableCellInsets,
+                        child: _buildElements(
+                          cell.elements,
+                          chapterIndex,
+                          scope,
+                          imageExtent: layout.imageExtent,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1742,35 +2381,131 @@ class EpubNativeViewState extends State<EpubNativeView> {
     // Use Text.rich instead of RichText — Text.rich automatically registers
     // with SelectionArea via its build context, enabling text selection.
     // RichText created directly doesn't look up the SelectionRegistrar.
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: block.type == TextBlockType.paragraph ? 12 : 8,
-        top: block.type == TextBlockType.h1 ? 24 : 4,
+    return SelectionRegistrarScope(
+      registrar: _SourceOrderRegistrar(
+        scope.selectionDelegate,
+        block.charStart,
       ),
-      child: Text.rich(
-        highlightedSpan is TextSpan ? highlightedSpan : TextSpan(),
-        key: scope.textKeys.putIfAbsent(block.charStart, () => GlobalKey()),
-        style: _baseTextStyle,
-        textDirection: TextDirection.ltr,
-        textHeightBehavior: const TextHeightBehavior(),
-        textAlign: block.type == TextBlockType.blockquote
-            ? TextAlign.justify
-            : TextAlign.start,
-        textScaler: TextScaler.noScaling,
+      child: Padding(
+        padding: _textBlockInsets(block),
+        child: Text.rich(
+          highlightedSpan is TextSpan ? highlightedSpan : const TextSpan(),
+          key: scope.textKeys.putIfAbsent(block.charStart, () => GlobalKey()),
+          style: _baseTextStyle,
+          textDirection: TextDirection.ltr,
+          textHeightBehavior: const TextHeightBehavior(),
+          textAlign: block.textAlign,
+          textScaler: TextScaler.noScaling,
+        ),
       ),
     );
   }
 
-  Widget _buildImageBlock(ImageBlock block) {
-    final maxImgHeight = widget.settings.readingMode == ReadingMode.horizontal
-        ? math.max(0.0, _currentPageHeight - _contentInsets().vertical - 24)
-        : null;
+  _RasterImageData _rasterImage(ImageBlock block) {
+    final cached = _rasterImages[block.bytes];
+    if (cached != null) return cached;
+    final data = _RasterImageData(block.bytes);
+    _rasterImages[block.bytes] = data;
+    data.stream = data.provider.resolve(createLocalImageConfiguration(context));
+    data.listener = ImageStreamListener(
+      (info, synchronousCall) {
+        data.aspectRatio = info.image.width / info.image.height;
+        info.dispose();
+        data.stopListening();
+        if (data.layoutPending) _scheduleImageLayout();
+      },
+      onError: (Object error, StackTrace? stack) {
+        data.stopListening();
+      },
+    );
+    data.stream!.addListener(data.listener!);
+    return data;
+  }
 
+  double? _imageAspectRatio(
+    ImageBlock block, {
+    bool forLayout = false,
+    bool painted = false,
+  }) {
+    if (block.isSvg || (!painted && block.aspectRatio != null)) {
+      return block.aspectRatio;
+    }
+    final data = _rasterImage(block);
+    if (forLayout && data.aspectRatio == null) data.layoutPending = true;
+    return data.aspectRatio;
+  }
+
+  void _scheduleImageLayout() {
+    if (_imageLayoutScheduled || !mounted) return;
+    _imageLayoutScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _imageLayoutScheduled = false;
+      if (!mounted) return;
+      _pendingRestore ??= _captureLocation(widget.settings.readingMode);
+      setState(() {
+        _tableLayouts.clear();
+        _paginatedPages.clear();
+        _lastPaginationSize = null;
+        _hasActiveSelection = false;
+        _layoutGeneration++;
+      });
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  double _tableImageHeight(
+    ImageBlock block,
+    double contentWidth,
+    double imageExtent,
+  ) {
+    final ratio = _imageAspectRatio(block, forLayout: true);
+    final maxHeight = math.max(0.0, imageExtent - 24);
+    return 24 +
+        (ratio == null
+            ? maxHeight
+            : math.min(
+                math.max(0.0, contentWidth - block.indent) / ratio,
+                maxHeight,
+              ));
+  }
+
+  Widget _buildImageBlock(
+    ImageBlock block,
+    _SelectionScopeData scope, {
+    double? imageExtent,
+  }) {
+    final availableHeight =
+        imageExtent ??
+        (widget.settings.readingMode == ReadingMode.horizontal
+            ? _currentPageHeight - _contentInsets().vertical
+            : null);
+    final maxImgHeight = availableHeight == null
+        ? double.infinity
+        : math.max(0.0, availableHeight - 24);
+    final ratio = _imageAspectRatio(block);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: maxImgHeight ?? double.infinity),
-        child: Image.memory(block.bytes, fit: BoxFit.contain),
+      padding: EdgeInsets.only(top: 12, bottom: 12, left: block.indent),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SizedBox(
+            key: scope.imageKeys.putIfAbsent(
+              block.charStart,
+              () => GlobalKey(),
+            ),
+            height: ratio == null
+                ? null
+                : math.min(constraints.maxWidth / ratio, maxImgHeight),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: maxImgHeight),
+              child: block.isSvg
+                  ? SvgPicture.memory(block.bytes, fit: BoxFit.contain)
+                  : Image(
+                      image: _rasterImage(block).provider,
+                      fit: BoxFit.contain,
+                    ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -1871,7 +2606,9 @@ class EpubNativeViewState extends State<EpubNativeView> {
     List<ContentElement> elements,
     SelectedContentRange range,
   ) {
-    final textBlocks = elements.whereType<TextBlock>().toList(growable: false);
+    final textBlocks = contentLeaves(
+      elements,
+    ).whereType<TextBlock>().toList(growable: false);
     if (textBlocks.isEmpty) return null;
 
     final startOffset = _mapLocalOffsetToChapterOffset(

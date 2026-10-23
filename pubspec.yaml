@@ -70,8 +70,17 @@ flutter:
   generate: true
   uses-material-design: true
 
-  # assets:
-  #   - assets/
+  assets:
+    - assets/fonts/Inter-OFL.txt
+    - assets/fonts/Lora-OFL.txt
+
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Variable.ttf
+    - family: Lora
+      fonts:
+        - asset: assets/fonts/Lora-Variable.ttf
 
 # Flutter Launcher Icons configuration
 # Run: flutter pub run flutter_launcher_icons:main

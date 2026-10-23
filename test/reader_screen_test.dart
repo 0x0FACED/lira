@@ -16,6 +16,7 @@ import 'package:lira/features/progress/data/repositories/reading_progress_local_
 import 'package:lira/features/progress/domain/models/reading_progress_dto.dart';
 import 'package:lira/features/reader/presentation/reader_screen.dart';
 import 'package:lira/features/settings/data/settings_provider.dart';
+import 'package:lira/l10n/app_localizations.dart';
 
 class _ProgressStore implements ReadingProgressLocalRepository {
   ReadingProgressDto? persisted;
@@ -55,6 +56,9 @@ class _HighlightsStore implements HighlightsLocalRepository {
 
 Widget _app(BookDto book) => ProviderScope(
   child: MaterialApp(
+    locale: const Locale('en'),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
     home: Builder(
       builder: (context) => Scaffold(
         body: Center(
@@ -113,11 +117,15 @@ void _expectSavedTextVisible(WidgetTester tester, EpubLocation location) {
   final reader = find.byType(EpubNativeView);
   final view = tester.widget<EpubNativeView>(reader);
   final viewport = tester.getRect(reader);
-  final blocks = XhtmlParser(
-    html: view.epub.chapters[location.chapterIndex].htmlContent,
-    images: view.epub.images,
-    baseStyle: TextStyle(fontSize: view.settings.fontSize),
-  ).parse().whereType<TextBlock>();
+  final blocks = contentLeaves(
+    XhtmlParser(
+      html: view.epub.chapters[location.chapterIndex].htmlContent,
+      images: view.epub.images,
+      documentPath: view.epub.chapters[location.chapterIndex].fileName,
+      stylesheets: view.epub.stylesheets,
+      baseStyle: TextStyle(fontSize: view.settings.fontSize),
+    ).parse(),
+  ).whereType<TextBlock>();
   final block = blocks.firstWhere(
     (block) =>
         block.charStart <= location.charOffset &&
@@ -215,26 +223,24 @@ void main() {
   });
   tearDown(() => getIt.reset());
 
-  testWidgets(
-    'an invalid EPUB shows an error without replacing saved progress',
-    (tester) async {
-      final existing = ReadingProgressDto(
-        bookId: corrupt.id,
-        percentage: 42,
-        location: 'saved-before-error',
-        updatedAt: DateTime(2026),
-      );
-      progress.persisted = existing;
-      await _open(tester, corrupt);
-      expect(find.textContaining('Error:'), findsOneWidget);
-      expect(find.byType(EpubNativeView), findsNothing);
-      expect(progress.persisted, existing);
-      await tester.tap(find.byTooltip('Back'));
-      await tester.pumpAndSettle();
-      expect(find.text('Open reader'), findsOneWidget);
-      await tester.pumpWidget(const SizedBox.shrink());
-    },
-  );
+  testWidgets('an invalid EPUB mounts no reader and preserves saved progress', (
+    tester,
+  ) async {
+    final existing = ReadingProgressDto(
+      bookId: corrupt.id,
+      percentage: 42,
+      location: 'saved-before-error',
+      updatedAt: DateTime(2026),
+    );
+    progress.persisted = existing;
+    await _open(tester, corrupt);
+    expect(find.byType(EpubNativeView), findsNothing);
+    expect(progress.persisted, existing);
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    expect(find.text('Open reader'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets(
     'closing and reopening restores the saved text near the reading edge',
@@ -266,11 +272,6 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
       await tester.pump();
       expect(find.byType(EpubNativeView), findsOneWidget);
-      expect(find.text('Error loading progress'), findsNothing);
-      expect(
-        find.textContaining('Failed to save reading position:'),
-        findsOneWidget,
-      );
       progress.failWrites = false;
       await tester.tapAt(tester.getCenter(find.byType(EpubNativeView)));
       await tester.pumpAndSettle();

@@ -547,6 +547,318 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Logout'**
   String get zLibraryLogout;
+
+  /// No description provided for @themeLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get themeLight;
+
+  /// No description provided for @proxyHost.
+  ///
+  /// In en, this message translates to:
+  /// **'Host'**
+  String get proxyHost;
+
+  /// No description provided for @proxyPort.
+  ///
+  /// In en, this message translates to:
+  /// **'Port'**
+  String get proxyPort;
+
+  /// No description provided for @proxyDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get proxyDisabled;
+
+  /// No description provided for @searchBothSources.
+  ///
+  /// In en, this message translates to:
+  /// **'Both sources'**
+  String get searchBothSources;
+
+  /// No description provided for @searchAllFormats.
+  ///
+  /// In en, this message translates to:
+  /// **'All formats'**
+  String get searchAllFormats;
+
+  /// No description provided for @searchSort.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort'**
+  String get searchSort;
+
+  /// No description provided for @searchSortRelevance.
+  ///
+  /// In en, this message translates to:
+  /// **'Relevance'**
+  String get searchSortRelevance;
+
+  /// No description provided for @searchSortTitleAsc.
+  ///
+  /// In en, this message translates to:
+  /// **'Title: A to Z'**
+  String get searchSortTitleAsc;
+
+  /// No description provided for @searchSortTitleDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Title: Z to A'**
+  String get searchSortTitleDesc;
+
+  /// No description provided for @searchSortAuthorAsc.
+  ///
+  /// In en, this message translates to:
+  /// **'Author: A to Z'**
+  String get searchSortAuthorAsc;
+
+  /// No description provided for @searchLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching the shelves…'**
+  String get searchLoading;
+
+  /// No description provided for @searchNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No books found'**
+  String get searchNoResults;
+
+  /// No description provided for @searchNoFilterResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No books match these filters'**
+  String get searchNoFilterResults;
+
+  /// No description provided for @searchResetFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset filters'**
+  String get searchResetFilters;
+
+  /// No description provided for @searchFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Search is unavailable'**
+  String get searchFailed;
+
+  /// No description provided for @searchRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get searchRetry;
+
+  /// No description provided for @searchSourcesPartialFailure.
+  ///
+  /// In en, this message translates to:
+  /// **'Some sources are unavailable. Showing the results we could find.'**
+  String get searchSourcesPartialFailure;
+
+  /// No description provided for @cancelDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel download'**
+  String get cancelDownload;
+
+  /// No description provided for @downloadBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Download book'**
+  String get downloadBook;
+
+  /// No description provided for @searchAnnaDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Find books by title, author or ISBN in Anna’s Archive.'**
+  String get searchAnnaDescription;
+
+  /// No description provided for @searchZLibraryDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Find your next read in Z-Library. Sign in from Settings to download books.'**
+  String get searchZLibraryDescription;
+
+  /// No description provided for @searchBothDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Search Anna’s Archive and Z-Library together.'**
+  String get searchBothDescription;
+
+  /// No description provided for @searchResultsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one {{count} book} other {{count} books}}'**
+  String searchResultsCount(int count);
+
+  /// No description provided for @highlights.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlights'**
+  String get highlights;
+
+  /// No description provided for @highlightsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No highlights yet'**
+  String get highlightsEmpty;
+
+  /// No description provided for @highlightsEmptyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select text in the book to save a highlight or note.'**
+  String get highlightsEmptyHint;
+
+  /// No description provided for @highlightsLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load highlights'**
+  String get highlightsLoadError;
+
+  /// No description provided for @addNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Add note'**
+  String get addNote;
+
+  /// No description provided for @editNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit note'**
+  String get editNote;
+
+  /// No description provided for @noteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Your note…'**
+  String get noteHint;
+
+  /// No description provided for @copyText.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get copyText;
+
+  /// No description provided for @copied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get copied;
+
+  /// No description provided for @highlightText.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlight'**
+  String get highlightText;
+
+  /// No description provided for @tableOfContentsUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Table of contents is not available'**
+  String get tableOfContentsUnavailable;
+
+  /// No description provided for @readerSansSerif.
+  ///
+  /// In en, this message translates to:
+  /// **'Sans serif'**
+  String get readerSansSerif;
+
+  /// No description provided for @readerSerif.
+  ///
+  /// In en, this message translates to:
+  /// **'Serif'**
+  String get readerSerif;
+
+  /// No description provided for @readerMonospace.
+  ///
+  /// In en, this message translates to:
+  /// **'Monospace'**
+  String get readerMonospace;
+
+  /// No description provided for @readerFontSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Font size'**
+  String get readerFontSize;
+
+  /// No description provided for @readerLineHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Line spacing'**
+  String get readerLineHeight;
+
+  /// No description provided for @readerPageMargins.
+  ///
+  /// In en, this message translates to:
+  /// **'Page margins'**
+  String get readerPageMargins;
+
+  /// No description provided for @readerBrightness.
+  ///
+  /// In en, this message translates to:
+  /// **'Brightness'**
+  String get readerBrightness;
+
+  /// No description provided for @readerBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Page background'**
+  String get readerBackground;
+
+  /// No description provided for @readerPaper.
+  ///
+  /// In en, this message translates to:
+  /// **'Warm paper'**
+  String get readerPaper;
+
+  /// No description provided for @readerNight.
+  ///
+  /// In en, this message translates to:
+  /// **'Night'**
+  String get readerNight;
+
+  /// No description provided for @readerCharcoal.
+  ///
+  /// In en, this message translates to:
+  /// **'Charcoal'**
+  String get readerCharcoal;
+
+  /// No description provided for @readerGraphite.
+  ///
+  /// In en, this message translates to:
+  /// **'Graphite'**
+  String get readerGraphite;
+
+  /// No description provided for @readerWhite.
+  ///
+  /// In en, this message translates to:
+  /// **'White'**
+  String get readerWhite;
+
+  /// No description provided for @readerSepia.
+  ///
+  /// In en, this message translates to:
+  /// **'Sepia'**
+  String get readerSepia;
+
+  /// No description provided for @readerSavePositionError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save reading position: {error}'**
+  String readerSavePositionError(String error);
+
+  /// No description provided for @highlightSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save highlight: {error}'**
+  String highlightSaveError(String error);
+
+  /// No description provided for @bookDownloaded.
+  ///
+  /// In en, this message translates to:
+  /// **'“{title}” added to your library'**
+  String bookDownloaded(String title);
 }
 
 class _AppLocalizationsDelegate

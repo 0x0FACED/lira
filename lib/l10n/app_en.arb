@@ -118,5 +118,73 @@
     }
   },
   "zLibraryNotLoggedIn": "Not logged in to Z-Library",
-  "zLibraryLogout": "Logout"
+  "zLibraryLogout": "Logout",
+  "themeLight": "Light",
+  "proxyHost": "Host",
+  "proxyPort": "Port",
+  "proxyDisabled": "Disabled",
+  "searchBothSources": "Both sources",
+  "searchAllFormats": "All formats",
+  "searchSort": "Sort",
+  "searchSortRelevance": "Relevance",
+  "searchSortTitleAsc": "Title: A to Z",
+  "searchSortTitleDesc": "Title: Z to A",
+  "searchSortAuthorAsc": "Author: A to Z",
+  "searchLoading": "Searching the shelves…",
+  "searchNoResults": "No books found",
+  "searchNoFilterResults": "No books match these filters",
+  "searchResetFilters": "Reset filters",
+  "searchFailed": "Search is unavailable",
+  "searchRetry": "Try again",
+  "searchSourcesPartialFailure": "Some sources are unavailable. Showing the results we could find.",
+  "cancelDownload": "Cancel download",
+  "downloadBook": "Download book",
+  "searchAnnaDescription": "Find books by title, author or ISBN in Anna’s Archive.",
+  "searchZLibraryDescription": "Find your next read in Z-Library. Sign in from Settings to download books.",
+  "searchBothDescription": "Search Anna’s Archive and Z-Library together.",
+  "searchResultsCount": "{count, plural, one {{count} book} other {{count} books}}",
+  "@searchResultsCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "highlights": "Highlights",
+  "highlightsEmpty": "No highlights yet",
+  "highlightsEmptyHint": "Select text in the book to save a highlight or note.",
+  "highlightsLoadError": "Could not load highlights",
+  "addNote": "Add note",
+  "editNote": "Edit note",
+  "noteHint": "Your note…",
+  "copyText": "Copy",
+  "copied": "Copied",
+  "highlightText": "Highlight",
+  "tableOfContentsUnavailable": "Table of contents is not available",
+  "readerSansSerif": "Sans serif",
+  "readerSerif": "Serif",
+  "readerMonospace": "Monospace",
+  "readerFontSize": "Font size",
+  "readerLineHeight": "Line spacing",
+  "readerPageMargins": "Page margins",
+  "readerBrightness": "Brightness",
+  "readerBackground": "Page background",
+  "readerPaper": "Warm paper",
+  "readerNight": "Night",
+  "readerCharcoal": "Charcoal",
+  "readerGraphite": "Graphite",
+  "readerWhite": "White",
+  "readerSepia": "Sepia",
+  "readerSavePositionError": "Could not save reading position: {error}",
+  "@readerSavePositionError": {
+    "placeholders": {"error": {"type": "String"}}
+  },
+  "highlightSaveError": "Could not save highlight: {error}",
+  "@highlightSaveError": {
+    "placeholders": {"error": {"type": "String"}}
+  },
+  "bookDownloaded": "“{title}” added to your library",
+  "@bookDownloaded": {
+    "placeholders": {
+      "title": {"type": "String"}
+    }
+  }
 }

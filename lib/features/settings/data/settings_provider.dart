@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:epub_engine/epub_engine.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/theme/app_theme.dart';
+
 /// Pre-loaded SharedPreferences instance, set in main() before runApp.
 late final SharedPreferences sharedPrefs;
 
@@ -13,10 +15,12 @@ final readerSettingsProvider =
 
 class ReaderSettingsNotifier extends StateNotifier<ReaderSettings> {
   static const _settingsKey = 'reader_settings';
+  static final _defaultSettings = ReaderSettings(
+    backgroundColor: AppTheme.paperColor.toARGB32(),
+  );
   final SharedPreferences _prefs;
 
-  ReaderSettingsNotifier(this._prefs)
-      : super(_loadInitial(_prefs));
+  ReaderSettingsNotifier(this._prefs) : super(_loadInitial(_prefs));
 
   static ReaderSettings _loadInitial(SharedPreferences prefs) {
     final settingsJson = prefs.getString(_settingsKey);
@@ -27,7 +31,7 @@ class ReaderSettingsNotifier extends StateNotifier<ReaderSettings> {
         // Corrupted settings — fall back to defaults
       }
     }
-    return const ReaderSettings();
+    return _defaultSettings;
   }
 
   Future<void> updateSettings(ReaderSettings newSettings) async {
@@ -36,6 +40,6 @@ class ReaderSettingsNotifier extends StateNotifier<ReaderSettings> {
   }
 
   void resetSettings() {
-    updateSettings(const ReaderSettings());
+    updateSettings(_defaultSettings);
   }
 }

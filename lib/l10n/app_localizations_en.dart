@@ -238,4 +238,179 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get zLibraryLogout => 'Logout';
+
+  @override
+  String get themeLight => 'Light';
+
+  @override
+  String get proxyHost => 'Host';
+
+  @override
+  String get proxyPort => 'Port';
+
+  @override
+  String get proxyDisabled => 'Disabled';
+
+  @override
+  String get searchBothSources => 'Both sources';
+
+  @override
+  String get searchAllFormats => 'All formats';
+
+  @override
+  String get searchSort => 'Sort';
+
+  @override
+  String get searchSortRelevance => 'Relevance';
+
+  @override
+  String get searchSortTitleAsc => 'Title: A to Z';
+
+  @override
+  String get searchSortTitleDesc => 'Title: Z to A';
+
+  @override
+  String get searchSortAuthorAsc => 'Author: A to Z';
+
+  @override
+  String get searchLoading => 'Searching the shelves…';
+
+  @override
+  String get searchNoResults => 'No books found';
+
+  @override
+  String get searchNoFilterResults => 'No books match these filters';
+
+  @override
+  String get searchResetFilters => 'Reset filters';
+
+  @override
+  String get searchFailed => 'Search is unavailable';
+
+  @override
+  String get searchRetry => 'Try again';
+
+  @override
+  String get searchSourcesPartialFailure =>
+      'Some sources are unavailable. Showing the results we could find.';
+
+  @override
+  String get cancelDownload => 'Cancel download';
+
+  @override
+  String get downloadBook => 'Download book';
+
+  @override
+  String get searchAnnaDescription =>
+      'Find books by title, author or ISBN in Anna’s Archive.';
+
+  @override
+  String get searchZLibraryDescription =>
+      'Find your next read in Z-Library. Sign in from Settings to download books.';
+
+  @override
+  String get searchBothDescription =>
+      'Search Anna’s Archive and Z-Library together.';
+
+  @override
+  String searchResultsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count books',
+      one: '$count book',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get highlights => 'Highlights';
+
+  @override
+  String get highlightsEmpty => 'No highlights yet';
+
+  @override
+  String get highlightsEmptyHint =>
+      'Select text in the book to save a highlight or note.';
+
+  @override
+  String get highlightsLoadError => 'Could not load highlights';
+
+  @override
+  String get addNote => 'Add note';
+
+  @override
+  String get editNote => 'Edit note';
+
+  @override
+  String get noteHint => 'Your note…';
+
+  @override
+  String get copyText => 'Copy';
+
+  @override
+  String get copied => 'Copied';
+
+  @override
+  String get highlightText => 'Highlight';
+
+  @override
+  String get tableOfContentsUnavailable => 'Table of contents is not available';
+
+  @override
+  String get readerSansSerif => 'Sans serif';
+
+  @override
+  String get readerSerif => 'Serif';
+
+  @override
+  String get readerMonospace => 'Monospace';
+
+  @override
+  String get readerFontSize => 'Font size';
+
+  @override
+  String get readerLineHeight => 'Line spacing';
+
+  @override
+  String get readerPageMargins => 'Page margins';
+
+  @override
+  String get readerBrightness => 'Brightness';
+
+  @override
+  String get readerBackground => 'Page background';
+
+  @override
+  String get readerPaper => 'Warm paper';
+
+  @override
+  String get readerNight => 'Night';
+
+  @override
+  String get readerCharcoal => 'Charcoal';
+
+  @override
+  String get readerGraphite => 'Graphite';
+
+  @override
+  String get readerWhite => 'White';
+
+  @override
+  String get readerSepia => 'Sepia';
+
+  @override
+  String readerSavePositionError(String error) {
+    return 'Could not save reading position: $error';
+  }
+
+  @override
+  String highlightSaveError(String error) {
+    return 'Could not save highlight: $error';
+  }
+
+  @override
+  String bookDownloaded(String title) {
+    return '“$title” added to your library';
+  }
 }

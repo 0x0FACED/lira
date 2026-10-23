@@ -118,5 +118,73 @@
     }
   },
   "zLibraryNotLoggedIn": "Нет входа в Z-Library",
-  "zLibraryLogout": "Выйти"
+  "zLibraryLogout": "Выйти",
+  "themeLight": "Светлая",
+  "proxyHost": "Хост",
+  "proxyPort": "Порт",
+  "proxyDisabled": "Выключен",
+  "searchBothSources": "Оба источника",
+  "searchAllFormats": "Все форматы",
+  "searchSort": "Сортировка",
+  "searchSortRelevance": "По релевантности",
+  "searchSortTitleAsc": "Название: А—Я",
+  "searchSortTitleDesc": "Название: Я—А",
+  "searchSortAuthorAsc": "Автор: А—Я",
+  "searchLoading": "Ищем на книжных полках…",
+  "searchNoResults": "Книги не найдены",
+  "searchNoFilterResults": "Нет книг с такими фильтрами",
+  "searchResetFilters": "Сбросить фильтры",
+  "searchFailed": "Поиск недоступен",
+  "searchRetry": "Попробовать снова",
+  "searchSourcesPartialFailure": "Часть источников недоступна. Показываем то, что удалось найти.",
+  "cancelDownload": "Отменить загрузку",
+  "downloadBook": "Скачать книгу",
+  "searchAnnaDescription": "Ищите книги по названию, автору или ISBN в Anna’s Archive.",
+  "searchZLibraryDescription": "Найдите следующую книгу в Z-Library. Для загрузки войдите в аккаунт в настройках.",
+  "searchBothDescription": "Поиск одновременно в Anna’s Archive и Z-Library.",
+  "searchResultsCount": "{count, plural, one {{count} книга} few {{count} книги} many {{count} книг} other {{count} книги}}",
+  "@searchResultsCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "highlights": "Выделения",
+  "highlightsEmpty": "Выделений пока нет",
+  "highlightsEmptyHint": "Выделите текст в книге, чтобы сохранить выделение или заметку.",
+  "highlightsLoadError": "Не удалось загрузить выделения",
+  "addNote": "Добавить заметку",
+  "editNote": "Изменить заметку",
+  "noteHint": "Ваша заметка…",
+  "copyText": "Копировать",
+  "copied": "Скопировано",
+  "highlightText": "Выделить",
+  "tableOfContentsUnavailable": "Оглавление недоступно",
+  "readerSansSerif": "Без засечек",
+  "readerSerif": "С засечками",
+  "readerMonospace": "Моноширинный",
+  "readerFontSize": "Размер шрифта",
+  "readerLineHeight": "Межстрочный интервал",
+  "readerPageMargins": "Отступы страницы",
+  "readerBrightness": "Яркость",
+  "readerBackground": "Фон страницы",
+  "readerPaper": "Тёплая бумага",
+  "readerNight": "Ночь",
+  "readerCharcoal": "Уголь",
+  "readerGraphite": "Графит",
+  "readerWhite": "Белый",
+  "readerSepia": "Сепия",
+  "readerSavePositionError": "Не удалось сохранить позицию чтения: {error}",
+  "@readerSavePositionError": {
+    "placeholders": {"error": {"type": "String"}}
+  },
+  "highlightSaveError": "Не удалось сохранить выделение: {error}",
+  "@highlightSaveError": {
+    "placeholders": {"error": {"type": "String"}}
+  },
+  "bookDownloaded": "«{title}» добавлена в библиотеку",
+  "@bookDownloaded": {
+    "placeholders": {
+      "title": {"type": "String"}
+    }
+  }
 }

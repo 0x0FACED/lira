@@ -1,80 +1,80 @@
-# Lira — UI Screen Map
+# Lira UI and design system
 
-## Auth Screen (`/login`)
-**File:** `lib/features/auth/presentation/auth_screen.dart`
+## Visual language
 
-- Login form (username + password) with "Sign In" / "Register" toggle
-- "Continue as Guest" button — sets `isGuest` flag, local-only mode
-- Redirects to `/` on success
-- **TODO:** API integration for login/register
+The light theme takes its warm paper, ink, stone and terracotta direction from the [Anthropic brand palette](https://github.com/anthropics/skills/blob/main/skills/brand-guidelines/SKILL.md). It is a Lira interface, not a copy of Claude's product UI.
 
----
+| Role | Light | Dark |
+|---|---|---|
+| App canvas | `#FAF9F5` | `#191817` |
+| Cards, dialogs, panels | `#FFFFFF` | `#252320` |
+| Main text | `#141413` | `#F2F0E8` |
+| Secondary text | `#6B695F` | `#B9B5A9` |
+| Primary controls/text | `#AD5036` | `#E29A7E` |
 
-## Main Shell (`/`)
-**File:** `lib/features/navigation/presentation/main_shell.dart`
+The reference orange `#D97757` is darkened for small foreground text and white-on-primary controls in the light theme. Use semantic `ColorScheme` roles rather than copying hex values into screens. Olive and blue distinguish secondary/informational roles, including search sources. Errors use `error`/`onError` and their container variants.
 
-Bottom `NavigationBar` with 3 tabs:
+Book covers, PDF content, saved annotation colors and explicitly chosen reading backgrounds are content, not chrome. Do not recolor them to match the app theme.
 
-### Tab 1: Library
-**File:** `lib/features/books/presentation/library_screen.dart`
+## Typography and tokens
 
-- Grid of book cards with covers, titles, authors, format badges
-- FAB "+" to import books (EPUB, PDF)
-- Long press to delete a book
-- Tap to open reader
-- Cover extraction: EPUB covers parsed on import, saved to `covers/` dir
+- **Inter**: controls, forms, body copy, navigation, metadata.
+- **Lora**: app/page headings and other editorial titles.
+- Both variable fonts are bundled in `assets/fonts`, work offline and include Cyrillic glyphs. OFL license texts are bundled and registered with Flutter's license registry.
+- Spacing: `AppSpacing` — 4, 8, 12, 16, 24, 32, 48, 64.
+- Radii: `AppRadius` — 8, 12, 20, 28.
+- Content width: `AppLayout.contentMaxWidth` (1120); forms/sheets use `formMaxWidth` (640).
+- Interactive targets use `AppLayout.minTouchTarget` (48). Labels wrap rather than shrinking below the type scale.
 
-### Tab 2: Search
-**File:** `lib/features/search/presentation/search_screen.dart`
+Implementations live in `lib/core/theme/app_theme.dart` and `app_tokens.dart`. Themes are constructed once, not reallocated on every app rebuild.
 
-- Placeholder screen
-- **TODO:** Search bar + z-library / custom API integration
+## Shared components
 
-### Tab 3: Settings
-**File:** `lib/features/settings/presentation/settings_screen.dart`
+`lib/core/widgets/app_components.dart` supplies:
 
-- **Profile section:** shows username (logged in) or "Guest" label
-- **Account:** Sign In / Register buttons (if guest), Logout (if authenticated)
-- **Appearance:** Theme toggle (dark/light), Language selector
-- **About:** App version
-- **TODO:** Theme toggle with Riverpod provider, language selector, API auth
+- `AppSurface`: outlined Material surface with optional InkWell interaction; no backdrop blur or colored glow.
+- `AppPageHeader`: shared editorial page heading, optional subtitle, leading control and actions.
+- `AppSection`: settings/form grouping with a shared heading and surface.
+- `AppEmptyState`: empty, initial and error presentations with optional action.
+- `AppBadge`: metadata/source labels.
+- `AppSearchField`: common input decoration, clear action and optional search submission action.
+- `AppStateTransition`: keyed state changes; outgoing children cannot receive input or focus.
+- `showAppDialog` / `showAppBottomSheet`: shared presentation, insets and motion. Bottom sheets provide their own drag handle; content must not draw a second one.
 
----
+Use the standard Material buttons, chips, switches, sliders, inputs, menus, progress indicators and tooltips. Their appearance is defined centrally by `AppTheme`; screens should not establish competing button/form systems.
 
-## Reader Screen (`/reader`)
-**File:** `lib/features/reader/presentation/reader_screen.dart`
+## Navigation and motion
 
-- Full-screen immersive reader (black background)
-- Tap anywhere to toggle top/bottom bars (AnimatedPositioned)
-- **Top bar:** Back button + book title
-- **Bottom bar:** Progress bar (percentage) + TOC button + Settings button
-- Supports PDF (pdfrx) and EPUB (flutter_widget_from_html)
+`MainShell` uses a navigation rail at widths of 900 or more and a normal bottom `NavigationBar` below that breakpoint. The scaffold reserves navigation space: pages must not add legacy padding for an overlaid glass navigation bar.
 
-### EPUB Reader
-**File:** `packages/epub_engine/lib/src/epub_reader_view.dart`
+Tabs retain their subtree, scroll position and query state in an `IndexedStack`; only the selected tab's tickers run. A short fade/translation introduces a newly selected tab without recreating all tabs. Resizing between rail and bottom navigation preserves the content subtree.
 
-- Continuous vertical scroll (all chapters in one ListView)
-- Scroll offset saved/restored for reading position
-- Internal links, embedded images, chapter dividers
-- Progress = scroll position / total height
+`AppMotion` defines 140 ms interaction, 220 ms standard and 320 ms sheet durations with `easeOutCubic`. Resolve custom durations through `AppMotion.duration(context)` so system reduced-motion preferences disable decorative movement. Dialogs, sheets, reader chrome, download state and tab transitions share this policy.
 
-### PDF Reader
-**File:** `packages/pdf_engine/lib/src/pdf_viewer_widget.dart`
+Desktop route transitions use a subtle fade/translation. Android predictive back and iOS interactive back transitions remain native. Gesture arbitration windows, network timeouts and database debounce intervals are not decorative animation durations.
 
-- pdfrx native viewer with text selection
-- Page-based progress tracking
+Never wrap a live EPUB/PDF engine in a keyed `AnimatedSwitcher`: progress, selection and controller identity must survive chrome/theme rebuilds.
 
----
+## Screens
 
-## Auth Provider
-**File:** `lib/features/auth/domain/providers/auth_provider.dart`
+- **Auth (`/login`)**: bounded form, local login/register state and guest entry. Backend authentication is still not implemented.
+- **Library (`/`)**: responsive shelf, local search, import, long-press deletion, navigation to book details; shared empty/error presentations.
+- **Book details (`/book-detail`)**: bounded adaptive cover/metadata layout, edit/delete actions and entry to the reader.
+- **Search tab**: Anna's Archive/Z-Library source selection, format/sort controls, results and partial/error/empty states, download progress and cancellation.
+- **Settings tab**: profile/account, source credentials, appearance/language, proxy and application version, grouped on common surfaces.
+- **Reader (`/reader`)**: themed chrome, TOC, selections/notes, highlights and settings sheets. EPUB/PDF parsing, geometry and persistence remain the reader subsystem's responsibility; see [READER.md](READER.md).
 
-- `SharedPreferences`-based: `isGuest`, `isLoggedIn`, `username`
-- Methods: `continueAsGuest()`, `login()`, `register()`, `logout()`
-- **TODO:** Replace login/register stubs with real API calls
+A fresh reader settings profile starts on warm paper. Saved reader settings, including old dark/white backgrounds, remain unchanged; app theme changes do not overwrite them. Resetting reader settings returns to warm paper. Reading controls and background swatches have localized semantic labels/tooltips.
 
-## Router
-**File:** `lib/core/router/app_router.dart`
+## Verification checklist
 
-- Auth redirect: unauthenticated → `/login`, authenticated → `/`
-- Routes: `/login`, `/`, `/reader`
+Run the real application (`flutter run -d macos`, or a supported connected device), not a standalone gallery of copied components:
+
+1. Check light/dark and English/Russian on auth, library, details, search, settings and reader chrome.
+2. Resize through the 900 px breakpoint; check 360 px width and increased text size. Scroll settings and forms with the keyboard open.
+3. Preserve library/search input and scroll state when switching tabs and resizing. Check filters, partial results, errors and download controls.
+4. Open real EPUB/PDF, toggle chrome, use TOC/settings/highlights, then close and reopen without losing reading position.
+5. Change app theme with an explicitly chosen reading background and saved highlights; content preferences must remain intact.
+6. Enable reduced motion and check navigation, dialogs, sheets and reader controls. Check keyboard focus and disabled states.
+
+`dart analyze lib` checks the application sources. Reader regression commands and native PDFium prerequisites remain in [READER.md](READER.md).

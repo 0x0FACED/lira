@@ -8,3 +8,8 @@
 - Preserve text under overlapping highlights and styled page splits; fix internal links, encoded paths and Unicode hit testing.
 - Own selection notifiers per mounted scope and capture scroll positions after layout.
 - Remove the unused WebView renderer and its dependencies.
+- Resolve images/CSS by complete document-relative URI paths; distinguish literal ZIP percent signs, spaces and duplicate basenames.
+- Render inline images, SVG covers and nested local SVG resources, with hidden descendants removed and vector IDs isolated.
+- Preserve nested list/quotation structure, explicit line breaks, ordered numbering and unresolved-object fallback content.
+- Render and paginate table grids with row/column spans, source-order selection and persistent oversized-page scrolling.
+- Apply a bounded local author CSS cascade without replacing the reader's font choice.

@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/app_components.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../books/domain/models/book_dto.dart';
 import '../../highlights/domain/models/highlight_dto.dart';
 import '../../highlights/domain/providers/highlights_provider.dart';
@@ -17,7 +20,7 @@ import '../domain/engine/pdf_book_reader_engine.dart';
 import '../domain/models/book_location.dart';
 
 const _highlightColors = [
-  '#BB86FC',
+  // Reader annotations are content colors, independent of the app chrome.
   '#FFEB3B',
   '#4CAF50',
   '#42A5F5',
@@ -150,7 +153,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save reading position: $error')),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)!.readerSavePositionError('$error'),
+            ),
+          ),
         );
       }
     } finally {
@@ -176,6 +183,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final l10n = AppLocalizations.of(context)!;
     final progressAsyncValue = ref.watch(
       readingProgressControllerProvider(widget.book.id),
     );
@@ -189,7 +199,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to save reading position: ${next.error}'),
+              content: Text(l10n.readerSavePositionError('${next.error}')),
             ),
           );
         });
@@ -208,14 +218,23 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         if (snapshot.hasError) {
           return Scaffold(
             appBar: AppBar(title: Text(widget.book.title)),
-            body: Center(child: Text('Error: ${snapshot.error}')),
+            body: AppEmptyState(
+              icon: Icons.error_outline,
+              title: l10n.errorLoadingBook,
+              description: '${snapshot.error}',
+              iconColor: colors.error,
+            ),
           );
         }
 
         final engine = snapshot.data;
         if (engine == null) {
-          return const Scaffold(
-            body: Center(child: Text('Failed to initialize reader engine.')),
+          return Scaffold(
+            body: AppEmptyState(
+              icon: Icons.menu_book_outlined,
+              title: l10n.failedToInitReader,
+              iconColor: colors.error,
+            ),
           );
         }
 
@@ -244,8 +263,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                           },
                           loading: () =>
                               const Center(child: CircularProgressIndicator()),
-                          error: (e, st) => const Center(
-                            child: Text('Error loading progress'),
+                          error: (e, st) => AppEmptyState(
+                            icon: Icons.error_outline,
+                            title: l10n.errorLoadingProgress,
+                            description: '$e',
+                            iconColor: colors.error,
                           ),
                         ),
                 ),
@@ -261,149 +283,188 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                   ),
                 ),
               AnimatedPositioned(
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeInOut,
-                top: _showUi ? 0 : -100,
+                duration: AppMotion.duration(context),
+                curve: AppMotion.curve,
+                top: _showUi ? 0 : -MediaQuery.sizeOf(context).height,
                 left: 0,
                 right: 0,
-                child: Container(
-                  color: Colors.black87,
-                  child: SafeArea(
-                    bottom: false,
-                    child: SizedBox(
-                      height: 48,
-                      child: Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(
-                              Icons.arrow_back,
-                              color: Colors.white,
-                              size: 20,
+                child: IgnorePointer(
+                  ignoring: !_showUi,
+                  child: ExcludeFocus(
+                    excluding: !_showUi,
+                    child: AppSurface(
+                      padding: EdgeInsets.zero,
+                      radius: 0,
+                      child: SafeArea(
+                        bottom: false,
+                        child: Center(
+                          heightFactor: 1,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(
+                              maxWidth: AppLayout.contentMaxWidth,
+                              minHeight: AppLayout.minTouchTarget,
                             ),
-                            onPressed: _closeReader,
-                          ),
-                          Expanded(
-                            child: Text(
-                              widget.book.title,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
+                            child: Padding(
+                              padding: const EdgeInsets.all(AppSpacing.xs),
+                              child: Row(
+                                children: [
+                                  IconButton(
+                                    tooltip: MaterialLocalizations.of(
+                                      context,
+                                    ).backButtonTooltip,
+                                    icon: const Icon(Icons.arrow_back),
+                                    onPressed: _closeReader,
+                                  ),
+                                  const SizedBox(width: AppSpacing.sm),
+                                  Expanded(
+                                    child: Text(
+                                      widget.book.title,
+                                      style: theme.textTheme.titleMedium,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: AppSpacing.md),
+                                ],
                               ),
-                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
               AnimatedPositioned(
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeInOut,
-                bottom: _showUi ? 0 : -120,
+                duration: AppMotion.duration(context),
+                curve: AppMotion.curve,
+                bottom: _showUi ? 0 : -MediaQuery.sizeOf(context).height,
                 left: 0,
                 right: 0,
-                child: Container(
-                  color: Colors.black87,
-                  child: SafeArea(
-                    top: false,
-                    child: ValueListenableBuilder<_ReaderProgressState>(
-                      valueListenable: _progressNotifier,
-                      builder: (context, progressState, _) {
-                        return Padding(
-                          padding: const EdgeInsets.only(
-                            left: 16,
-                            right: 16,
-                            top: 8,
-                            bottom: 4,
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(4),
-                                      child: LinearProgressIndicator(
-                                        value: progressState.fraction,
-                                        backgroundColor: Colors.white24,
-                                        minHeight: 4,
+                child: IgnorePointer(
+                  ignoring: !_showUi,
+                  child: ExcludeFocus(
+                    excluding: !_showUi,
+                    child: AppSurface(
+                      padding: EdgeInsets.zero,
+                      radius: 0,
+                      child: SafeArea(
+                        top: false,
+                        child: Center(
+                          heightFactor: 1,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(
+                              maxWidth: AppLayout.contentMaxWidth,
+                            ),
+                            child: ValueListenableBuilder<_ReaderProgressState>(
+                              valueListenable: _progressNotifier,
+                              builder: (context, progressState, _) {
+                                return Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    AppSpacing.md,
+                                    AppSpacing.compact,
+                                    AppSpacing.md,
+                                    AppSpacing.xs,
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(
+                                                    AppRadius.sm,
+                                                  ),
+                                              child: LinearProgressIndicator(
+                                                value: progressState.fraction,
+                                                backgroundColor: colors
+                                                    .surfaceContainerHighest,
+                                                minHeight: AppSpacing.xs,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(
+                                            width: AppSpacing.compact,
+                                          ),
+                                          Text(
+                                            progressState.label,
+                                            style: theme.textTheme.labelMedium
+                                                ?.copyWith(
+                                                  color:
+                                                      colors.onSurfaceVariant,
+                                                ),
+                                          ),
+                                        ],
                                       ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  SizedBox(
-                                    width: 48,
-                                    child: Text(
-                                      progressState.label,
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 12,
+                                      const SizedBox(height: AppSpacing.xs),
+                                      Wrap(
+                                        alignment: WrapAlignment.spaceEvenly,
+                                        crossAxisAlignment:
+                                            WrapCrossAlignment.center,
+                                        spacing: AppSpacing.lg,
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.format_list_bulleted,
+                                            ),
+                                            tooltip: l10n.tableOfContents,
+                                            onPressed: () => _scaffoldKey
+                                                .currentState
+                                                ?.openDrawer(),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.bookmark_outline,
+                                            ),
+                                            tooltip: l10n.highlights,
+                                            onPressed: () =>
+                                                _showHighlightsPanel(context),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(Icons.settings),
+                                            tooltip: l10n.readerSettings,
+                                            onPressed: () =>
+                                                _showSettings(context),
+                                          ),
+                                        ],
                                       ),
-                                    ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Wrap(
-                                alignment: WrapAlignment.spaceEvenly,
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                spacing: 20,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.format_list_bulleted,
-                                      color: Colors.white,
-                                      size: 22,
-                                    ),
-                                    tooltip: 'Table of Contents',
-                                    onPressed: () =>
-                                        _scaffoldKey.currentState?.openDrawer(),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.bookmark_outline,
-                                      color: Colors.white,
-                                      size: 22,
-                                    ),
-                                    tooltip: 'Highlights',
-                                    onPressed: () =>
-                                        _showHighlightsPanel(context),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.settings,
-                                      color: Colors.white,
-                                      size: 22,
-                                    ),
-                                    tooltip: 'Settings',
-                                    onPressed: () => _showSettings(context),
-                                  ),
-                                ],
-                              ),
-                            ],
+                                );
+                              },
+                            ),
                           ),
-                        );
-                      },
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
               AnimatedPositioned(
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeOutCubic,
-                right: _selectedText != null ? 12 : -60,
+                duration: AppMotion.duration(context),
+                curve: AppMotion.curve,
+                right: _selectedText != null
+                    ? AppSpacing.compact
+                    : -(AppLayout.minTouchTarget + AppSpacing.md),
                 top: 0,
                 bottom: 0,
-                child: SafeArea(
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxHeight: MediaQuery.of(context).size.height - 32,
+                child: IgnorePointer(
+                  ignoring: _selectedText == null,
+                  child: ExcludeFocus(
+                    excluding: _selectedText == null,
+                    child: SafeArea(
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxHeight:
+                                MediaQuery.sizeOf(context).height -
+                                AppSpacing.xl,
+                          ),
+                          child: _buildSelectionBar(),
+                        ),
                       ),
-                      child: _buildSelectionBar(),
                     ),
                   ),
                 ),
@@ -493,38 +554,33 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   }
 
   Widget _buildSelectionBar() {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.black87,
-        borderRadius: BorderRadius.circular(22),
+    final l10n = AppLocalizations.of(context)!;
+    return AppSurface(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
       ),
+      radius: AppRadius.md,
       child: SizedBox(
-        width: 44,
+        width: AppLayout.minTouchTarget,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(vertical: 10),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              _highlightSwatch(Theme.of(context).colorScheme.primary),
               for (final color in _highlightColors)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: GestureDetector(
-                    onTap: () => _saveHighlight(color),
-                    child: Container(
-                      width: 26,
-                      height: 26,
-                      decoration: BoxDecoration(
-                        color: _parseColor(color),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white24, width: 1.5),
-                      ),
-                    ),
-                  ),
-                ),
-              const SizedBox(height: 4),
-              _miniButton(Icons.note_add, _addNote),
-              const SizedBox(height: 6),
-              _miniButton(Icons.copy, _copySelection),
+                _highlightSwatch(_parseColor(color)),
+              const SizedBox(height: AppSpacing.xs),
+              IconButton(
+                tooltip: l10n.addNote,
+                icon: const Icon(Icons.note_add_outlined),
+                onPressed: _addNote,
+              ),
+              IconButton(
+                tooltip: l10n.copyText,
+                icon: const Icon(Icons.copy_outlined),
+                onPressed: _copySelection,
+              ),
             ],
           ),
         ),
@@ -532,17 +588,21 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     );
   }
 
-  Widget _miniButton(IconData icon, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 30,
-        height: 30,
-        decoration: BoxDecoration(
-          color: Colors.white12,
-          borderRadius: BorderRadius.circular(8),
+  Widget _highlightSwatch(Color color) {
+    return SizedBox.square(
+      dimension: AppLayout.minTouchTarget,
+      child: IconButton(
+        tooltip: AppLocalizations.of(context)!.highlightText,
+        onPressed: () => _saveHighlight(_colorHex(color)),
+        icon: Container(
+          width: AppSpacing.lg,
+          height: AppSpacing.lg,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: Border.all(color: Theme.of(context).colorScheme.outline),
+          ),
         ),
-        child: Icon(icon, color: Colors.white70, size: 16),
       ),
     );
   }
@@ -557,7 +617,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   Future<void> _persistHighlight(
     String text,
     String location, {
-    String color = '#BB86FC',
+    required String color,
     String? note,
   }) async {
     final generation = _loadGeneration;
@@ -587,7 +647,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save highlight: $error')),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)!.highlightSaveError('$error'),
+            ),
+          ),
         );
       }
     } finally {
@@ -605,43 +669,42 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       return;
     final bookId = widget.book.id;
     final generation = _loadGeneration;
+    final l10n = AppLocalizations.of(context)!;
+    final color = _colorHex(Theme.of(context).colorScheme.primary);
     var noteText = '';
-    final note = await showDialog<String>(
+    final note = await showAppDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Add note'),
+        title: Text(l10n.addNote),
+        scrollable: true,
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               '"${text.length > 100 ? '${text.substring(0, 100)}...' : text}"',
-              style: TextStyle(
+              style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
                 fontStyle: FontStyle.italic,
-                color: Theme.of(context).colorScheme.onSurface.withAlpha(150),
-                fontSize: 13,
+                color: Theme.of(ctx).colorScheme.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.compact),
             TextField(
               onChanged: (value) => noteText = value,
               autofocus: true,
               maxLines: 3,
-              decoration: const InputDecoration(
-                hintText: 'Your note...',
-                border: OutlineInputBorder(),
-              ),
+              decoration: InputDecoration(hintText: l10n.noteHint),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, noteText),
-            child: const Text('Save'),
+            child: Text(l10n.save),
           ),
         ],
       ),
@@ -650,7 +713,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         mounted &&
         generation == _loadGeneration &&
         widget.book.id == bookId) {
-      await _persistHighlight(text, location, note: note.isEmpty ? null : note);
+      await _persistHighlight(
+        text,
+        location,
+        color: color,
+        note: note.isEmpty ? null : note,
+      );
     }
   }
 
@@ -658,7 +726,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     if (_selectedText != null) {
       Clipboard.setData(ClipboardData(text: _selectedText!));
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Copied'), duration: Duration(seconds: 1)),
+        SnackBar(
+          content: Text(AppLocalizations.of(context)!.copied),
+          duration: const Duration(seconds: 1),
+        ),
       );
     }
     FocusManager.instance.primaryFocus?.unfocus();
@@ -673,11 +744,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     return Color(int.parse('FF$h', radix: 16));
   }
 
+  String _colorHex(Color color) {
+    final rgb = color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2);
+    return '#${rgb.toUpperCase()}';
+  }
+
   void _showHighlightsPanel(BuildContext context) {
-    showModalBottomSheet(
+    showAppBottomSheet<void>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (ctx) => _HighlightsPanel(
         bookId: widget.book.id,
         onNavigate: (location) {
@@ -691,38 +765,30 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
   Drawer _buildTocDrawer(BookReaderEngine engine) {
     final toc = engine.getToc();
-
-    if (toc.isEmpty) {
-      return Drawer(
-        child: Center(
-          child: Text(
-            'Table of Contents is not available.',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        ),
-      );
-    }
+    final l10n = AppLocalizations.of(context)!;
 
     return Drawer(
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text(
-                'Contents',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
+            AppPageHeader(title: l10n.tableOfContents),
             const Divider(),
             Expanded(
-              child: ListView.builder(
-                itemCount: toc.length,
-                itemBuilder: (context, index) {
-                  return _buildTocItem(toc[index]);
-                },
-              ),
+              child: toc.isEmpty
+                  ? SingleChildScrollView(
+                      child: AppEmptyState(
+                        icon: Icons.format_list_bulleted,
+                        title: l10n.tableOfContentsUnavailable,
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+                      itemCount: toc.length,
+                      itemBuilder: (context, index) {
+                        return _buildTocItem(toc[index]);
+                      },
+                    ),
             ),
           ],
         ),
@@ -731,12 +797,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   }
 
   Widget _buildTocItem(TOCItem item, {int depth = 0}) {
-    final padding = 16.0 + (depth * 16.0);
+    final padding = AppSpacing.md + (depth * AppSpacing.md);
 
     if (item.subItems.isEmpty) {
       return ListTile(
-        contentPadding: EdgeInsets.only(left: padding),
-        title: Text(item.title),
+        contentPadding: EdgeInsets.only(left: padding, right: AppSpacing.md),
+        title: Text(item.title, style: Theme.of(context).textTheme.bodyLarge),
         onTap: () {
           _engine?.goToLocation(BookLocation(locator: item.fileName));
           Navigator.pop(context);
@@ -758,10 +824,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   }
 
   void _showSettings(BuildContext context) {
-    showModalBottomSheet(
+    showAppBottomSheet<void>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (context) => const SettingsPanel(),
     );
   }
@@ -800,23 +864,30 @@ class _ExpandableTocItemState extends State<_ExpandableTocItem> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         ListTile(
-          contentPadding: EdgeInsets.only(left: widget.padding),
+          contentPadding: EdgeInsets.only(
+            left: widget.padding,
+            right: AppSpacing.md,
+          ),
           leading: IconButton(
+            tooltip: _expanded
+                ? MaterialLocalizations.of(context).expandedIconTapHint
+                : MaterialLocalizations.of(context).collapsedIconTapHint,
             icon: Icon(
               _expanded
                   ? Icons.keyboard_arrow_down
                   : Icons.keyboard_arrow_right,
               size: 20,
             ),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
             onPressed: () {
               setState(() {
                 _expanded = !_expanded;
               });
             },
           ),
-          title: Text(widget.item.title),
+          title: Text(
+            widget.item.title,
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
           onTap: () => widget.onNavigate(widget.item.fileName),
         ),
         if (_expanded) ..._buildSubItems(widget.item.subItems),
@@ -828,15 +899,18 @@ class _ExpandableTocItemState extends State<_ExpandableTocItem> {
     return items.map((item) {
       if (item.subItems.isEmpty) {
         return ListTile(
-          contentPadding: EdgeInsets.only(left: widget.padding + 16),
-          title: Text(item.title),
+          contentPadding: EdgeInsets.only(
+            left: widget.padding + AppSpacing.md,
+            right: AppSpacing.md,
+          ),
+          title: Text(item.title, style: Theme.of(context).textTheme.bodyLarge),
           onTap: () => widget.onNavigate(item.fileName),
         );
       }
 
       return _ExpandableTocItem(
         item: item,
-        padding: widget.padding + 16,
+        padding: widget.padding + AppSpacing.md,
         depth: widget.depth + 1,
         onNavigate: widget.onNavigate,
       );
@@ -854,82 +928,83 @@ class _HighlightsPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final highlightsAsync = ref.watch(highlightsControllerProvider(bookId));
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.5,
       minChildSize: 0.3,
       maxChildSize: 0.85,
+      expand: false,
       builder: (ctx, scrollController) {
-        return Container(
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 12, bottom: 8),
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.onSurface.withAlpha(40),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+        return CustomScrollView(
+          controller: scrollController,
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.lg,
+                  vertical: AppSpacing.sm,
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   children: [
-                    Text('Highlights', style: theme.textTheme.titleMedium),
-                    const Spacer(),
+                    Expanded(
+                      child: Text(
+                        l10n.highlights,
+                        style: theme.textTheme.titleLarge,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
                     highlightsAsync.whenOrNull(
-                          data: (list) => Text(
-                            '${list.length}',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurface.withAlpha(120),
-                            ),
-                          ),
+                          data: (list) => AppBadge(label: '${list.length}'),
                         ) ??
                         const SizedBox.shrink(),
                   ],
                 ),
               ),
-              const Divider(),
-              Expanded(
-                child: highlightsAsync.when(
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Center(child: Text('Error: $e')),
-                  data: (highlights) {
-                    if (highlights.isEmpty) {
-                      return Center(
-                        child: Text(
-                          'No highlights yet.\nSelect text in the book to highlight it.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: theme.colorScheme.onSurface.withAlpha(100),
-                          ),
-                        ),
-                      );
-                    }
-                    return ListView.builder(
-                      controller: scrollController,
-                      itemCount: highlights.length,
-                      padding: const EdgeInsets.only(bottom: 24),
-                      itemBuilder: (ctx, i) => _buildHighlightTile(
+            ),
+            const SliverToBoxAdapter(child: Divider()),
+            highlightsAsync.when(
+              loading: () => const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              error: (e, _) => SliverToBoxAdapter(
+                child: AppEmptyState(
+                  icon: Icons.error_outline,
+                  title: l10n.highlightsLoadError,
+                  description: '$e',
+                  iconColor: theme.colorScheme.error,
+                ),
+              ),
+              data: (highlights) {
+                if (highlights.isEmpty) {
+                  return SliverToBoxAdapter(
+                    child: AppEmptyState(
+                      icon: Icons.bookmark_outline,
+                      title: l10n.highlightsEmpty,
+                      description: l10n.highlightsEmptyHint,
+                    ),
+                  );
+                }
+                return SliverPadding(
+                  padding: EdgeInsets.only(
+                    bottom: AppSpacing.lg + MediaQuery.paddingOf(ctx).bottom,
+                  ),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (ctx, i) => _buildHighlightTile(
                         context,
                         ref,
                         highlights[i],
                         theme,
                       ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
+                      childCount: highlights.length,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
         );
       },
     );
@@ -942,14 +1017,20 @@ class _HighlightsPanel extends ConsumerWidget {
     ThemeData theme,
   ) {
     final color = _parseHex(highlight.color);
+    final l10n = AppLocalizations.of(context)!;
     return Dismissible(
       key: Key(highlight.id),
       direction: DismissDirection.endToStart,
+      movementDuration: AppMotion.duration(context),
+      resizeDuration: AppMotion.duration(context),
       background: Container(
         alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        color: Colors.red.withAlpha(40),
-        child: const Icon(Icons.delete_outline, color: Colors.red),
+        padding: const EdgeInsets.only(right: AppSpacing.lg),
+        color: theme.colorScheme.errorContainer,
+        child: Icon(
+          Icons.delete_outline,
+          color: theme.colorScheme.onErrorContainer,
+        ),
       ),
       onDismissed: (_) {
         ref
@@ -957,36 +1038,40 @@ class _HighlightsPanel extends ConsumerWidget {
             .removeHighlight(highlight.id);
       },
       child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.xs,
+        ),
         leading: Container(
-          width: 4,
-          height: 40,
+          width: AppSpacing.xs,
+          height: AppSpacing.xxl,
           decoration: BoxDecoration(
             color: color,
-            borderRadius: BorderRadius.circular(2),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
         ),
         title: Text(
           highlight.text,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 13),
+          style: theme.textTheme.bodyMedium,
         ),
         subtitle: highlight.note != null
             ? Text(
                 highlight.note!,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: theme.colorScheme.onSurface.withAlpha(120),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               )
             : null,
         trailing: IconButton(
+          tooltip: highlight.note != null ? l10n.editNote : l10n.addNote,
           icon: Icon(
             highlight.note != null ? Icons.edit_note : Icons.note_add_outlined,
-            size: 18,
-            color: theme.colorScheme.onSurface.withAlpha(100),
+            size: 20,
+            color: theme.colorScheme.onSurfaceVariant,
           ),
           onPressed: () => _editNote(context, ref, highlight),
         ),
@@ -997,23 +1082,22 @@ class _HighlightsPanel extends ConsumerWidget {
 
   void _editNote(BuildContext context, WidgetRef ref, HighlightDto highlight) {
     final controller = TextEditingController(text: highlight.note ?? '');
-    showDialog(
+    final l10n = AppLocalizations.of(context)!;
+    showAppDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Edit note'),
+        title: Text(l10n.editNote),
+        scrollable: true,
         content: TextField(
           controller: controller,
           autofocus: true,
           maxLines: 3,
-          decoration: const InputDecoration(
-            hintText: 'Your note...',
-            border: OutlineInputBorder(),
-          ),
+          decoration: InputDecoration(hintText: l10n.noteHint),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () {
@@ -1025,7 +1109,7 @@ class _HighlightsPanel extends ConsumerWidget {
                   );
               Navigator.pop(ctx);
             },
-            child: const Text('Save'),
+            child: Text(l10n.save),
           ),
         ],
       ),

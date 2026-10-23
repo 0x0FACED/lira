@@ -12,11 +12,7 @@ const _keyProxyEnabled = 'pref_proxy_enabled';
 const _keyProxyHost = 'pref_proxy_host';
 const _keyProxyPort = 'pref_proxy_port';
 
-enum SearchSource {
-  anna,
-  zlibrary,
-  both,
-}
+enum SearchSource { anna, zlibrary, both }
 
 /// Theme mode provider
 final themeModeProvider = NotifierProvider<ThemeModeNotifier, ThemeMode>(
@@ -27,13 +23,13 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
   @override
   ThemeMode build() {
     _load();
-    return ThemeMode.dark;
+    return ThemeMode.light;
   }
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
-    final value = prefs.getString(_keyThemeMode) ?? 'dark';
-    state = value == 'light' ? ThemeMode.light : ThemeMode.dark;
+    final value = prefs.getString(_keyThemeMode) ?? 'light';
+    state = value == 'dark' ? ThemeMode.dark : ThemeMode.light;
   }
 
   Future<void> toggle() async {
@@ -74,9 +70,10 @@ class LocaleNotifier extends Notifier<Locale> {
 }
 
 /// Search source provider
-final searchSourceProvider = NotifierProvider<SearchSourceNotifier, SearchSource>(
-  () => SearchSourceNotifier(),
-);
+final searchSourceProvider =
+    NotifierProvider<SearchSourceNotifier, SearchSource>(
+      () => SearchSourceNotifier(),
+    );
 
 class SearchSourceNotifier extends Notifier<SearchSource> {
   @override
@@ -112,9 +109,10 @@ class ZLibCredentials {
 }
 
 /// ZLibrary credentials provider
-final zLibraryCredentialsProvider = NotifierProvider<ZLibraryCredentialsNotifier, ZLibCredentials?>(
-  () => ZLibraryCredentialsNotifier(),
-);
+final zLibraryCredentialsProvider =
+    NotifierProvider<ZLibraryCredentialsNotifier, ZLibCredentials?>(
+      () => ZLibraryCredentialsNotifier(),
+    );
 
 class ZLibraryCredentialsNotifier extends Notifier<ZLibCredentials?> {
   @override
@@ -131,7 +129,9 @@ class ZLibraryCredentialsNotifier extends Notifier<ZLibCredentials?> {
     if (cookiesStr != null && email != null) {
       try {
         final Map<String, dynamic> decoded = jsonDecode(cookiesStr);
-        final cookies = decoded.map((key, value) => MapEntry(key, value.toString()));
+        final cookies = decoded.map(
+          (key, value) => MapEntry(key, value.toString()),
+        );
         state = ZLibCredentials(cookies: cookies, email: email);
       } catch (e) {
         state = null;
@@ -141,7 +141,10 @@ class ZLibraryCredentialsNotifier extends Notifier<ZLibCredentials?> {
     }
   }
 
-  Future<void> saveCredentials(String email, Map<String, String> cookies) async {
+  Future<void> saveCredentials(
+    String email,
+    Map<String, String> cookies,
+  ) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyZLibEmail, email);
     await prefs.setString(_keyZLibCookies, jsonEncode(cookies));
@@ -177,9 +180,10 @@ class Socks5Config {
   }
 }
 
-final socks5ConfigProvider = NotifierProvider<Socks5ConfigNotifier, Socks5Config>(
-  () => Socks5ConfigNotifier(),
-);
+final socks5ConfigProvider =
+    NotifierProvider<Socks5ConfigNotifier, Socks5Config>(
+      () => Socks5ConfigNotifier(),
+    );
 
 class Socks5ConfigNotifier extends Notifier<Socks5Config> {
   @override
@@ -215,4 +219,3 @@ class Socks5ConfigNotifier extends Notifier<Socks5Config> {
     await prefs.setInt(_keyProxyPort, port);
   }
 }
-

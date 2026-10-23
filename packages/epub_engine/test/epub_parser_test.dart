@@ -3,6 +3,9 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:epub_engine/src/epub_parser.dart';
+import 'package:epub_engine/src/epub_paths.dart';
+import 'package:epub_engine/src/xhtml_parser.dart';
+import 'package:flutter/material.dart' show TextStyle;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xml/xml.dart';
 
@@ -456,20 +459,205 @@ void main() {
         expect(parsed.coverImage, orderedEquals(coverBytes));
         expect(parsed.images['OEBPS/$imagePath'], orderedEquals(coverBytes));
         expect(
-          parsed.images[imagePath.split('/').last],
-          orderedEquals(coverBytes),
-        );
-        expect(
           parsed.images['OEBPS/images/illustration.png'],
-          orderedEquals(illustrationBytes),
-        );
-        expect(
-          parsed.images['illustration.png'],
           orderedEquals(illustrationBytes),
         );
       },
     );
   }
+
+  test(
+    'keeps same-basename illustrations distinct at their resolved paths',
+    () async {
+      final parsed = await EpubParser.parse(
+        _epub(
+          documents: {
+            'Text/one.xhtml': _document(
+              'One',
+              '<p><img src="../Images/one/figure.png"/></p>',
+            ),
+            'Text/two.xhtml': _document(
+              'Two',
+              '<p><img src="../Images/two/figure.png"/></p>',
+            ),
+          },
+          spine: ['Text/one.xhtml', 'Text/two.xhtml'],
+          images: {
+            'Images/one/figure.png': [1, 2, 3],
+            'Images/two/figure.png': [4, 5, 6],
+          },
+        ),
+      );
+      for (var index = 0; index < parsed.chapters.length; index++) {
+        final chapter = parsed.chapters[index];
+        final src = XmlDocument.parse(chapter.htmlContent).descendants
+            .whereType<XmlElement>()
+            .singleWhere((element) => element.name.local == 'img')
+            .getAttribute('src')!;
+        expect(
+          parsed.images[resolveEpubPath(chapter.fileName, src)],
+          orderedEquals(index == 0 ? [1, 2, 3] : [4, 5, 6]),
+        );
+      }
+    },
+  );
+
+  test(
+    'renders distinct raw percent and space ZIP image names from escaped URIs',
+    () async {
+      final parsed = await EpubParser.parse(
+        _epub(
+          documents: {
+            'Text/chapter.xhtml': _document(
+              'Chapter',
+              '<p><img src="../Images/figure%2520one.png"/>'
+                  '<img src="../Images/figure%20one.png"/></p>',
+            ),
+          },
+          spine: ['Text/chapter.xhtml'],
+          images: {
+            'Images/figure%20one.png': [1, 2, 3],
+            'Images/figure one.png': [4, 5, 6],
+          },
+          imageHrefs: {
+            'Images/figure%20one.png': 'Images/figure%2520one.png',
+            'Images/figure one.png': 'Images/figure%20one.png',
+          },
+        ),
+      );
+      final chapter = parsed.chapters.single;
+      final rendered = XhtmlParser(
+        html: chapter.htmlContent,
+        documentPath: chapter.fileName,
+        images: parsed.images,
+        baseStyle: const TextStyle(fontSize: 16),
+      ).parse().whereType<ImageBlock>().toList();
+      expect(rendered, hasLength(2));
+      expect(rendered[0].bytes, orderedEquals([1, 2, 3]));
+      expect(rendered[1].bytes, orderedEquals([4, 5, 6]));
+    },
+  );
+
+  test(
+    'loads linked CSS and percent-encoded resource paths canonically',
+    () async {
+      const css = 'div.title1 { font-weight: bold; } /* Заголовок 😀 */';
+      final parsed = await EpubParser.parse(
+        _epub(
+          documents: {
+            'Text/chapter%20one.xhtml': _document(
+              'Chapter',
+              '<p><img src="../Images/figure%20one.png?size=2#preview"/></p>',
+            ),
+          },
+          spine: ['Text/chapter%20one.xhtml'],
+          images: {
+            'Images/figure one.png': [7, 8, 9],
+          },
+          stylesheets: {'Styles/book%20styles.css': css},
+          rawText: {
+            'OEBPS/Styles/book%20styles.css': _utf16(css, Endian.little),
+          },
+        ),
+      );
+      final chapter = parsed.chapters.single;
+      expect(chapter.fileName, 'OEBPS/Text/chapter one.xhtml');
+      final stylesheetPath = resolveEpubPath(
+        chapter.fileName,
+        '../Styles/book%20styles.css',
+      );
+      expect(parsed.stylesheets[stylesheetPath], css);
+      expect(
+        parsed.images[resolveEpubPath(
+          chapter.fileName,
+          '../Images/figure%20one.png?size=2#preview',
+        )],
+        orderedEquals([7, 8, 9]),
+      );
+    },
+  );
+
+  test(
+    'TOC locators escape reserved filename characters without changing title lookup',
+    () async {
+      final parsed = await EpubParser.parse(
+        _epub(
+          documents: {
+            'Text/a%23b%2520c.xhtml': _document(
+              'Original',
+              '<p id="deep anchor">Destination</p>',
+            ),
+          },
+          spine: ['Text/a%23b%2520c.xhtml'],
+          navigation:
+              '<nav epub:type="toc"><ol><li>'
+              '<a href="Text/a%23b%2520c.xhtml#deep%20anchor">Named destination</a>'
+              '</li></ol></nav>',
+        ),
+      );
+      final locator = parsed.toc.single.fileName;
+      expect(resolveEpubPath('', locator), parsed.chapters.single.fileName);
+      expect(Uri.decodeComponent(Uri.parse(locator).fragment), 'deep anchor');
+      expect(parsed.chapters.single.title, 'Named destination');
+      expect(locator, contains('%23'));
+      expect(locator, contains('%2520'));
+    },
+  );
+
+  group('EPUB local resource paths', () {
+    test('resolves dots, escaping, backslashes, root paths and fragments', () {
+      expect(
+        resolveEpubPath(
+          'OPS/Text/chapter.xhtml',
+          r'..\\Images\\cover%20one.png?x=1#y',
+        ),
+        'OPS/Images/cover one.png',
+      );
+      expect(
+        resolveEpubPath('OPS/Text/chapter.xhtml', '/Images/a%23b.png'),
+        'Images/a#b.png',
+      );
+      expect(
+        resolveEpubPath('OPS/Text/chapter.xhtml', '#footnote'),
+        'OPS/Text/chapter.xhtml',
+      );
+      expect(
+        resolveEpubPath('OPS/Text/chapter.xhtml', '../Images/%2e%2e/cover.png'),
+        'OPS/cover.png',
+      );
+    });
+
+    test('rejects remote, data and protocol-relative references', () {
+      for (final href in [
+        'https://example.com/cover.png',
+        '//example.com/cover.png',
+        'data:image/png;base64,AA==',
+        'file:///tmp/cover.png',
+      ]) {
+        expect(resolveEpubPath('OPS/chapter.xhtml', href), isNull);
+      }
+    });
+
+    test('does not lowercase distinct archive resource names', () {
+      expect(
+        resolveEpubPath('OPS/chapter.xhtml', 'Images/Cover.png'),
+        isNot(resolveEpubPath('OPS/chapter.xhtml', 'Images/cover.png')),
+      );
+    });
+
+    test('does not decode an already canonical document directory twice', () {
+      const documentPath = 'OPS/notes%20source/chapter.xhtml';
+      expect(
+        normalizeEpubArchivePath('OPS/figure%20one.png'),
+        'OPS/figure%20one.png',
+      );
+      expect(
+        resolveEpubPath(documentPath, 'figure.png'),
+        'OPS/notes%20source/figure.png',
+      );
+      expect(resolveEpubPath(documentPath, '#note'), documentPath);
+    });
+  });
 }
 
 void _expectChapters(
@@ -521,6 +709,8 @@ Uint8List _epub({
   String? ncxPoints,
   String? navigation,
   Map<String, List<int>> images = const {},
+  Map<String, String> stylesheets = const {},
+  Map<String, String> imageHrefs = const {},
   String? coverImage,
   String coverDeclaration = 'metadata',
 }) {
@@ -584,10 +774,17 @@ Uint8List _epub({
         ? ' properties="cover-image"'
         : '';
     manifest.write(
-      '<item id="${imageIds[entry.key]}" href="${_escape(entry.key)}" '
+      '<item id="${imageIds[entry.key]}" href="${_escape(imageHrefs[entry.key] ?? entry.key)}" '
       'media-type="image/png"$properties/>',
     );
     addBytes('OEBPS/${entry.key}', entry.value);
+  }
+  for (final entry in stylesheets.entries) {
+    manifest.write(
+      '<item id="stylesheet-${manifest.length}" href="${_escape(entry.key)}" '
+      'media-type="text/css"/>',
+    );
+    addText('OEBPS/${entry.key}', entry.value);
   }
   if (ncxPoints != null) {
     manifest.write(

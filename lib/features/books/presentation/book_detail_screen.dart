@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../l10n/app_localizations.dart';
+import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/app_components.dart';
+import '../../../l10n/app_localizations.dart';
 import '../domain/models/book_dto.dart';
 import '../domain/providers/books_provider.dart';
 
@@ -15,9 +17,7 @@ class BookDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
-
     final currentBook =
         ref
             .watch(booksControllerProvider)
@@ -26,183 +26,174 @@ class BookDetailScreen extends ConsumerWidget {
         book;
 
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 350,
-            pinned: true,
-            // Dark overlay on back button so it's visible on any cover
-            leading: Container(
-              margin: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.black.withAlpha(120),
-                shape: BoxShape.circle,
+      appBar: AppBar(
+        title: Text(l10n.details),
+        leading: BackButton(onPressed: () => context.pop()),
+      ),
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: AppLayout.contentMaxWidth,
               ),
-              child: IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => context.pop(),
-              ),
-            ),
-            flexibleSpace: FlexibleSpaceBar(
-              background: _buildCover(context, currentBook),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              currentBook.title,
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              currentBook.author,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                  AppPageHeader(
+                    title: currentBook.title,
+                    subtitle: currentBook.author,
+                    actions: [
                       IconButton(
                         icon: const Icon(Icons.edit_outlined),
+                        tooltip: l10n.editBook,
                         onPressed: () =>
                             _showEditDialog(context, ref, l10n, currentBook),
-                        tooltip: l10n.editBook,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.lg,
+                      0,
+                      AppSpacing.lg,
+                      AppSpacing.xl,
                     ),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary.withAlpha(30),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      currentBook.format.toUpperCase(),
-                      style: TextStyle(
-                        color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Details Section
-                  Text(
-                    l10n.details,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildDetailRow(
-                    context,
-                    Icons.pages_outlined,
-                    l10n.pages,
-                    currentBook.pageCount > 0
-                        ? '${currentBook.pageCount}'
-                        : l10n.unknown,
-                  ),
-                  const SizedBox(height: 8),
-                  _buildDetailRow(
-                    context,
-                    Icons.sd_storage_outlined,
-                    l10n.size,
-                    currentBook.fileSizeBytes > 0
-                        ? _formatBytes(currentBook.fileSizeBytes)
-                        : l10n.unknown,
-                  ),
-                  const SizedBox(height: 8),
-                  _buildDetailRow(
-                    context,
-                    Icons.calendar_today_outlined,
-                    l10n.added,
-                    '${currentBook.createdAt.year}-${currentBook.createdAt.month.toString().padLeft(2, '0')}-${currentBook.createdAt.day.toString().padLeft(2, '0')}',
-                  ),
-
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: FilledButton.icon(
-                      onPressed: () {
-                        context.push('/reader', extra: currentBook);
-                      },
-                      icon: const Icon(Icons.menu_book),
-                      label: Text(
-                        currentBook.format == 'epub'
-                            ? l10n.readBook
-                            : l10n.openBook,
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        showDialog(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            title: Text(l10n.deleteBook),
-                            content: Text(
-                              l10n.deleteBookConfirm(currentBook.title),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final cover = SizedBox(
+                          width: 240,
+                          child: AppSurface(
+                            padding: EdgeInsets.zero,
+                            radius: AppRadius.md,
+                            child: AspectRatio(
+                              aspectRatio: 3 / 4,
+                              child: _buildCover(context, currentBook),
                             ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx),
-                                child: Text(l10n.cancel),
-                              ),
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.pop(ctx);
-                                  ref
-                                      .read(booksControllerProvider.notifier)
-                                      .removeBook(currentBook.id);
-                                  context.pop();
-                                },
-                                child: Text(
-                                  l10n.delete,
-                                  style: const TextStyle(color: Colors.red),
-                                ),
-                              ),
-                            ],
                           ),
                         );
+                        final details = _buildDetails(
+                          context,
+                          ref,
+                          l10n,
+                          currentBook,
+                        );
+                        if (constraints.maxWidth >= 720) {
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              cover,
+                              const SizedBox(width: AppSpacing.xl),
+                              Expanded(child: details),
+                            ],
+                          );
+                        }
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Center(child: cover),
+                            const SizedBox(height: AppSpacing.lg),
+                            details,
+                          ],
+                        );
                       },
-                      icon: const Icon(Icons.delete_outline, color: Colors.red),
-                      label: Text(
-                        l10n.delete,
-                        style: const TextStyle(color: Colors.red),
-                      ),
                     ),
                   ),
                 ],
               ),
             ),
           ),
-        ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildDetails(
+    BuildContext context,
+    WidgetRef ref,
+    AppLocalizations l10n,
+    BookDto currentBook,
+  ) {
+    final colors = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: AppBadge(label: currentBook.format.toUpperCase()),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        AppSurface(
+          child: Column(
+            children: [
+              _buildDetailRow(
+                context,
+                Icons.pages_outlined,
+                l10n.pages,
+                currentBook.pageCount > 0
+                    ? '${currentBook.pageCount}'
+                    : l10n.unknown,
+              ),
+              const Divider(height: AppSpacing.xl),
+              _buildDetailRow(
+                context,
+                Icons.sd_storage_outlined,
+                l10n.size,
+                currentBook.fileSizeBytes > 0
+                    ? _formatBytes(currentBook.fileSizeBytes)
+                    : l10n.unknown,
+              ),
+              const Divider(height: AppSpacing.xl),
+              _buildDetailRow(
+                context,
+                Icons.calendar_today_outlined,
+                l10n.added,
+                '${currentBook.createdAt.year}-${currentBook.createdAt.month.toString().padLeft(2, '0')}-${currentBook.createdAt.day.toString().padLeft(2, '0')}',
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        FilledButton.icon(
+          onPressed: () => context.push('/reader', extra: currentBook),
+          icon: const Icon(Icons.menu_book_outlined),
+          label: Text(
+            currentBook.format == 'epub' ? l10n.readBook : l10n.openBook,
+            textAlign: TextAlign.center,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.compact),
+        OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(foregroundColor: colors.error),
+          onPressed: () => showAppDialog<void>(
+            context: context,
+            builder: (dialogContext) => AlertDialog(
+              title: Text(l10n.deleteBook),
+              content: Text(l10n.deleteBookConfirm(currentBook.title)),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: Text(l10n.cancel),
+                ),
+                TextButton(
+                  style: TextButton.styleFrom(foregroundColor: colors.error),
+                  onPressed: () {
+                    Navigator.pop(dialogContext);
+                    ref
+                        .read(booksControllerProvider.notifier)
+                        .removeBook(currentBook.id);
+                    context.pop();
+                  },
+                  child: Text(l10n.delete),
+                ),
+              ],
+            ),
+          ),
+          icon: const Icon(Icons.delete_outline),
+          label: Text(l10n.delete, textAlign: TextAlign.center),
+        ),
+      ],
     );
   }
 
@@ -212,13 +203,28 @@ class BookDetailScreen extends ConsumerWidget {
     String label,
     String value,
   ) {
+    final theme = Theme.of(context);
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 20, color: Colors.grey),
-        const SizedBox(width: 12),
-        Text(label, style: const TextStyle(color: Colors.grey)),
-        const Spacer(),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
+        Icon(icon, size: 20, color: theme.colorScheme.onSurfaceVariant),
+        const SizedBox(width: AppSpacing.compact),
+        Expanded(
+          child: Text(
+            label,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.compact),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: theme.textTheme.bodyMedium,
+          ),
+        ),
       ],
     );
   }
@@ -238,48 +244,54 @@ class BookDetailScreen extends ConsumerWidget {
     AppLocalizations l10n,
     BookDto currentBook,
   ) {
-    final titleController = TextEditingController(text: currentBook.title);
-    final authorController = TextEditingController(text: currentBook.author);
+    var title = currentBook.title;
+    var author = currentBook.author;
 
-    showDialog(
+    showAppDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
+        scrollable: true,
         title: Text(l10n.editBook),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
-              controller: titleController,
+            TextFormField(
+              initialValue: currentBook.title,
+              onChanged: (value) => title = value,
               decoration: InputDecoration(labelText: l10n.editBookTitle),
+              textCapitalization: TextCapitalization.sentences,
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: authorController,
+            const SizedBox(height: AppSpacing.md),
+            TextFormField(
+              initialValue: currentBook.author,
+              onChanged: (value) => author = value,
               decoration: InputDecoration(labelText: l10n.editBookAuthor),
+              textCapitalization: TextCapitalization.words,
             ),
           ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
+            onPressed: () => Navigator.pop(dialogContext),
             child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () {
-              final newTitle = titleController.text.trim();
-              final newAuthor = authorController.text.trim();
-
+              final newTitle = title.trim();
+              final newAuthor = author.trim();
               if (newTitle.isNotEmpty) {
-                final updatedBook = currentBook.copyWith(
-                  title: newTitle,
-                  author: newAuthor.isEmpty ? 'Unknown Author' : newAuthor,
-                );
-
                 ref
                     .read(booksControllerProvider.notifier)
-                    .updateBook(updatedBook);
+                    .updateBook(
+                      currentBook.copyWith(
+                        title: newTitle,
+                        author: newAuthor.isEmpty
+                            ? 'Unknown Author'
+                            : newAuthor,
+                      ),
+                    );
               }
-              Navigator.pop(ctx);
+              Navigator.pop(dialogContext);
             },
             child: Text(l10n.save),
           ),
@@ -289,58 +301,60 @@ class BookDetailScreen extends ConsumerWidget {
   }
 
   Widget _buildCover(BuildContext context, BookDto currentBook) {
-    if (currentBook.coverUrl != null &&
-        currentBook.coverUrl!.isNotEmpty &&
-        File(currentBook.coverUrl!).existsSync()) {
-      return Container(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        child: Image.file(
-          File(currentBook.coverUrl!), // <-- using ! here is safe due to check
-          fit: BoxFit.contain,
-          width: double.infinity,
-          errorBuilder: (context, error, stackTrace) {
-            return _buildFormatFallback(currentBook);
-          },
+    final path = currentBook.coverUrl;
+    if (path != null && path.isNotEmpty) {
+      return ColoredBox(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.compact),
+          child: Image.file(
+            File(path),
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) =>
+                _buildFormatFallback(context, currentBook),
+          ),
         ),
       );
     }
-
-    return _buildFormatFallback(currentBook);
+    return _buildFormatFallback(context, currentBook);
   }
 
-  Widget _buildFormatFallback(BookDto currentBook) {
-    final isEpub = currentBook.format.toLowerCase() == 'epub';
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: isEpub
-              ? [const Color(0xFF1B3A4B), const Color(0xFF0D253F)]
-              : [const Color(0xFF3B1B2E), const Color(0xFF2D1426)],
-        ),
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isEpub ? Icons.auto_stories : Icons.picture_as_pdf,
-              size: 80,
-              color: isEpub ? const Color(0xFF64B5F6) : const Color(0xFFEF9A9A),
+  Widget _buildFormatFallback(BuildContext context, BookDto currentBook) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return ColoredBox(
+      color: colors.surfaceContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border(
+              left: BorderSide(color: colors.outlineVariant, width: 3),
+              top: BorderSide(color: colors.outlineVariant),
+              bottom: BorderSide(color: colors.outlineVariant),
             ),
-            const SizedBox(height: 16),
-            Text(
-              currentBook.format.toUpperCase(),
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: isEpub
-                    ? const Color(0xFF64B5F6)
-                    : const Color(0xFFEF9A9A),
-              ),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  currentBook.format.toLowerCase() == 'epub'
+                      ? Icons.auto_stories_outlined
+                      : Icons.description_outlined,
+                  size: 64,
+                  color: colors.secondary,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  currentBook.format.toUpperCase(),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

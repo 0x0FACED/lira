@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_tokens.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../data/settings_provider.dart';
 
@@ -49,163 +51,221 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
             defaultTargetPlatform == TargetPlatform.iOS) &&
         media.size.shortestSide < 600;
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.onSurface.withAlpha(40),
-              borderRadius: BorderRadius.circular(2),
-            ),
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.sm,
+            AppSpacing.lg,
+            AppSpacing.lg,
           ),
-          const SizedBox(height: 12),
-          SegmentedButton<ReadingMode>(
-            segments: [
-              ButtonSegment(
-                value: ReadingMode.vertical,
-                icon: const Icon(Icons.swap_vert, size: 18),
-                label: Text(l10n.readerVertical),
-              ),
-              ButtonSegment(
-                value: ReadingMode.horizontal,
-                icon: const Icon(Icons.swap_horiz, size: 18),
-                label: Text(l10n.readerHorizontal),
-              ),
-            ],
-            selected: {settings.readingMode},
-            onSelectionChanged: (s) => notifier.updateSettings(
-              settings.copyWith(readingMode: s.first),
-            ),
-            style: SegmentedButton.styleFrom(
-              visualDensity: VisualDensity.compact,
-            ),
-          ),
-          const SizedBox(height: 14),
-          if (settings.readingMode == ReadingMode.horizontal && !isPhone) ...[
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              secondary: const Icon(Icons.chrome_reader_mode_rounded, size: 18),
-              title: Text(
-                l10n.readerTwoPageSpread,
-                style: theme.textTheme.bodyMedium,
-              ),
-              value: settings.enableDualPageSpread,
-              onChanged: (value) => notifier.updateSettings(
-                settings.copyWith(enableDualPageSpread: value),
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-          DropdownButtonFormField<String>(
-            key: ValueKey(settings.fontFamily),
-            initialValue: settings.fontFamily,
-            isExpanded: true,
-            menuMaxHeight: 280,
-            decoration: InputDecoration(
-              isDense: true,
-              labelText: l10n.readerFont,
-              prefixIcon: const Icon(Icons.font_download_outlined, size: 18),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 10,
-              ),
-            ),
-            items: _readerFontOptions
-                .map(
-                  (option) => DropdownMenuItem<String>(
-                    value: option.family,
-                    child: Text(
-                      option.label,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontFamily: option.family, fontSize: 14),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: AppLayout.formMaxWidth),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(l10n.readerSettings, style: theme.textTheme.headlineSmall),
+                const SizedBox(height: AppSpacing.lg),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  children: [
+                    ChoiceChip(
+                      avatar: const Icon(Icons.swap_vert, size: 18),
+                      label: Text(l10n.readerVertical),
+                      selected: settings.readingMode == ReadingMode.vertical,
+                      onSelected: (_) => notifier.updateSettings(
+                        settings.copyWith(readingMode: ReadingMode.vertical),
+                      ),
+                    ),
+                    ChoiceChip(
+                      avatar: const Icon(Icons.swap_horiz, size: 18),
+                      label: Text(l10n.readerHorizontal),
+                      selected: settings.readingMode == ReadingMode.horizontal,
+                      onSelected: (_) => notifier.updateSettings(
+                        settings.copyWith(readingMode: ReadingMode.horizontal),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                if (settings.readingMode == ReadingMode.horizontal &&
+                    !isPhone) ...[
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    secondary: const Icon(
+                      Icons.chrome_reader_mode_rounded,
+                      size: 20,
+                    ),
+                    title: Text(
+                      l10n.readerTwoPageSpread,
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                    value: settings.enableDualPageSpread,
+                    onChanged: (value) => notifier.updateSettings(
+                      settings.copyWith(enableDualPageSpread: value),
                     ),
                   ),
-                )
-                .toList(growable: false),
-            onChanged: (value) {
-              if (value == null) return;
-              notifier.updateSettings(settings.copyWith(fontFamily: value));
-            },
-          ),
-          const SizedBox(height: 10),
-          _sliderRow(
-            icon: Icons.text_fields,
-            value: _fontSize,
-            min: 12,
-            max: 32,
-            divisions: 10,
-            label: '${_fontSize.round()}',
-            onChanged: (v) => setState(() => _fontSize = v),
-            onChangeEnd: (v) =>
-                notifier.updateSettings(settings.copyWith(fontSize: v)),
-          ),
-          _sliderRow(
-            icon: Icons.format_line_spacing,
-            value: _lineHeight,
-            min: 1.0,
-            max: 2.5,
-            label: _lineHeight.toStringAsFixed(1),
-            onChanged: (v) => setState(() => _lineHeight = v),
-            onChangeEnd: (v) =>
-                notifier.updateSettings(settings.copyWith(lineHeight: v)),
-          ),
-          _sliderRow(
-            icon: Icons.horizontal_distribute,
-            value: _horizontalPadding,
-            min: 8,
-            max: 64,
-            label: '${_horizontalPadding.round()}',
-            onChanged: (v) => setState(() => _horizontalPadding = v),
-            onChangeEnd: (v) => notifier.updateSettings(
-              settings.copyWith(horizontalPadding: v),
+                  const SizedBox(height: AppSpacing.sm),
+                ],
+                DropdownButtonFormField<String>(
+                  key: ValueKey(settings.fontFamily),
+                  initialValue: settings.fontFamily,
+                  isExpanded: true,
+                  menuMaxHeight: 280,
+                  decoration: InputDecoration(
+                    labelText: l10n.readerFont,
+                    prefixIcon: const Icon(
+                      Icons.font_download_outlined,
+                      size: 20,
+                    ),
+                  ),
+                  items: _readerFontOptions
+                      .map(
+                        (option) => DropdownMenuItem<String>(
+                          value: option.family,
+                          child: Text(
+                            switch (option.family) {
+                              'sans-serif' => l10n.readerSansSerif,
+                              'serif' => l10n.readerSerif,
+                              'monospace' => l10n.readerMonospace,
+                              _ => option.label,
+                            },
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontFamily: option.family,
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(growable: false),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    notifier.updateSettings(
+                      settings.copyWith(fontFamily: value),
+                    );
+                  },
+                ),
+                const SizedBox(height: AppSpacing.compact),
+                _sliderRow(
+                  icon: Icons.text_fields,
+                  semanticsLabel: l10n.readerFontSize,
+                  value: _fontSize,
+                  min: 12,
+                  max: 32,
+                  divisions: 10,
+                  label: '${_fontSize.round()}',
+                  onChanged: (v) => setState(() => _fontSize = v),
+                  onChangeEnd: (v) =>
+                      notifier.updateSettings(settings.copyWith(fontSize: v)),
+                ),
+                _sliderRow(
+                  icon: Icons.format_line_spacing,
+                  semanticsLabel: l10n.readerLineHeight,
+                  value: _lineHeight,
+                  min: 1.0,
+                  max: 2.5,
+                  label: _lineHeight.toStringAsFixed(1),
+                  onChanged: (v) => setState(() => _lineHeight = v),
+                  onChangeEnd: (v) =>
+                      notifier.updateSettings(settings.copyWith(lineHeight: v)),
+                ),
+                _sliderRow(
+                  icon: Icons.horizontal_distribute,
+                  semanticsLabel: l10n.readerPageMargins,
+                  value: _horizontalPadding,
+                  min: 8,
+                  max: 64,
+                  label: '${_horizontalPadding.round()}',
+                  onChanged: (v) => setState(() => _horizontalPadding = v),
+                  onChangeEnd: (v) => notifier.updateSettings(
+                    settings.copyWith(horizontalPadding: v),
+                  ),
+                ),
+                _sliderRow(
+                  icon: Icons.brightness_6_rounded,
+                  semanticsLabel: l10n.readerBrightness,
+                  value: _brightness,
+                  min: 0.2,
+                  max: 1.0,
+                  label: '${(_brightness * 100).round()}%',
+                  onChanged: (v) => setState(() => _brightness = v),
+                  onChangeEnd: (v) =>
+                      notifier.updateSettings(settings.copyWith(brightness: v)),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(
+                    l10n.readerBackground,
+                    style: theme.textTheme.labelLarge,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.compact),
+                Wrap(
+                  alignment: WrapAlignment.spaceEvenly,
+                  spacing: AppSpacing.xs,
+                  runSpacing: AppSpacing.sm,
+                  children: [
+                    _colorDot(
+                      theme,
+                      AppTheme.paperColor.toARGB32(),
+                      settings,
+                      notifier,
+                      label: l10n.readerPaper,
+                    ),
+                    _colorDot(
+                      theme,
+                      0xFF121212,
+                      settings,
+                      notifier,
+                      label: l10n.readerNight,
+                    ),
+                    _colorDot(
+                      theme,
+                      0xFF1E1E1E,
+                      settings,
+                      notifier,
+                      label: l10n.readerCharcoal,
+                    ),
+                    _colorDot(
+                      theme,
+                      0xFF2C2C2C,
+                      settings,
+                      notifier,
+                      label: l10n.readerGraphite,
+                    ),
+                    _colorDot(
+                      theme,
+                      0xFFF5F5F5,
+                      settings,
+                      notifier,
+                      label: l10n.readerWhite,
+                    ),
+                    _colorDot(
+                      theme,
+                      0xFFFFF8E1,
+                      settings,
+                      notifier,
+                      label: l10n.readerSepia,
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-          _sliderRow(
-            icon: Icons.brightness_6_rounded,
-            value: _brightness,
-            min: 0.2,
-            max: 1.0,
-            label: '${(_brightness * 100).round()}%',
-            onChanged: (v) => setState(() => _brightness = v),
-            onChangeEnd: (v) =>
-                notifier.updateSettings(settings.copyWith(brightness: v)),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _colorDot(theme, 0xFF121212, settings, notifier),
-              _colorDot(theme, 0xFF1E1E1E, settings, notifier),
-              _colorDot(theme, 0xFF2C2C2C, settings, notifier),
-              _colorDot(
-                theme,
-                0xFFF5F5F5,
-                settings,
-                notifier,
-                border: Colors.grey,
-              ),
-              _colorDot(theme, 0xFFFFF8E1, settings, notifier),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _sliderRow({
     required IconData icon,
+    required String semanticsLabel,
     required double value,
     required double min,
     required double max,
@@ -214,35 +274,39 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
     required ValueChanged<double> onChanged,
     ValueChanged<double>? onChangeEnd,
   }) {
-    return SizedBox(
-      height: 36,
+    final theme = Theme.of(context);
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: AppLayout.minTouchTarget),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: Colors.grey),
+          Tooltip(
+            message: semanticsLabel,
+            child: Icon(
+              icon,
+              size: 20,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
           Expanded(
-            child: SliderTheme(
-              data: const SliderThemeData(
-                trackHeight: 2,
-                thumbShape: RoundSliderThumbShape(enabledThumbRadius: 6),
-                overlayShape: RoundSliderOverlayShape(overlayRadius: 14),
-              ),
+            child: Semantics(
+              label: semanticsLabel,
               child: Slider(
                 value: value,
                 min: min,
                 max: max,
                 divisions: divisions,
+                label: label,
                 onChanged: onChanged,
                 onChangeEnd: onChangeEnd,
               ),
             ),
           ),
-          SizedBox(
-            width: 42,
-            child: Text(
-              label,
-              style: const TextStyle(fontSize: 11, color: Colors.grey),
-              textAlign: TextAlign.right,
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
+            textAlign: TextAlign.right,
           ),
         ],
       ),
@@ -254,72 +318,53 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
     int colorValue,
     ReaderSettings settings,
     ReaderSettingsNotifier notifier, {
-    Color? border,
+    required String label,
   }) {
     final selected = settings.backgroundColor == colorValue;
     final color = Color(colorValue);
-    final borderColor = _resolveSwatchBorderColor(
-      theme: theme,
-      swatchColor: color,
-      selected: selected,
-      explicitBorder: border,
-    );
+    final borderColor = selected
+        ? theme.colorScheme.primary
+        : theme.colorScheme.outline;
 
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: () => notifier.updateSettings(
-          settings.copyWith(backgroundColor: colorValue),
-        ),
-        child: Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            border: Border.all(color: borderColor, width: selected ? 2.5 : 1.5),
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      color: theme.colorScheme.primary.withAlpha(60),
-                      blurRadius: 6,
-                      spreadRadius: 1,
-                    ),
-                  ]
-                : null,
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        selected: selected,
+        button: true,
+        child: SizedBox.square(
+          dimension: AppLayout.minTouchTarget,
+          child: InkResponse(
+            radius: AppSpacing.lg,
+            onTap: () => notifier.updateSettings(
+              settings.copyWith(backgroundColor: colorValue),
+            ),
+            child: Center(
+              child: Container(
+                width: AppSpacing.xl,
+                height: AppSpacing.xl,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: borderColor,
+                    width: selected ? 3 : 1,
+                  ),
+                ),
+                child: selected
+                    ? Icon(
+                        Icons.check,
+                        size: 18,
+                        color: color.computeLuminance() > 0.5
+                            ? Colors.black
+                            : Colors.white,
+                      )
+                    : null,
+              ),
+            ),
           ),
-          child: selected
-              ? Icon(
-                  Icons.check,
-                  size: 16,
-                  color: color.computeLuminance() > 0.5
-                      ? Colors.black
-                      : Colors.white,
-                )
-              : null,
         ),
       ),
     );
-  }
-
-  Color _resolveSwatchBorderColor({
-    required ThemeData theme,
-    required Color swatchColor,
-    required bool selected,
-    Color? explicitBorder,
-  }) {
-    if (selected) return theme.colorScheme.primary;
-    if (explicitBorder != null) return explicitBorder;
-
-    final surfaceLuminance = theme.colorScheme.surface.computeLuminance();
-    final swatchLuminance = swatchColor.computeLuminance();
-    final luminanceDelta = (surfaceLuminance - swatchLuminance).abs();
-
-    if (luminanceDelta < 0.08) {
-      return theme.colorScheme.outline.withAlpha(220);
-    }
-
-    return swatchLuminance < 0.35 ? Colors.white24 : Colors.black12;
   }
 }
 

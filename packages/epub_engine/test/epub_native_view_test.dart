@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui' as ui;
 
 import 'package:archive/archive.dart';
 import 'package:epub_engine/epub_engine.dart';
@@ -7,6 +8,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 ParsedEpub _book() => ParsedEpub(
   title: 'Reader regression book',
@@ -87,6 +89,83 @@ String _topVisibleText(WidgetTester tester) {
   final text = first.text.toPlainText();
   final end = (position.offset + 200).clamp(0, text.length);
   return text.substring(position.offset, end);
+}
+
+ParsedEpub _htmlBook(String html, {Map<String, Uint8List> images = const {}}) =>
+    ParsedEpub(
+      title: 'Layout regressions',
+      author: 'Lira',
+      chapters: [
+        EpubChapter(
+          title: 'Chapter',
+          fileName: 'OEBPS/text/chapter.xhtml',
+          htmlContent: '<html><body>$html</body></html>',
+        ),
+      ],
+      toc: const [],
+      images: images,
+    );
+
+RenderParagraph _paragraph(WidgetTester tester, String text) =>
+    tester.renderObject<RenderParagraph>(
+      find.descendant(of: find.text(text), matching: find.byType(RichText)),
+    );
+
+Future<void> _tapFirstGlyph(WidgetTester tester, String text) {
+  final paragraph = _paragraph(tester, text);
+  final box = paragraph
+      .getBoxesForSelection(const TextSelection(baseOffset: 0, extentOffset: 1))
+      .first;
+  return tester.tapAt(paragraph.localToGlobal(box.toRect().center));
+}
+
+Rect _cellRect(WidgetTester tester, String text) => tester.getRect(
+  find.ancestor(of: find.text(text), matching: find.byType(Positioned)).first,
+);
+
+Future<Uint8List> _rasterBytes(int width, int height) async {
+  final recorder = ui.PictureRecorder();
+  ui.Canvas(recorder).drawRect(
+    Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
+    ui.Paint()..color = const Color(0xffff0000),
+  );
+  final picture = recorder.endRecording();
+  final image = await picture.toImage(width, height);
+  final data = await image.toByteData(format: ui.ImageByteFormat.png);
+  image.dispose();
+  picture.dispose();
+  return data!.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+}
+
+Future<void> _selectTextRange(
+  WidgetTester tester,
+  String startText,
+  String endText,
+) async {
+  final start = _paragraph(tester, startText);
+  final end = _paragraph(tester, endText);
+  final first = start
+      .getBoxesForSelection(const TextSelection(baseOffset: 0, extentOffset: 1))
+      .first;
+  final last = end
+      .getBoxesForSelection(
+        TextSelection(
+          baseOffset: endText.length - 1,
+          extentOffset: endText.length,
+        ),
+      )
+      .last;
+  final gesture = await tester.startGesture(
+    start.localToGlobal(Offset(first.left + 1, (first.top + first.bottom) / 2)),
+    kind: PointerDeviceKind.mouse,
+  );
+  await tester.pump();
+  await gesture.moveTo(
+    end.localToGlobal(Offset(last.right - 1, (last.top + last.bottom) / 2)),
+  );
+  await tester.pump();
+  await gesture.up();
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -258,8 +337,10 @@ void main() {
           title: 'Chapter',
           fileName: 'chapter.xhtml',
           htmlContent:
-              '<p>${List.generate(pieces.length, (index) => '<span style="font-size: ${index.isEven ? 22 : 30}px">'
-                  '<b>${pieces[index]}</b></span>').join()}</p>',
+              '<blockquote style="margin: 0">'
+              '<p style="text-align: right; margin: 10px 24px 16px 32px">'
+              '${List.generate(pieces.length, (index) => '<span style="font-size: ${index.isEven ? 22 : 30}px">'
+                  '<b>${pieces[index]}</b></span>').join()}</p></blockquote>',
         ),
       ],
       toc: const [],
@@ -282,14 +363,23 @@ void main() {
     );
     await tester.pumpAndSettle();
     final text = StringBuffer();
+    double? paragraphLeft;
+    double? paragraphWidth;
     for (var page = 0; page < 200; page++) {
       final paragraphs = tester.widgetList<RichText>(find.byType(RichText));
       text.write(paragraphs.map((widget) => widget.text.toPlainText()).join());
       for (final element in find.byType(RichText).evaluate()) {
         final paragraph = element.renderObject! as RenderParagraph;
+        final rect = paragraph.localToGlobal(Offset.zero) & paragraph.size;
+        paragraphLeft ??= rect.left;
+        paragraphWidth ??= rect.width;
+        expect(paragraph.textAlign, TextAlign.right);
+        expect(rect.left, closeTo(paragraphLeft, 0.01));
+        expect(rect.width, closeTo(paragraphWidth, 0.01));
+        expect(rect.top, closeTo(34, 0.01));
         expect(
           paragraph.localToGlobal(Offset(0, paragraph.size.height)).dy,
-          lessThanOrEqualTo(336.01),
+          lessThanOrEqualTo(320.01),
         );
       }
       final previous = offset;
@@ -366,7 +456,7 @@ void main() {
     'relative internal links decode paths and fragments without center tap',
     (tester) async {
       final book = await _encodedHrefBook();
-      expect(book.chapters[1].fileName, contains('second%20chapter.xhtml'));
+      expect(book.chapters[1].fileName, contains('second chapter.xhtml'));
       var centerTaps = 0;
       EpubLocation? latest;
       await tester.pumpWidget(
@@ -384,7 +474,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Open destination'));
+      await _tapFirstGlyph(tester, 'Open destination');
       await tester.pumpAndSettle();
       expect(centerTaps, 0);
       expect(latest!.chapterIndex, 1);
@@ -551,7 +641,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Open block link'));
+      await _tapFirstGlyph(tester, 'Open block link');
       await tester.pumpAndSettle();
       expect(_renderedText(tester), contains('BLOCK DESTINATION'));
     }
@@ -784,6 +874,804 @@ void main() {
       await tester.pumpAndSettle();
       expect(latest!.chapterIndex, 3);
       expect(_topVisibleText(tester), contains('FOURTH'));
+    },
+  );
+
+  testWidgets(
+    'table grid retains spans, borders and wrapped cells in both modes',
+    (tester) async {
+      const leftText = 'Left column text wraps over several readable lines.';
+      final book = _htmlBook(
+        '<table>'
+        '<tr><th colspan="2">Wide heading</th></tr>'
+        '<tr><td rowspan="2"><p>$leftText</p></td><td>Upper right</td></tr>'
+        '<tr><td>Lower right</td></tr>'
+        '</table>',
+      );
+      for (final mode in ReadingMode.values) {
+        await tester.pumpWidget(
+          _frame(
+            EpubNativeView(
+              key: ValueKey(mode),
+              epub: book,
+              settings: ReaderSettings(
+                readingMode: mode,
+                enableDualPageSpread: false,
+              ),
+              theme: ThemeData.dark(),
+            ),
+            size: const Size(600, 500),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final heading = _cellRect(tester, 'Wide heading');
+        final left = _cellRect(tester, leftText);
+        final upper = _cellRect(tester, 'Upper right');
+        final lower = _cellRect(tester, 'Lower right');
+        expect(heading.width, closeTo(left.width + upper.width, 0.01));
+        expect(left.top, closeTo(upper.top, 0.01));
+        expect(left.right, closeTo(upper.left, 0.01));
+        expect(upper.bottom, closeTo(lower.top, 0.01));
+        expect(left.height, closeTo(upper.height + lower.height, 0.01));
+        expect(
+          _paragraph(tester, leftText)
+              .getBoxesForSelection(
+                TextSelection(baseOffset: 0, extentOffset: leftText.length),
+              )
+              .length,
+          greaterThan(1),
+        );
+        final headingSpan =
+            _paragraph(
+                  tester,
+                  'Wide heading',
+                ).text.getSpanForPosition(const TextPosition(offset: 0))
+                as TextSpan;
+        expect(headingSpan.style?.fontWeight, FontWeight.bold);
+        final borders = tester
+            .widgetList<DecoratedBox>(
+              find.descendant(
+                of: find.byType(EpubNativeView),
+                matching: find.byType(DecoratedBox),
+              ),
+            )
+            .where((box) {
+              final decoration = box.decoration;
+              return decoration is BoxDecoration && decoration.border != null;
+            });
+        expect(borders, hasLength(4));
+      }
+    },
+  );
+
+  testWidgets(
+    'table pages cover every source cell without splitting rowspans',
+    (tester) async {
+      final expected = <String>[];
+      final rows = StringBuffer('<table>');
+      for (var group = 0; group < 10; group++) {
+        for (var row = 0; row < 3; row++) {
+          rows.write('<tr>');
+          if (row == 0) {
+            expected.add('GROUP $group');
+            rows.write('<td rowspan="3">GROUP $group</td>');
+          }
+          final label = 'ROW $group.$row';
+          expected.add(label);
+          rows.write('<td>$label</td></tr>');
+        }
+      }
+      rows.write('</table>');
+      var offset = -1;
+      await tester.pumpWidget(
+        _frame(
+          EpubNativeView(
+            epub: _htmlBook(rows.toString()),
+            settings: const ReaderSettings(
+              readingMode: ReadingMode.horizontal,
+              enableDualPageSpread: false,
+            ),
+            theme: ThemeData.dark(),
+            onLocationChanged: (location, _) => offset = location.charOffset,
+          ),
+          size: const Size(600, 360),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final actual = <String>[];
+      final pagesByLabel = <String, int>{};
+      var pageCount = 0;
+      for (var page = 0; page < 50; page++) {
+        pageCount++;
+        final labels = tester
+            .widgetList<RichText>(find.byType(RichText))
+            .map((text) => text.text.toPlainText())
+            .toList();
+        actual.addAll(labels);
+        for (final label in labels) {
+          pagesByLabel[label] = page;
+        }
+        final previous = offset;
+        await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+        await tester.pumpAndSettle();
+        if (offset == previous) break;
+      }
+      expect(pageCount, greaterThan(1));
+      expect(actual, expected);
+      for (var group = 0; group < 10; group++) {
+        for (var row = 0; row < 3; row++) {
+          expect(pagesByLabel['ROW $group.$row'], pagesByLabel['GROUP $group']);
+        }
+      }
+    },
+  );
+
+  testWidgets(
+    'oversized table cells scroll and their links reveal deep anchors',
+    (tester) async {
+      final key = GlobalKey<EpubNativeViewState>();
+      EpubLocation? latest;
+      await tester.pumpWidget(
+        _frame(
+          EpubNativeView(
+            key: key,
+            epub: _htmlBook(
+              '<table><tr><td><p>${'Tall cell content. ' * 100}</p>'
+              '<p id="deep">DEEP CELL</p></td>'
+              '<td><a href="#deep">Jump deep</a></td></tr></table>',
+            ),
+            settings: const ReaderSettings(
+              readingMode: ReadingMode.horizontal,
+              enableDualPageSpread: false,
+            ),
+            theme: ThemeData.dark(),
+            onLocationChanged: (location, _) => latest = location,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final scrollable = tester.state<ScrollableState>(
+        find.byType(Scrollable).first,
+      );
+      expect(scrollable.position.maxScrollExtent, greaterThan(400));
+      expect(tester.getTopLeft(find.text('DEEP CELL')).dy, greaterThan(400));
+      await tester.drag(
+        find.byType(SingleChildScrollView),
+        const Offset(0, -220),
+      );
+      await tester.pumpAndSettle();
+      expect(scrollable.position.pixels, greaterThan(0));
+      scrollable.position.jumpTo(0);
+      await tester.pumpAndSettle();
+      await _tapFirstGlyph(tester, 'Jump deep');
+      await tester.pumpAndSettle();
+      expect(latest!.anchor, 'deep');
+      expect(latest!.charOffset, greaterThan(500));
+      final target = tester.getRect(find.text('DEEP CELL'));
+      expect(target.top, greaterThanOrEqualTo(24));
+      expect(target.bottom, lessThanOrEqualTo(376.01));
+    },
+  );
+
+  testWidgets('rowspan cell selections and highlights retain source offsets', (
+    tester,
+  ) async {
+    String? selected;
+    EpubLocation? location;
+    await tester.pumpWidget(
+      _frame(
+        EpubNativeView(
+          epub: _htmlBook(
+            '<p>Before</p><table><tr>'
+            '<td rowspan="2"><p>Left heading</p><p>CHOSEN</p></td>'
+            '<td>Upper right</td></tr><tr><td>Lower right</td></tr></table>',
+          ),
+          settings: const ReaderSettings(),
+          theme: ThemeData.dark(),
+          highlights: const [
+            {
+              'chapterIndex': 0,
+              'startOffset': 18,
+              'endOffset': 24,
+              'color': '#FFEB3B',
+            },
+          ],
+          onTextSelected: (text, json) {
+            if (text.isNotEmpty) {
+              selected = text;
+              location = EpubLocation.fromJson(json);
+            }
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final paragraph = _paragraph(tester, 'CHOSEN');
+    var highlighted = false;
+    paragraph.text.visitChildren((span) {
+      if (span is TextSpan && span.style?.backgroundColor != null) {
+        highlighted = true;
+      }
+      return true;
+    });
+    expect(highlighted, isTrue);
+    final box = paragraph
+        .getBoxesForSelection(
+          const TextSelection(baseOffset: 0, extentOffset: 6),
+        )
+        .single;
+    final gesture = await tester.startGesture(
+      paragraph.localToGlobal(Offset(box.left + 1, (box.top + box.bottom) / 2)),
+      kind: PointerDeviceKind.mouse,
+    );
+    await gesture.moveTo(
+      paragraph.localToGlobal(
+        Offset(box.right - 1, (box.top + box.bottom) / 2),
+      ),
+    );
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(selected, 'CHOSEN');
+    expect(location!.startOffset, 18);
+    expect(location!.endOffset, 24);
+  });
+
+  testWidgets('linked SVG covers remain contained on their horizontal page', (
+    tester,
+  ) async {
+    EpubLocation? latest;
+    final bytes = Uint8List.fromList(
+      utf8.encode(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 900">'
+        '<rect width="300" height="900" fill="#ff0000"/></svg>',
+      ),
+    );
+    await tester.pumpWidget(
+      _frame(
+        EpubNativeView(
+          epub: _htmlBook(
+            '<a href="#end"><img src="../images/cover.svg"/></a>'
+            '<p id="end">END OF COVER</p>',
+            images: {'OEBPS/images/cover.svg': bytes},
+          ),
+          settings: const ReaderSettings(
+            readingMode: ReadingMode.horizontal,
+            enableDualPageSpread: false,
+          ),
+          theme: ThemeData.dark(),
+          onLocationChanged: (location, _) => latest = location,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final cover = tester.getRect(find.byType(SvgPicture));
+    expect(cover.top, greaterThanOrEqualTo(24));
+    expect(cover.bottom, lessThanOrEqualTo(376));
+    expect(cover.left, greaterThanOrEqualTo(0));
+    expect(cover.right, lessThanOrEqualTo(600));
+    await tester.tap(find.byType(SvgPicture));
+    await tester.pumpAndSettle();
+    expect(latest!.anchor, 'end');
+    expect(_renderedText(tester), contains('END OF COVER'));
+  });
+  testWidgets(
+    'escaped percent filenames and space filenames stay distinct in links',
+    (tester) async {
+      final book = ParsedEpub(
+        title: 'Distinct paths',
+        author: 'Lira',
+        chapters: [
+          EpubChapter(
+            title: 'Links',
+            fileName: 'OPS/chapter.xhtml',
+            htmlContent:
+                '<p><a href="figure%2520one.xhtml">Literal percent</a></p>'
+                '<p><a href="figure%20one.xhtml">Space</a></p>',
+          ),
+          EpubChapter(
+            title: 'Percent',
+            fileName: 'OPS/figure%20one.xhtml',
+            htmlContent: '<p>LITERAL PERCENT DOCUMENT</p>',
+          ),
+          EpubChapter(
+            title: 'Space',
+            fileName: 'OPS/figure one.xhtml',
+            htmlContent: '<p>SPACE DOCUMENT</p>',
+          ),
+        ],
+        toc: const [],
+        images: const {},
+      );
+      for (final mode in ReadingMode.values) {
+        final key = GlobalKey<EpubNativeViewState>();
+        EpubLocation? latest;
+        await tester.pumpWidget(
+          _frame(
+            EpubNativeView(
+              key: key,
+              epub: book,
+              settings: ReaderSettings(
+                readingMode: mode,
+                enableDualPageSpread: false,
+              ),
+              theme: ThemeData.light(),
+              onLocationChanged: (value, _) => latest = value,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await _tapFirstGlyph(tester, 'Literal percent');
+        await tester.pumpAndSettle();
+        expect(latest!.chapterIndex, 1);
+        expect(_renderedText(tester), contains('LITERAL PERCENT DOCUMENT'));
+        key.currentState!.goToLocation(
+          EpubLocation.fromPosition(chapterIndex: 0),
+        );
+        await tester.pumpAndSettle();
+        await _tapFirstGlyph(tester, 'Space');
+        await tester.pumpAndSettle();
+        expect(latest!.chapterIndex, 2);
+        expect(_renderedText(tester), contains('SPACE DOCUMENT'));
+      }
+    },
+  );
+
+  testWidgets(
+    'upper-right cell selection uses geometry while copied ranges use source order',
+    (tester) async {
+      final book = _htmlBook(
+        '<p>Before</p><table><tr>'
+        '<td rowspan="2"><p>Left heading</p><p>SECOND LEFT</p></td>'
+        '<td>UPPER RIGHT</td></tr><tr><td>LOWER RIGHT</td></tr></table>',
+      );
+      for (final mode in ReadingMode.values) {
+        String? selected;
+        EpubLocation? location;
+        await tester.pumpWidget(
+          _frame(
+            EpubNativeView(
+              key: ValueKey(mode),
+              epub: book,
+              settings: ReaderSettings(
+                readingMode: mode,
+                enableDualPageSpread: false,
+              ),
+              theme: ThemeData.dark(),
+              onTextSelected: (text, json) {
+                if (text.isEmpty) return;
+                selected = text;
+                location = EpubLocation.fromJson(json);
+              },
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await _selectTextRange(tester, 'UPPER RIGHT', 'UPPER RIGHT');
+        final rightStart = 'BeforeLeft headingSECOND LEFT'.length;
+        expect(selected, 'UPPER RIGHT', reason: '$mode');
+        expect(location!.startOffset, rightStart);
+        expect(location!.endOffset, rightStart + 'UPPER RIGHT'.length);
+        await _selectTextRange(tester, 'Left heading', 'UPPER RIGHT');
+        expect(selected, 'Left headingSECOND LEFTUPPER RIGHT');
+        expect(location!.startOffset, 'Before'.length);
+        expect(location!.endOffset, rightStart + 'UPPER RIGHT'.length);
+      }
+    },
+  );
+
+  testWidgets(
+    'manual oversized-page scrolling survives reflow, resize, modes and reopening',
+    (tester) async {
+      final text = List.generate(
+        300,
+        (i) => '[${i.toString().padLeft(4, '0')}] sample ',
+      ).join();
+      final book = _htmlBook(
+        '<table><tr><td><p>$text</p></td><td>SIDE CELL</td></tr></table>',
+      );
+      var settings = const ReaderSettings(
+        readingMode: ReadingMode.horizontal,
+        enableDualPageSpread: false,
+      );
+      var size = const Size(600, 400);
+      var readerId = 0;
+      EpubLocation? initial;
+      EpubLocation? latest;
+      late StateSetter rebuild;
+      await tester.pumpWidget(
+        StatefulBuilder(
+          builder: (context, setState) {
+            rebuild = setState;
+            return _frame(
+              EpubNativeView(
+                key: ValueKey(readerId),
+                epub: book,
+                initialLocation: initial,
+                settings: settings,
+                theme: ThemeData.dark(),
+                onLocationChanged: (location, _) => latest = location,
+              ),
+              size: size,
+            );
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.drag(
+        find.byType(SingleChildScrollView),
+        const Offset(0, -600),
+      );
+      await tester.pumpAndSettle();
+      final saved = latest!;
+      expect(saved.hasExactCharOffset, isTrue);
+      expect(saved.charOffset, greaterThan(100));
+      final marker = RegExp(
+        r'\[\d{4}\]',
+      ).firstMatch(text.substring(saved.charOffset))!.group(0)!;
+      expect(_topVisibleText(tester), contains(marker));
+      rebuild(() {
+        initial = EpubLocation.fromJson(saved.toJson());
+        readerId++;
+      });
+      await tester.pumpAndSettle();
+      expect(_topVisibleText(tester), contains(marker));
+      rebuild(
+        () => settings = settings.copyWith(fontSize: 23, lineHeight: 1.8),
+      );
+      await tester.pumpAndSettle();
+      expect(_topVisibleText(tester), contains(marker));
+      rebuild(() => size = const Size(700, 400));
+      await tester.pumpAndSettle();
+      expect(_topVisibleText(tester), contains(marker));
+      rebuild(
+        () => settings = settings.copyWith(readingMode: ReadingMode.vertical),
+      );
+      await tester.pumpAndSettle();
+      expect(_topVisibleText(tester), contains(marker));
+      rebuild(
+        () => settings = settings.copyWith(readingMode: ReadingMode.horizontal),
+      );
+      await tester.pumpAndSettle();
+      expect(_topVisibleText(tester), contains(marker));
+    },
+  );
+
+  testWidgets('table rows use constrained SVG and cached raster aspect ratios', (
+    tester,
+  ) async {
+    final wideRaster = await tester.runAsync(() => _rasterBytes(8, 1));
+    final portraitRaster = await tester.runAsync(() => _rasterBytes(1, 8));
+    for (final mode in ReadingMode.values) {
+      for (final svg in [true, false]) {
+        final heights = <double>[];
+        for (final portrait in [false, true]) {
+          final bytes = svg
+              ? Uint8List.fromList(
+                  utf8.encode(
+                    '<svg xmlns="http://www.w3.org/2000/svg" '
+                    'viewBox="0 0 ${portrait ? 100 : 800} ${portrait ? 800 : 100}">'
+                    '<rect width="100%" height="100%" fill="red"/></svg>',
+                  ),
+                )
+              : (portrait ? portraitRaster! : wideRaster!);
+          final path = 'OEBPS/images/figure.${svg ? 'svg' : 'png'}';
+          await tester.pumpWidget(
+            _frame(
+              EpubNativeView(
+                key: ValueKey((mode, svg, portrait)),
+                epub: _htmlBook(
+                  '<table><tr><td><img src="../images/${path.split('/').last}"/>'
+                  '</td><td>IMAGE ROW</td></tr></table>'
+                  '<p>AFTER IMAGE</p>',
+                  images: {path: bytes},
+                ),
+                settings: ReaderSettings(
+                  readingMode: mode,
+                  enableDualPageSpread: false,
+                ),
+                theme: ThemeData.dark(),
+              ),
+            ),
+          );
+          if (!svg) {
+            await tester.runAsync(
+              () => precacheImage(
+                MemoryImage(bytes),
+                tester.element(find.byType(EpubNativeView)),
+              ),
+            );
+          }
+          await tester.pumpAndSettle();
+          heights.add(_cellRect(tester, 'IMAGE ROW').height);
+          if (!portrait) {
+            expect(heights.last, lessThan(140));
+            final after = tester.getRect(find.text('AFTER IMAGE'));
+            expect(after.top, greaterThanOrEqualTo(24));
+            expect(after.bottom, lessThanOrEqualTo(376));
+          }
+        }
+        expect(heights.first, lessThan(heights.last / 2));
+      }
+    }
+  });
+
+  testWidgets(
+    'raster SVG covers retain their viewport ratio inside table cells',
+    (tester) async {
+      final raster = (await tester.runAsync(() => _rasterBytes(1, 8)))!;
+      final svg = utf8.encode(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200">'
+        '<image href="portrait.png" width="400" height="200"/></svg>',
+      );
+      for (final mode in ReadingMode.values) {
+        await tester.pumpWidget(
+          _frame(
+            EpubNativeView(
+              key: ValueKey(mode),
+              epub: _htmlBook(
+                '<table><tr><td><img src="../images/cover.svg"/></td>'
+                '<td>VIEWPORT ROW</td></tr></table><p>AFTER VIEWPORT</p>',
+                images: {
+                  'OEBPS/images/cover.svg': svg,
+                  'OEBPS/images/portrait.png': raster,
+                },
+              ),
+              settings: ReaderSettings(
+                readingMode: mode,
+                enableDualPageSpread: false,
+              ),
+              theme: ThemeData.light(),
+            ),
+          ),
+        );
+        await tester.runAsync(
+          () => precacheImage(
+            MemoryImage(raster),
+            tester.element(find.byType(EpubNativeView)),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final row = _cellRect(tester, 'VIEWPORT ROW');
+        expect(row.height, closeTo(172, 0.1));
+        expect(
+          tester.getRect(find.text('AFTER VIEWPORT')).bottom,
+          lessThan(376),
+        );
+      }
+    },
+  );
+
+  testWidgets(
+    'late raster dimensions repaginate without losing a restored text target',
+    (tester) async {
+      final bytes = (await tester.runAsync(() => _rasterBytes(16, 1)))!;
+      final book = _htmlBook(
+        '<table><tr><td><img src="../images/wide.png"/></td>'
+        '<td>RASTER ROW</td></tr></table><p id="after">AFTER RASTER</p>',
+        images: {'OEBPS/images/wide.png': bytes},
+      );
+      final leaves = contentLeaves(
+        XhtmlParser(
+          html: book.chapters.single.htmlContent,
+          images: book.images,
+          documentPath: book.chapters.single.fileName,
+          baseStyle: const TextStyle(fontSize: 18),
+        ).parse(),
+      );
+      final offset = leaves.whereType<TextBlock>().last.charStart;
+      EpubLocation? latest;
+      await tester.pumpWidget(
+        _frame(
+          EpubNativeView(
+            epub: book,
+            initialLocation: EpubLocation.fromPosition(
+              chapterIndex: 0,
+              charOffset: offset,
+              hasExactCharOffset: true,
+            ),
+            settings: const ReaderSettings(
+              readingMode: ReadingMode.horizontal,
+              enableDualPageSpread: false,
+            ),
+            theme: ThemeData.dark(),
+            onLocationChanged: (value, _) => latest = value,
+          ),
+        ),
+      );
+      await tester.runAsync(
+        () => precacheImage(
+          MemoryImage(bytes),
+          tester.element(find.byType(EpubNativeView)),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(latest!.charOffset, offset);
+      expect(_cellRect(tester, 'RASTER ROW').height, lessThan(140));
+      final target = tester.getRect(find.text('AFTER RASTER'));
+      expect(target.top, greaterThanOrEqualTo(24));
+      expect(target.bottom, lessThanOrEqualTo(376));
+    },
+  );
+
+  testWidgets(
+    'linked cover padding and contained-image gutters do not activate links',
+    (tester) async {
+      final raster = (await tester.runAsync(() => _rasterBytes(1, 3)))!;
+      for (final svg in [true, false]) {
+        var centerTaps = 0;
+        EpubLocation? latest;
+        final bytes = svg
+            ? Uint8List.fromList(
+                utf8.encode(
+                  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 900">'
+                  '<rect width="300" height="900" fill="red"/></svg>',
+                ),
+              )
+            : raster;
+        final path = 'cover.${svg ? 'svg' : 'png'}';
+        await tester.pumpWidget(
+          _frame(
+            EpubNativeView(
+              key: ValueKey(svg),
+              epub: ParsedEpub(
+                title: 'Cover gutters',
+                author: 'Lira',
+                chapters: [
+                  EpubChapter(
+                    title: 'Cover',
+                    fileName: 'cover.xhtml',
+                    htmlContent:
+                        '<a href="target.xhtml"><img src="$path"/></a>',
+                  ),
+                  EpubChapter(
+                    title: 'Next',
+                    fileName: 'next.xhtml',
+                    htmlContent: '<p>NEXT PAGE</p>',
+                  ),
+                  EpubChapter(
+                    title: 'Link target',
+                    fileName: 'target.xhtml',
+                    htmlContent: '<p>LINK TARGET</p>',
+                  ),
+                ],
+                toc: const [],
+                images: {path: bytes},
+              ),
+              settings: const ReaderSettings(
+                readingMode: ReadingMode.horizontal,
+                enableDualPageSpread: false,
+              ),
+              theme: ThemeData.dark(),
+              onCenterTapped: () => centerTaps++,
+              onLocationChanged: (value, _) => latest = value,
+            ),
+          ),
+        );
+        if (!svg) {
+          await tester.runAsync(
+            () => precacheImage(
+              MemoryImage(bytes),
+              tester.element(find.byType(EpubNativeView)),
+            ),
+          );
+        }
+        await tester.pumpAndSettle();
+        await tester.tapAt(const Offset(300, 25));
+        await tester.pumpAndSettle();
+        expect(centerTaps, 1);
+        expect(latest!.chapterIndex, 0);
+        await tester.tapAt(const Offset(550, 180));
+        await tester.pumpAndSettle();
+        expect(latest!.chapterIndex, 1);
+        expect(_renderedText(tester), contains('NEXT PAGE'));
+        expect(_renderedText(tester), isNot(contains('LINK TARGET')));
+      }
+    },
+  );
+
+  testWidgets(
+    'terminal anchors reveal the final caret inside an oversized table row',
+    (tester) async {
+      final text = '${'Tall terminal content. ' * 120}TERMINAL WORD';
+      EpubLocation? latest;
+      await tester.pumpWidget(
+        _frame(
+          EpubNativeView(
+            epub: _htmlBook(
+              '<table><tr><td><a href="#terminal">Jump terminal</a></td>'
+              '<td><p>$text<span id="terminal"></span></p></td>'
+              '</tr></table>',
+            ),
+            settings: const ReaderSettings(
+              readingMode: ReadingMode.horizontal,
+              enableDualPageSpread: false,
+            ),
+            theme: ThemeData.dark(),
+            onLocationChanged: (value, _) => latest = value,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _tapFirstGlyph(tester, 'Jump terminal');
+      await tester.pumpAndSettle();
+      expect(latest!.charOffset, 'Jump terminal'.length + text.length);
+      final paragraph = _paragraph(tester, text);
+      final last = paragraph
+          .getBoxesForSelection(
+            TextSelection(
+              baseOffset: text.length - 'TERMINAL WORD'.length,
+              extentOffset: text.length,
+            ),
+          )
+          .last
+          .toRect();
+      final top = paragraph.localToGlobal(last.topLeft).dy;
+      final bottom = paragraph.localToGlobal(last.bottomRight).dy;
+      expect(top, greaterThanOrEqualTo(24));
+      expect(bottom, lessThanOrEqualTo(376));
+    },
+  );
+
+  testWidgets(
+    'escaped package TOC locators distinguish percent and space filenames',
+    (tester) async {
+      final book = ParsedEpub(
+        title: 'TOC paths',
+        author: 'Lira',
+        chapters: [
+          EpubChapter(
+            title: 'Start',
+            fileName: 'OPS/start.xhtml',
+            htmlContent: '<p>START</p>',
+          ),
+          EpubChapter(
+            title: 'Percent',
+            fileName: 'OPS/figure%20one.xhtml',
+            htmlContent: '<p>LITERAL PERCENT DOCUMENT</p>',
+          ),
+          EpubChapter(
+            title: 'Space',
+            fileName: 'OPS/figure one.xhtml',
+            htmlContent: '<p>SPACE DOCUMENT</p>',
+          ),
+        ],
+        toc: const [],
+        images: const {},
+      );
+      for (final mode in ReadingMode.values) {
+        final key = GlobalKey<EpubNativeViewState>();
+        EpubLocation? latest;
+        await tester.pumpWidget(
+          _frame(
+            EpubNativeView(
+              key: key,
+              epub: book,
+              settings: ReaderSettings(
+                readingMode: mode,
+                enableDualPageSpread: false,
+              ),
+              theme: ThemeData.dark(),
+              onLocationChanged: (value, _) => latest = value,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        for (final index in [2, 1]) {
+          key.currentState!.scrollToChapter(
+            Uri(
+              pathSegments: book.chapters[index].fileName.split('/'),
+            ).toString(),
+          );
+          await tester.pumpAndSettle();
+          expect(latest!.chapterIndex, index);
+          expect(
+            _renderedText(tester),
+            contains(
+              index == 1 ? 'LITERAL PERCENT DOCUMENT' : 'SPACE DOCUMENT',
+            ),
+          );
+        }
+      }
     },
   );
 }

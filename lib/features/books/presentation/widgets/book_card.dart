@@ -1,8 +1,10 @@
 import 'dart:io';
-import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_tokens.dart';
+import '../../../../core/widgets/app_components.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../domain/models/book_dto.dart';
 
 class BookCard extends StatelessWidget {
@@ -19,149 +21,80 @@ class BookCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-      onTap: onTap,
-      onLongPress: () {
-        showDialog(
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    return Tooltip(
+      message: '${book.title}\n${book.author}',
+      child: AppSurface(
+        padding: EdgeInsets.zero,
+        radius: AppRadius.md,
+        onTap: onTap,
+        onLongPress: () => showAppDialog<void>(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Delete Book'),
-            content: Text('Are you sure you want to delete ${book.title}?'),
+          builder: (dialogContext) => AlertDialog(
+            title: Text(l10n.deleteBook),
+            content: Text(l10n.deleteBookConfirm(book.title)),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
+                onPressed: () => Navigator.pop(dialogContext),
+                child: Text(l10n.cancel),
               ),
               TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: theme.colorScheme.error,
+                ),
                 onPressed: () {
-                  Navigator.pop(context);
+                  Navigator.pop(dialogContext);
                   onDelete();
                 },
-                child: const Text(
-                  'Delete',
-                  style: TextStyle(color: Colors.red),
-                ),
+                child: Text(l10n.delete),
               ),
             ],
           ),
-        );
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: Theme.of(context).brightness == Brightness.dark
-              ? [
-                  BoxShadow(
-                    color: Theme.of(context).colorScheme.primary.withAlpha(40),
-                    blurRadius: 16,
-                    spreadRadius: -2,
-                    offset: const Offset(0, 4),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: _buildCover(context)),
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.compact),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    book.title.trim(),
+                    style: theme.textTheme.titleSmall,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ]
-              : [
-                  BoxShadow(
-                    color: Colors.black.withAlpha(20),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    book.author.trim(),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  BoxShadow(
-                    color: Theme.of(context).colorScheme.primary.withAlpha(10),
-                    blurRadius: 20,
-                    spreadRadius: 2,
+                  const SizedBox(height: AppSpacing.compact),
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.xs,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      AppBadge(label: book.format.toUpperCase()),
+                      if (book.pageCount > 0)
+                        Text(
+                          '${l10n.pages}: ${book.pageCount}',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                    ],
                   ),
                 ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            color: Theme.of(context).colorScheme.surface,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Cover — fixed 3:4 aspect ratio
-                AspectRatio(aspectRatio: 3 / 4, child: _buildCover(context)),
-                // Info section
-                _buildInfoSection(context),
-              ],
-            ),
-          ),
-        ),
-      ),
-    ),
-    );
-  }
-
-  Widget _buildInfoSection(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      child: DefaultTextStyle(
-        style: DefaultTextStyle.of(context).style,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Title - 1 line with ellipsis
-            Text(
-              book.title.trim(),
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-                height: 1.2,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 2),
-            // Author - 1 line with ellipsis
-            Text(
-              book.author.trim(),
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: Colors.grey, fontSize: 11),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 4),
-            // Bottom row: page count (left) and format badge (right)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                // Left side: Page count if available
-                if (book.pageCount > 0)
-                  Text(
-                    '${book.pageCount} p.',
-                    style: const TextStyle(
-                      fontSize: 9,
-                      color: Colors.grey,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  )
-                else
-                  const SizedBox.shrink(),
-
-                // Right side: Format badge
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary.withAlpha(30),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    book.format.toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 9,
-                      color: Theme.of(context).colorScheme.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
             ),
           ],
         ),
@@ -170,91 +103,60 @@ class BookCard extends StatelessWidget {
   }
 
   Widget _buildCover(BuildContext context) {
-    if (book.coverUrl != null &&
-        book.coverUrl!.isNotEmpty &&
-        File(book.coverUrl!).existsSync()) {
-      // Fill the entire area with the cover, using a blurred background
-      // to hide cropped edges gracefully
-      // Use errorBuilder to show fallback if image fails to decode
-      final image = Image.file(
-        File(book.coverUrl!),
-        fit: BoxFit.cover,
-        alignment: Alignment.center,
-        errorBuilder: (context, error, stackTrace) {
-          return _buildFormatFallback();
-        },
-      );
-
-      return Stack(
-        fit: StackFit.expand,
-        children: [
-          // Blurred background — creates a nice glow effect
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            child: ImageFiltered(
-              imageFilter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-              child: image,
-            ),
+    final path = book.coverUrl;
+    if (path != null && path.isNotEmpty) {
+      return ColoredBox(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          child: Image.file(
+            File(path),
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) =>
+                _buildFormatFallback(context),
           ),
-          // Main image with subtle shadow for depth
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha(60),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: image,
-              ),
-            ),
-          ),
-        ],
+        ),
       );
     }
-
-    return _buildFormatFallback();
+    return _buildFormatFallback(context);
   }
 
-  Widget _buildFormatFallback() {
-    final isEpub = book.format.toLowerCase() == 'epub';
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isEpub
-              ? [const Color(0xFF1B3A4B), const Color(0xFF0D253F)]
-              : [const Color(0xFF3B1B2E), const Color(0xFF2D1426)],
-        ),
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isEpub ? Icons.auto_stories : Icons.picture_as_pdf,
-              size: 48,
-              color: isEpub ? const Color(0xFF64B5F6) : const Color(0xFFEF9A9A),
+  Widget _buildFormatFallback(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return ColoredBox(
+      color: colors.surfaceContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border(
+              left: BorderSide(color: colors.outlineVariant, width: 3),
+              top: BorderSide(color: colors.outlineVariant),
+              bottom: BorderSide(color: colors.outlineVariant),
             ),
-            const SizedBox(height: 8),
-            Text(
-              book.format.toUpperCase(),
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: isEpub
-                    ? const Color(0xFF64B5F6)
-                    : const Color(0xFFEF9A9A),
-              ),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  book.format.toLowerCase() == 'epub'
+                      ? Icons.auto_stories_outlined
+                      : Icons.description_outlined,
+                  size: 36,
+                  color: colors.secondary,
+                ),
+                const SizedBox(height: AppSpacing.compact),
+                Text(
+                  book.format.toUpperCase(),
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
