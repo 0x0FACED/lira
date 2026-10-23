@@ -1,5 +1,5 @@
 name: epub_engine
-description: "EPUB rendering engine for Lira using epubx + flutter_widget_from_html"
+description: "Native Flutter EPUB rendering engine for Lira"
 version: 0.0.2
 homepage:
 
@@ -10,19 +10,13 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  epubx: ^4.0.0
-  flutter_widget_from_html: ^0.15.2
   scrollable_positioned_list: ^0.3.8
   archive: ^3.6.1
   html: ^0.15.5
   xml: ^6.5.0
   freezed_annotation: ^3.1.0
   json_annotation: ^4.9.0
-  webview_flutter: ^4.13.1
-  shelf: ^1.4.2
-  shelf_static: ^1.1.3
-  path_provider: ^2.1.5
-  webview_flutter_android: ^4.10.13
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

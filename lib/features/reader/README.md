@@ -1,16 +1,31 @@
-# Lira Reader Feature Module
+# Lira Reader Module
 
-Этот модуль отвечает за рендеринг книг в различных форматах.
+Общий экран чтения EPUB/PDF. Актуальная архитектура и сценарии проверки — в [`READER.md`](../../../READER.md).
 
-## Архитектура движков (BookReaderEngine)
+## Ответственность
 
-Для поддержки мультиформатности используется единый интерфейс `BookReaderEngine`. 
-Различные реализации движков (экранов чтения) инкапсулируют логику внешней библиотеки:
+- `ReaderScreen`: загрузка локального файла, lifecycle, панели, TOC, настройки, сохранение progress/highlights/notes.
+- `BookReaderEngine`: выбор содержимого и навигация через непрозрачный `BookLocation.locator`.
+- `EpubBookReaderEngine`: нативный Flutter renderer из `packages/epub_engine`.
+- `PdfBookReaderEngine`: `pdfrx` viewer из `packages/pdf_engine`.
 
-- `EpubBookReaderEngine` — использует независимый локальный пакет `packages/epub_engine` (основа: `epub_view`).
-- `PdfBookReaderEngine` — использует независимый локальный пакет `packages/pdf_engine` (основа: `pdfx`).
+`initialLocation` — начальное состояние, не команда навигации при каждой записи в БД. После открытия переходы выполняются через `goToLocation`. Асинхронная загрузка старой книги не может подменить новую; движок освобождается при ошибке/закрытии.
 
-Оба движка преобразуют события и местоположение (`cfi` для epub, номер страницы для pdf) в общую абстракцию `BookLocation`.
+## Координаты
 
-## Пакеты
-Исходный код оберток над виджетами рендеринга изолирован в соответствующих пакетах в корне проекта `packages/`. Они не зависят от бизнес-логики Lira, а Lira зависит от них.
+**EPUB:** собственный JSON `EpubLocation`/`EpubCfi`. В `v:2` поле `c` означает точный UTF-16 offset разобранного содержимого; unversioned записи читаются с legacy-семантикой. Это не стандартная EPUB CFI-строка.
+
+**PDF:** старый строковый номер страницы для progress; versioned `PdfReaderLocation` с page ranges и PDF rectangles для selection/highlights.
+
+`ReaderScreen` передаёт движкам:
+
+- EPUB highlights: `{highlightId, chapterIndex, startOffset, endOffset, color}`;
+- PDF highlights: `{highlightId, location, color}`, где декодирование location принадлежит PDF-пакету.
+
+Общий интерфейс не должен интерпретировать PDF rectangles или EPUB HTML.
+
+## Сохранение
+
+`ReadingProgressController` объединяет частые события, сериализует записи и предоставляет `flush()`. Экран вызывает его перед явным Back и при lifecycle/disposal. Окончание старой записи не очищает более новую pending-позицию. Ошибки хранения не маскируются успешным сохранением.
+
+Выделение очищается после успешной записи, а не до неё. Текст для заметки фиксируется перед открытием диалога. При смене книги async close/highlight операции ограничены поколением загрузки и исходным route.

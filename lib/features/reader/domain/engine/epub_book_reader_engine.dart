@@ -16,23 +16,8 @@ class EpubBookReaderEngine implements BookReaderEngine {
 
   @override
   Future<void> loadBook(Uint8List bookData) async {
-    try {
-      _epub = await EpubParser.parse(bookData);
-    } catch (e) {
-      _epub = ParsedEpub(
-        title: 'Error',
-        author: 'Unknown',
-        chapters: [
-          EpubChapter(
-            title: 'Error loading EPUB',
-            htmlContent: '<p>Failed to parse this EPUB file: $e</p>',
-            fileName: 'error',
-          ),
-        ],
-        toc: [],
-        images: {},
-      );
-    }
+    _epub = null;
+    _epub = await EpubParser.parse(bookData);
   }
 
   @override
@@ -90,5 +75,7 @@ class EpubBookReaderEngine implements BookReaderEngine {
   }
 
   @override
-  void dispose() {}
+  void dispose() {
+    _epub = null;
+  }
 }

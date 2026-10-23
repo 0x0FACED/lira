@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/di/injection.dart';
@@ -19,16 +20,29 @@ class ReadingProgressController
   late final ReadingProgressLocalRepository _repository;
   Timer? _debounceTimer;
   ReadingProgressDto? _pendingProgress;
+  Future<void>? _writeFuture;
+  bool _disposed = false;
 
   @override
   FutureOr<ReadingProgressDto?> build(String arg) async {
     _repository = getIt<ReadingProgressLocalRepository>();
     ref.onDispose(() {
+      _disposed = true;
       _debounceTimer?.cancel();
-      final pendingProgress = _pendingProgress;
-      if (pendingProgress != null) {
-        unawaited(_repository.saveProgress(pendingProgress));
-      }
+      unawaited(
+        flush().catchError((Object error, StackTrace stack) {
+          FlutterError.reportError(
+            FlutterErrorDetails(
+              exception: error,
+              stack: stack,
+              library: 'Lira progress',
+              context: ErrorDescription(
+                'while flushing a disposed progress controller',
+              ),
+            ),
+          );
+        }),
+      );
     });
     return _repository.getProgress(arg);
   }
@@ -46,13 +60,54 @@ class ReadingProgressController
     );
     _pendingProgress = progress;
 
-    _debounceTimer = Timer(const Duration(seconds: 1), () async {
-      final pendingProgress = _pendingProgress;
-      if (pendingProgress == null) return;
-
-      await _repository.saveProgress(pendingProgress);
-      state = AsyncValue.data(pendingProgress);
-      _pendingProgress = null;
+    _debounceTimer = Timer(const Duration(seconds: 1), () {
+      unawaited(
+        flush().catchError((Object error, StackTrace stack) {
+          if (!_disposed) {
+            state = AsyncValue<ReadingProgressDto?>.error(error, stack)
+                .copyWithPrevious(
+                  AsyncValue.data(_pendingProgress ?? state.valueOrNull),
+                );
+          }
+        }),
+      );
     });
+  }
+
+  /// Persists the latest position before leaving or suspending the reader.
+  /// Writes are serialized so a slow older write cannot overwrite a newer one.
+  Future<void> flush() async {
+    _debounceTimer?.cancel();
+    _debounceTimer = null;
+    while (true) {
+      final inFlight = _writeFuture;
+      if (inFlight != null) {
+        await inFlight;
+        continue;
+      }
+      if (_pendingProgress == null) return;
+
+      final write = _persistPending();
+      _writeFuture = write;
+      try {
+        await write;
+      } finally {
+        _writeFuture = null;
+      }
+    }
+  }
+
+  Future<void> _persistPending() async {
+    while (_pendingProgress != null) {
+      final progress = _pendingProgress!;
+      _pendingProgress = null;
+      try {
+        await _repository.saveProgress(progress);
+      } catch (_) {
+        _pendingProgress ??= progress;
+        rethrow;
+      }
+      if (!_disposed) state = AsyncValue.data(progress);
+    }
   }
 }

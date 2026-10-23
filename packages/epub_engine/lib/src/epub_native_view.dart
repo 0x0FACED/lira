@@ -4,8 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart'
-    show SelectedContent, SelectedContentRange;
+    show RenderObject, RenderParagraph, SelectedContent, SelectedContentRange;
 import 'package:flutter/services.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'epub_parser.dart';
 import 'models/reader_settings.dart';
@@ -25,18 +27,83 @@ class _PageInfo {
     required this.elements,
     required this.isChapterStart,
   });
+
+  int get charStart => elements.first.charStart;
+  int get charEnd => elements.last.charEnd;
 }
 
 class _SelectionScopeData {
   final SelectionListenerNotifier notifier;
   int chapterIndex;
   List<ContentElement> elements;
+  final Map<int, GlobalKey> textKeys = {};
+  final Map<int, GlobalKey> elementKeys = {};
+  final Map<int, int> textEnds = {};
 
   _SelectionScopeData({
     required this.notifier,
     required this.chapterIndex,
     required this.elements,
   });
+}
+
+/// A positioned-list jump can mount two copies of one chapter during a frame.
+/// Render keys and selection notifiers belong to each mounted copy.
+class _MountedContentScope extends StatefulWidget {
+  final int chapterIndex;
+  final List<ContentElement> elements;
+  final ValueChanged<_SelectionScopeData> onMount;
+  final ValueChanged<_SelectionScopeData> onUnmount;
+  final Widget Function(_SelectionScopeData) builder;
+
+  const _MountedContentScope({
+    required this.chapterIndex,
+    required this.elements,
+    required this.onMount,
+    required this.onUnmount,
+    required this.builder,
+  });
+
+  @override
+  State<_MountedContentScope> createState() => _MountedContentScopeState();
+}
+
+class _MountedContentScopeState extends State<_MountedContentScope> {
+  late final _SelectionScopeData scope;
+
+  @override
+  void initState() {
+    super.initState();
+    scope = _SelectionScopeData(
+      notifier: SelectionListenerNotifier(),
+      chapterIndex: widget.chapterIndex,
+      elements: widget.elements,
+    );
+    widget.onMount(scope);
+  }
+
+  @override
+  void didUpdateWidget(covariant _MountedContentScope oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.chapterIndex != widget.chapterIndex ||
+        !identical(oldWidget.elements, widget.elements)) {
+      scope.textKeys.clear();
+      scope.elementKeys.clear();
+      scope.textEnds.clear();
+    }
+    scope.chapterIndex = widget.chapterIndex;
+    scope.elements = widget.elements;
+  }
+
+  @override
+  void dispose() {
+    widget.onUnmount(scope);
+    scope.notifier.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(scope);
 }
 
 /// Native Flutter EPUB reader view — no WebView.
@@ -82,18 +149,29 @@ class EpubNativeViewState extends State<EpubNativeView> {
   // Parsed content per chapter (lazy, cached)
   final Map<int, List<ContentElement>> _parsedChapters = {};
 
-  // Scroll controller for vertical mode
-  final ScrollController _scrollController = ScrollController();
-  final Map<String, _SelectionScopeData> _selectionScopes = {};
+  final ItemScrollController _itemScrollController = ItemScrollController();
+  final ScrollOffsetController _scrollOffsetController =
+      ScrollOffsetController();
+  final GlobalKey _viewportKey = GlobalKey();
+  final Map<int, List<HighlightRange>> _highlightsByChapter = {};
+  List<int>? _bookOffsets;
+  final Map<int, Map<String, int>> _chapterAnchors = {};
+  final Map<int, List<ContentLink>> _chapterLinks = {};
+  final Set<_SelectionScopeData> _selectionScopes = {};
 
   // Horizontal mode pagination state
   List<_PageInfo> _paginatedPages = [];
   int _currentPageIndex = 0;
   bool _isDualPage = false;
   Size? _lastPaginationSize;
-  double? _lastVerticalContentWidth;
-  List<double>? _verticalChapterOffsets;
-  List<double>? _verticalChapterHeights;
+  Size? _lastViewportSize;
+  EpubLocation? _logicalLocation;
+  EpubLocation? _pendingRestore;
+  bool _restoreScheduled = false;
+  bool _restoring = false;
+  bool _scrollReportScheduled = false;
+  ContentLink? _pointerDownLink;
+  int? _pointerDownLinkChapter;
 
   // Available page height for constraining images in horizontal mode
   double _currentPageHeight = 0;
@@ -111,13 +189,16 @@ class EpubNativeViewState extends State<EpubNativeView> {
   DateTime? _lastScrollTime;
   DateTime? _lastTrackpadPageTurnTime;
 
-  bool _didRestoreInitialLocation = false;
+  int _layoutGeneration = 0;
   bool _hasActiveSelection = false;
 
   @override
   void initState() {
     super.initState();
-    _scrollController.addListener(_onScroll);
+    _pendingRestore =
+        widget.initialLocation ??
+        EpubLocation.fromPosition(chapterIndex: 0, hasExactCharOffset: true);
+    _readHighlights();
 
     if (widget.epub.chapters.isNotEmpty) {
       _parseChapter(0);
@@ -127,6 +208,7 @@ class EpubNativeViewState extends State<EpubNativeView> {
   @override
   void didUpdateWidget(covariant EpubNativeView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!listEquals(oldWidget.highlights, widget.highlights)) _readHighlights();
     final needsReparse =
         oldWidget.epub != widget.epub ||
         oldWidget.settings.fontFamily != widget.settings.fontFamily ||
@@ -142,38 +224,73 @@ class EpubNativeViewState extends State<EpubNativeView> {
         oldWidget.settings.enableDualPageSpread !=
             widget.settings.enableDualPageSpread;
 
+    if (oldWidget.epub != widget.epub) {
+      _bookOffsets = null;
+      _logicalLocation = null;
+      _pendingRestore =
+          widget.initialLocation ??
+          EpubLocation.fromPosition(chapterIndex: 0, hasExactCharOffset: true);
+      _chapterAnchors.clear();
+      _chapterLinks.clear();
+    } else if (needsRepagination) {
+      _pendingRestore ??= _captureLocation(oldWidget.settings.readingMode);
+    }
     if (needsReparse) {
       _parsedChapters.clear();
-      _invalidateVerticalMetrics();
+      _chapterAnchors.clear();
+      _chapterLinks.clear();
     }
     if (needsRepagination) {
+      _hasActiveSelection = false;
       _paginatedPages.clear();
       _lastPaginationSize = null;
-      final staleScopeIds = _selectionScopes.keys.toList(growable: false);
-      for (final scopeId in staleScopeIds) {
-        _selectionScopes.remove(scopeId)?.notifier.dispose();
-      }
-    }
-    if (oldWidget.settings.horizontalPadding !=
-            widget.settings.horizontalPadding ||
-        oldWidget.settings.readingMode != widget.settings.readingMode) {
-      _invalidateVerticalMetrics();
-    }
-    if (oldWidget.epub != widget.epub ||
-        oldWidget.initialLocation?.toJson() !=
-            widget.initialLocation?.toJson()) {
-      _didRestoreInitialLocation = false;
+      _layoutGeneration++;
     }
   }
 
-  @override
-  void dispose() {
-    _scrollController.removeListener(_onScroll);
-    _scrollController.dispose();
-    for (final scope in _selectionScopes.values) {
-      scope.notifier.dispose();
+  void _readHighlights() {
+    _highlightsByChapter.clear();
+    for (final highlight in widget.highlights) {
+      final chapter = highlight['chapterIndex'] as int;
+      (_highlightsByChapter[chapter] ??= []).add(
+        HighlightRange(
+          startOffset: highlight['startOffset'] as int,
+          endOffset: highlight['endOffset'] as int,
+          color: highlight['color'] as String,
+        ),
+      );
     }
-    super.dispose();
+  }
+
+  RenderParagraph? _paragraphForKey(GlobalKey? key) {
+    final root = key?.currentContext?.findRenderObject();
+    RenderParagraph? paragraph;
+    void visit(RenderObject render) {
+      if (paragraph != null) return;
+      if (render is RenderParagraph) {
+        paragraph = render;
+      } else {
+        render.visitChildren(visit);
+      }
+    }
+
+    if (root != null) visit(root);
+    return paragraph;
+  }
+
+  RenderObject? _renderForPosition(
+    int chapter,
+    int start, {
+    bool text = false,
+  }) {
+    for (final scope in _selectionScopes) {
+      if (scope.chapterIndex != chapter) continue;
+      final render = text
+          ? _paragraphForKey(scope.textKeys[start])
+          : scope.elementKeys[start]?.currentContext?.findRenderObject();
+      if (render != null && render.attached) return render;
+    }
+    return null;
   }
 
   // ---------------------------------------------------------------------------
@@ -184,10 +301,53 @@ class EpubNativeViewState extends State<EpubNativeView> {
     _pointerDownPos = e.localPosition;
     _pointerDownTime = DateTime.now();
     _pointerDownKind = e.kind;
+    _pointerDownLink = null;
+    _pointerDownLinkChapter = null;
+    for (final scope in _selectionScopes) {
+      for (final entry in scope.textKeys.entries) {
+        final render = _paragraphForKey(entry.value);
+        if (render == null || !render.hasSize || !render.attached) continue;
+        final local = render.globalToLocal(e.position);
+        if (!(Offset.zero & render.size).contains(local)) continue;
+        final blockStart = entry.key;
+        final blockEnd = scope.textEnds[blockStart]!;
+        for (final link
+            in _chapterLinks[scope.chapterIndex] ?? const <ContentLink>[]) {
+          final start = math.max(link.startOffset, blockStart);
+          final end = math.min(link.endOffset, blockEnd);
+          if (start >= end) continue;
+          final boxes = render.getBoxesForSelection(
+            TextSelection(
+              baseOffset: start - blockStart,
+              extentOffset: end - blockStart,
+            ),
+          );
+          if (boxes.any((box) => box.toRect().contains(local))) {
+            _pointerDownLink = link;
+            _pointerDownLinkChapter = scope.chapterIndex;
+            return;
+          }
+        }
+      }
+    }
   }
 
   void _onPointerUp(PointerUpEvent e) {
     if (_pointerDownPos == null || _pointerDownTime == null) return;
+    final link = _pointerDownLink;
+    if (link != null) {
+      final chapterIndex = _pointerDownLinkChapter!;
+      final isTap =
+          (e.localPosition - _pointerDownPos!).distance < 20 &&
+          DateTime.now().difference(_pointerDownTime!).inMilliseconds < 300;
+      _pointerDownPos = null;
+      _pointerDownTime = null;
+      _pointerDownKind = null;
+      _pointerDownLink = null;
+      _pointerDownLinkChapter = null;
+      if (isTap && !_hasActiveSelection) _openLink(link.href, chapterIndex);
+      return;
+    }
 
     if (widget.settings.readingMode == ReadingMode.horizontal &&
         _isTouchPointer(_pointerDownKind)) {
@@ -350,16 +510,89 @@ class EpubNativeViewState extends State<EpubNativeView> {
   // ---------------------------------------------------------------------------
 
   void _onScroll() {
-    if (widget.settings.readingMode != ReadingMode.vertical) return;
-    if (!_scrollController.hasClients) return;
+    if (widget.settings.readingMode != ReadingMode.vertical ||
+        _restoring ||
+        _pendingRestore != null ||
+        _scrollReportScheduled) {
+      return;
+    }
+    // ScrollPosition dispatches updates as soon as pixels change, before the
+    // viewport lays out its new offset. Read glyph positions after that layout,
+    // coalescing all drag/ballistic updates in the same frame.
+    _scrollReportScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollReportScheduled = false;
+      if (!mounted ||
+          widget.settings.readingMode != ReadingMode.vertical ||
+          _restoring ||
+          _pendingRestore != null) {
+        return;
+      }
+      _logicalLocation = _captureVerticalLocation() ?? _logicalLocation;
+      _reportProgress();
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
 
-    final offset = _scrollController.offset;
-    final max = _scrollController.position.maxScrollExtent;
-    final bookFraction = max > 0 ? (offset / max).clamp(0.0, 1.0) : 0.0;
-    final location = _locationFromBookFraction(
-      bookFraction,
-    ).copyWith(bookScrollOffset: offset, bookScrollFraction: bookFraction);
-    widget.onLocationChanged?.call(location, bookFraction * 100);
+  EpubLocation _captureLocation(ReadingMode mode) {
+    if (_logicalLocation != null) return _logicalLocation!;
+    if (mode == ReadingMode.vertical) {
+      return _captureVerticalLocation() ??
+          EpubLocation.fromPosition(chapterIndex: 0, hasExactCharOffset: true);
+    }
+    if (_paginatedPages.isEmpty) {
+      return widget.initialLocation ??
+          EpubLocation.fromPosition(chapterIndex: 0, hasExactCharOffset: true);
+    }
+    final page =
+        _paginatedPages[_currentPageIndex.clamp(0, _paginatedPages.length - 1)];
+    return EpubLocation.fromPosition(
+      hasExactCharOffset: true,
+      chapterIndex: page.chapterIndex,
+      charOffset: page.charStart,
+    );
+  }
+
+  EpubLocation? _captureVerticalLocation() {
+    final viewport = _viewportKey.currentContext?.findRenderObject();
+    if (viewport is! RenderBox || !viewport.hasSize) return null;
+    final top = viewport.localToGlobal(Offset.zero).dy + _contentInsets().top;
+    final bottom =
+        viewport.localToGlobal(Offset.zero).dy + viewport.size.height;
+    _SelectionScopeData? firstScope;
+    int? firstStart;
+    var firstTop = double.infinity;
+    for (final scope in _selectionScopes) {
+      for (final entry in scope.elementKeys.entries) {
+        final render = entry.value.currentContext?.findRenderObject();
+        if (render is! RenderBox || !render.hasSize || !render.attached)
+          continue;
+        final y = render.localToGlobal(Offset.zero).dy;
+        if (y + render.size.height <= top || y >= bottom || y >= firstTop) {
+          continue;
+        }
+        firstScope = scope;
+        firstStart = entry.key;
+        firstTop = y;
+      }
+    }
+    if (firstScope == null || firstStart == null) return null;
+    final paragraph = _paragraphForKey(firstScope.textKeys[firstStart]);
+    final position = paragraph != null
+        ? paragraph
+              .getPositionForOffset(
+                Offset(
+                  0,
+                  math.max(0.0, top - paragraph.localToGlobal(Offset.zero).dy),
+                ),
+              )
+              .offset
+        : 0;
+    return EpubLocation.fromPosition(
+      hasExactCharOffset: true,
+      chapterIndex: firstScope.chapterIndex,
+      charOffset: firstStart + position,
+    );
   }
 
   void _handleSelectionChanged(SelectedContent? content) {
@@ -386,22 +619,12 @@ class EpubNativeViewState extends State<EpubNativeView> {
         : 0.0;
 
     final location = EpubLocation.fromPosition(
+      hasExactCharOffset: true,
       chapterIndex: chapterIndex,
       charOffset: startOffset,
       scrollFraction: scrollFraction,
-      bookScrollOffset:
-          widget.settings.readingMode == ReadingMode.vertical &&
-              _scrollController.hasClients
-          ? _scrollController.offset
-          : null,
-      bookScrollFraction:
-          widget.settings.readingMode == ReadingMode.vertical &&
-              _scrollController.hasClients &&
-              _scrollController.position.maxScrollExtent > 0
-          ? (_scrollController.offset /
-                    _scrollController.position.maxScrollExtent)
-                .clamp(0.0, 1.0)
-          : null,
+      bookScrollOffset: null,
+      bookScrollFraction: null,
       startOffset: startOffset,
       endOffset: endOffset,
     );
@@ -410,132 +633,105 @@ class EpubNativeViewState extends State<EpubNativeView> {
   }
 
   void _reportProgress() {
-    if (widget.onLocationChanged == null) return;
-
-    if (widget.settings.readingMode == ReadingMode.vertical) {
-      _onScroll();
-      return;
-    }
-
-    if (_paginatedPages.isEmpty) return;
-    final idx = _currentPageIndex.clamp(0, _paginatedPages.length - 1);
-    final page = _paginatedPages[idx];
-    final chapterIndex = page.chapterIndex;
-    final chapterPages = _chapterPageIndexes(chapterIndex);
-    final pageInChapter = chapterPages.indexOf(idx);
-    final chapterFraction = chapterPages.length > 1 && pageInChapter >= 0
-        ? pageInChapter / (chapterPages.length - 1)
+    final location = _logicalLocation;
+    if (location == null) return;
+    final weight = _chapterWeight(location.chapterIndex);
+    final fraction = weight > 0
+        ? (location.charOffset / weight).clamp(0.0, 1.0)
         : 0.0;
-    final chapterWeight = _chapterWeight(chapterIndex);
-    final location = EpubLocation.fromPosition(
-      chapterIndex: chapterIndex,
-      charOffset: (chapterWeight * chapterFraction).round(),
-      scrollFraction: chapterFraction,
+    widget.onLocationChanged?.call(
+      location.copyWith(scrollFraction: fraction),
+      _computeBookFraction(location.chapterIndex, fraction) * 100,
     );
-    final percentage =
-        (_computeBookFraction(chapterIndex, chapterFraction) * 100).clamp(
-          0.0,
-          100.0,
-        );
-
-    widget.onLocationChanged!(location, percentage);
   }
 
   int _chapterWeight(int chapterIndex) {
     if (chapterIndex < 0 || chapterIndex >= widget.epub.chapters.length) {
       return 0;
     }
-    return widget.epub.chapters[chapterIndex].htmlContent.length;
+    _parseChapter(chapterIndex);
+    final elements = _parsedChapters[chapterIndex]!;
+    return elements.isEmpty ? 0 : elements.last.charEnd;
   }
 
-  double _extractChapterFraction(EpubLocation location) {
-    if (location.scrollFraction > 0) {
-      return location.scrollFraction.clamp(0.0, 1.0);
+  int _locationCharOffset(EpubLocation location) {
+    _parseChapter(location.chapterIndex);
+    final anchorOffset =
+        _chapterAnchors[location.chapterIndex]?[location.anchor];
+    if (anchorOffset != null) return anchorOffset;
+    final length = _chapterWeight(location.chapterIndex);
+    if (location.hasExactCharOffset) {
+      return location.charOffset.clamp(0, length);
     }
-    final chapterWeight = _chapterWeight(location.chapterIndex);
-    if (chapterWeight <= 0) return 0.0;
-    return (location.charOffset / chapterWeight).clamp(0.0, 1.0);
+    if (location.startOffset != null && location.endOffset != null) {
+      return location.startOffset!.clamp(0, length);
+    }
+    if (location.scrollFraction > 0) {
+      return (location.scrollFraction.clamp(0.0, 1.0) * length).round();
+    }
+    final htmlLength =
+        widget.epub.chapters[location.chapterIndex].htmlContent.length;
+    return htmlLength > 0
+        ? ((location.charOffset / htmlLength).clamp(0.0, 1.0) * length).round()
+        : 0;
+  }
+
+  List<int> get _contentBookOffsets {
+    if (_bookOffsets case final offsets?) return offsets;
+    final offsets = <int>[0];
+    for (var chapter = 0; chapter < widget.epub.chapters.length; chapter++) {
+      offsets.add(offsets.last + _chapterWeight(chapter));
+    }
+    return _bookOffsets = offsets;
   }
 
   double _computeBookFraction(int chapterIndex, double chapterFraction) {
-    final chapterWeights = widget.epub.chapters
-        .map((chapter) => chapter.htmlContent.length)
-        .toList();
-    final totalWeight = chapterWeights.fold<int>(
-      0,
-      (sum, weight) => sum + weight,
-    );
-    if (totalWeight <= 0) return 0.0;
-
-    var priorWeight = 0;
-    for (
-      int index = 0;
-      index < chapterIndex && index < chapterWeights.length;
-      index++
-    ) {
-      priorWeight += chapterWeights[index];
-    }
-
-    final currentWeight =
-        chapterIndex >= 0 && chapterIndex < chapterWeights.length
-        ? chapterWeights[chapterIndex]
-        : 0;
-    final absoluteWeight =
-        priorWeight + currentWeight * chapterFraction.clamp(0.0, 1.0);
-    return (absoluteWeight / totalWeight).clamp(0.0, 1.0);
+    final offsets = _contentBookOffsets;
+    if (offsets.last == 0 ||
+        chapterIndex < 0 ||
+        chapterIndex + 1 >= offsets.length)
+      return 0;
+    final weight = offsets[chapterIndex + 1] - offsets[chapterIndex];
+    return ((offsets[chapterIndex] + weight * chapterFraction.clamp(0.0, 1.0)) /
+            offsets.last)
+        .clamp(0.0, 1.0);
   }
 
-  EpubLocation _locationFromBookFraction(double bookFraction) {
-    final clampedFraction = bookFraction.clamp(0.0, 1.0);
-    final chapterWeights = widget.epub.chapters
-        .map((chapter) => chapter.htmlContent.length)
-        .toList();
-    final totalWeight = chapterWeights.fold<int>(
-      0,
-      (sum, weight) => sum + weight,
-    );
-
-    if (chapterWeights.isEmpty || totalWeight <= 0) {
-      return EpubLocation.fromPosition(chapterIndex: 0);
-    }
-
-    final absoluteWeight = totalWeight * clampedFraction;
-    var accumulatedWeight = 0;
-
-    for (int index = 0; index < chapterWeights.length; index++) {
-      final chapterWeight = chapterWeights[index];
-      final chapterEnd = accumulatedWeight + chapterWeight;
-      final isLastChapter = index == chapterWeights.length - 1;
-
-      if (absoluteWeight <= chapterEnd || isLastChapter) {
-        final weightInsideChapter = (absoluteWeight - accumulatedWeight).clamp(
-          0.0,
-          chapterWeight.toDouble(),
-        );
-        final chapterFraction = chapterWeight > 0
-            ? (weightInsideChapter / chapterWeight).clamp(0.0, 1.0)
-            : 0.0;
+  EpubLocation _resolveLegacyFraction(EpubLocation location) {
+    if (location.hasExactCharOffset || location.cfi.hasRange) return location;
+    if (location.chapterIndex != 0 ||
+        location.anchor != null ||
+        location.charOffset != 0 ||
+        location.scrollFraction != 0 ||
+        location.bookScrollOffset != null ||
+        (location.bookScrollFraction ?? 0) <= 0)
+      return location;
+    final offsets = _contentBookOffsets;
+    final absolute =
+        (offsets.last * location.bookScrollFraction!.clamp(0.0, 1.0)).round();
+    for (var chapter = 0; chapter + 1 < offsets.length; chapter++) {
+      if (absolute < offsets[chapter + 1] || chapter + 2 == offsets.length) {
         return EpubLocation.fromPosition(
-          chapterIndex: index,
-          charOffset: weightInsideChapter.round(),
-          scrollFraction: chapterFraction,
+          hasExactCharOffset: true,
+          chapterIndex: chapter,
+          charOffset: absolute - offsets[chapter],
         );
       }
-
-      accumulatedWeight = chapterEnd;
     }
-
-    final lastIndex = chapterWeights.length - 1;
-    return EpubLocation.fromPosition(
-      chapterIndex: lastIndex,
-      charOffset: chapterWeights[lastIndex],
-      scrollFraction: 1.0,
-    );
+    return location;
   }
 
   // ---------------------------------------------------------------------------
   // Parsing
   // ---------------------------------------------------------------------------
+
+  TextStyle get _baseTextStyle => TextStyle(
+    inherit: false,
+    fontFamily: widget.settings.fontFamily,
+    fontSize: widget.settings.fontSize,
+    height: widget.settings.lineHeight,
+    color: _computeTextColor(widget.settings.backgroundColor),
+  );
 
   void _parseChapter(int index) {
     if (_parsedChapters.containsKey(index)) return;
@@ -543,12 +739,7 @@ class EpubNativeViewState extends State<EpubNativeView> {
 
     final chapter = widget.epub.chapters[index];
 
-    final baseStyle = TextStyle(
-      fontFamily: widget.settings.fontFamily,
-      fontSize: widget.settings.fontSize,
-      height: widget.settings.lineHeight,
-      color: _computeTextColor(widget.settings.backgroundColor),
-    );
+    final baseStyle = _baseTextStyle;
 
     final parser = XhtmlParser(
       html: chapter.htmlContent,
@@ -559,6 +750,8 @@ class EpubNativeViewState extends State<EpubNativeView> {
     );
 
     _parsedChapters[index] = parser.parse();
+    _chapterAnchors[index] = Map.of(parser.anchors);
+    _chapterLinks[index] = List.of(parser.links);
   }
 
   Color _computeTextColor(int bgColor) {
@@ -583,301 +776,229 @@ class EpubNativeViewState extends State<EpubNativeView> {
   }
 
   void _jumpToLocation(EpubLocation location) {
-    if (widget.settings.readingMode == ReadingMode.vertical) {
-      _jumpToVerticalLocation(location);
-      return;
+    _pendingRestore = location;
+    setState(() {});
+    _scheduleRestore();
+  }
+
+  int? _pageIndexForLocation(EpubLocation location) {
+    final offset = _locationCharOffset(location);
+    int? last;
+    for (var index = 0; index < _paginatedPages.length; index++) {
+      final page = _paginatedPages[index];
+      if (page.chapterIndex != location.chapterIndex) continue;
+      last = index;
+      if (offset < page.charEnd || offset <= page.charStart) return index;
     }
-
-    _jumpToHorizontalLocation(location);
+    if (last != null) return last;
+    final following = _paginatedPages.indexWhere(
+      (page) => page.chapterIndex > location.chapterIndex,
+    );
+    if (following >= 0) return following;
+    return _paginatedPages.isEmpty ? null : _paginatedPages.length - 1;
   }
 
-  void _jumpToVerticalLocation(EpubLocation location) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scrollController.hasClients) return;
-      final maxScrollExtent = _scrollController.position.maxScrollExtent;
-
-      double targetOffset;
-      if (location.bookScrollOffset != null) {
-        targetOffset = location.bookScrollOffset!;
-      } else if (_currentVerticalContentWidth() case final contentWidth?
-          when contentWidth > 0) {
-        targetOffset = _estimateVerticalOffsetForLocation(
-          location,
-          contentWidth,
-        );
-      } else {
-        final targetBookFraction =
-            location.bookScrollFraction ??
-            _computeBookFraction(
-              location.chapterIndex,
-              _extractChapterFraction(location),
-            );
-        targetOffset = maxScrollExtent * targetBookFraction.clamp(0.0, 1.0);
-      }
-
-      targetOffset = targetOffset.clamp(0.0, maxScrollExtent);
-      _scrollController.jumpTo(targetOffset);
-      _onScroll();
-    });
-  }
-
-  void _jumpToHorizontalLocation(EpubLocation location) {
-    if (_paginatedPages.isEmpty) return;
-
-    final chapterIndexes = _chapterPageIndexes(location.chapterIndex);
-    if (chapterIndexes.isEmpty) return;
-
-    final chapterFraction = _extractChapterFraction(location);
-    final pageOffset = chapterIndexes.length > 1
-        ? (chapterFraction * (chapterIndexes.length - 1)).round()
-        : 0;
-    final targetPageIndex =
-        chapterIndexes[pageOffset.clamp(0, chapterIndexes.length - 1)];
-    final snappedPageIndex = _isDualPage
-        ? (targetPageIndex ~/ 2) * 2
-        : targetPageIndex;
-
-    setState(() {
-      _currentPageIndex = snappedPageIndex.clamp(0, _paginatedPages.length - 1);
-    });
-    _reportProgress();
-  }
-
-  List<int> _chapterPageIndexes(int chapterIndex) {
-    final result = <int>[];
-    for (int index = 0; index < _paginatedPages.length; index++) {
-      if (_paginatedPages[index].chapterIndex == chapterIndex) {
-        result.add(index);
-      }
-    }
-    return result;
-  }
-
-  void _restoreInitialLocationIfNeeded() {
-    if (_didRestoreInitialLocation) return;
-
-    final initialLocation = widget.initialLocation;
-    if (initialLocation == null) {
-      _didRestoreInitialLocation = true;
-      return;
-    }
-
-    if (widget.settings.readingMode == ReadingMode.vertical) {
-      if (!_scrollController.hasClients) {
+  void _scheduleRestore() {
+    if (_pendingRestore == null || _restoreScheduled || _restoring) return;
+    _restoreScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _restoreScheduled = false;
+      if (!mounted || _pendingRestore == null) return;
+      final location = _pendingRestore!;
+      if (widget.epub.chapters.isEmpty) {
+        _pendingRestore = null;
         return;
       }
-
-      final maxScrollExtent = _scrollController.position.maxScrollExtent;
-      final targetOffset = initialLocation.bookScrollOffset;
-      final targetBookFraction =
-          initialLocation.bookScrollFraction ??
-          _computeBookFraction(
-            initialLocation.chapterIndex,
-            _extractChapterFraction(initialLocation),
+      final resolved = _resolveLegacyFraction(location);
+      final chapter = resolved.chapterIndex.clamp(
+        0,
+        widget.epub.chapters.length - 1,
+      );
+      final target = EpubLocation.fromPosition(
+        hasExactCharOffset: true,
+        chapterIndex: chapter,
+        anchor: resolved.anchor,
+        charOffset: _locationCharOffset(
+          resolved.copyWith(chapterIndex: chapter),
+        ),
+      );
+      if (widget.settings.readingMode == ReadingMode.horizontal) {
+        final page = _pageIndexForLocation(target);
+        if (page == null) {
+          _pendingRestore = null;
+          _logicalLocation = target;
+          _reportProgress();
+          return;
+        }
+        final displayed = _paginatedPages[page];
+        final resolvedTarget = displayed.chapterIndex == target.chapterIndex
+            ? target
+            : EpubLocation.fromPosition(
+                chapterIndex: displayed.chapterIndex,
+                charOffset: displayed.charStart,
+                hasExactCharOffset: true,
+              );
+        _pendingRestore = null;
+        setState(() {
+          _currentPageIndex = _isDualPage ? (page ~/ 2) * 2 : page;
+          _logicalLocation = resolvedTarget;
+        });
+        _reportProgress();
+        return;
+      }
+      if (!_itemScrollController.isAttached) return;
+      _restoring = true;
+      final generation = _layoutGeneration;
+      _itemScrollController.jumpTo(index: chapter);
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        if (generation != _layoutGeneration ||
+            !identical(_pendingRestore, location)) {
+          _restoring = false;
+          _scheduleRestore();
+          return;
+        }
+        final elements = _parsedChapters[chapter]!;
+        ContentElement? element;
+        for (final candidate in elements) {
+          element = candidate;
+          if (candidate.charEnd > target.charOffset) break;
+        }
+        final viewport = _viewportKey.currentContext?.findRenderObject();
+        double? delta;
+        final pixelOnly =
+            !location.hasExactCharOffset &&
+            !location.cfi.hasRange &&
+            chapter == 0 &&
+            location.anchor == null &&
+            location.charOffset == 0 &&
+            location.scrollFraction == 0 &&
+            (location.bookScrollOffset ?? 0) > 0;
+        if (pixelOnly) {
+          delta = location.bookScrollOffset;
+        } else if (element != null && viewport is RenderBox) {
+          final render = _renderForPosition(
+            chapter,
+            element.charStart,
+            text: true,
           );
-      if ((targetOffset != null && targetOffset > 0 && maxScrollExtent <= 0) ||
-          (targetOffset == null &&
-              targetBookFraction > 0 &&
-              maxScrollExtent <= 0)) {
-        return;
-      }
-    }
-
-    if (widget.settings.readingMode == ReadingMode.horizontal &&
-        _paginatedPages.isEmpty) {
-      return;
-    }
-
-    _didRestoreInitialLocation = true;
-    _jumpToLocation(initialLocation);
+          if (element is TextBlock && render is RenderParagraph) {
+            final local = (target.charOffset - element.charStart).clamp(
+              0,
+              element.charEnd - element.charStart,
+            );
+            final caret = render.getOffsetForCaret(
+              TextPosition(offset: local),
+              Rect.zero,
+            );
+            delta = render.localToGlobal(caret).dy;
+          } else {
+            final render = _renderForPosition(chapter, element.charStart);
+            if (render is RenderBox) {
+              delta = render.localToGlobal(Offset.zero).dy;
+            }
+          }
+          if (delta != null) {
+            delta -=
+                viewport.localToGlobal(Offset.zero).dy + _contentInsets().top;
+          }
+        }
+        if (delta != null && delta.abs() > 0.5) {
+          await _scrollOffsetController.animateScroll(
+            offset: delta,
+            duration: const Duration(milliseconds: 1),
+          );
+        }
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _restoring = false;
+          if (generation != _layoutGeneration ||
+              !identical(_pendingRestore, location)) {
+            _scheduleRestore();
+            return;
+          }
+          _pendingRestore = null;
+          _logicalLocation = pixelOnly
+              ? (_captureVerticalLocation() ?? target)
+              : target;
+          _reportProgress();
+        });
+        WidgetsBinding.instance.ensureVisualUpdate();
+      });
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
-  int? _findChapterIndex(String fileName) {
-    var target = fileName;
-    while (target.startsWith('.') || target.startsWith('/')) {
-      target = target.substring(1);
+  String _normalizePath(String path) {
+    final segments = <String>[];
+    try {
+      path = Uri.decodeComponent(path);
+    } on FormatException {
+      // Legacy manifests can contain a literal, unescaped percent sign.
     }
-    target = target.split('#').first;
-
-    for (int i = 0; i < widget.epub.chapters.length; i++) {
-      var current = widget.epub.chapters[i].fileName;
-      while (current.startsWith('.') || current.startsWith('/')) {
-        current = current.substring(1);
-      }
-      if (current == target ||
-          current.endsWith(target) ||
-          target.endsWith(current)) {
-        return i;
+    for (final segment in path.replaceAll('\\', '/').split('/')) {
+      if (segment.isEmpty || segment == '.') continue;
+      if (segment == '..') {
+        if (segments.isNotEmpty) segments.removeLast();
+      } else {
+        segments.add(segment);
       }
     }
-    return null;
+    return segments.join('/');
   }
 
-  EpubLocation? _locationFromLocator(String locator) {
-    final chapterIndex = _findChapterIndex(locator);
-    if (chapterIndex == null) return null;
-
-    final chapterFraction = _estimateLocatorFraction(locator, chapterIndex);
-    final chapterWeight = _chapterWeight(chapterIndex);
+  EpubLocation? _locationFromLocator(String locator, {int? fromChapter}) {
+    if (widget.epub.chapters.isEmpty) return null;
+    final uri = Uri.tryParse(locator);
+    if (uri == null || uri.hasScheme || uri.hasAuthority) return null;
+    final source = (fromChapter ?? _logicalLocation?.chapterIndex ?? 0).clamp(
+      0,
+      widget.epub.chapters.length - 1,
+    );
+    final path = uri.path;
+    int? chapterIndex;
+    if (path.isEmpty) {
+      chapterIndex = source;
+    } else {
+      final current = _normalizePath(widget.epub.chapters[source].fileName);
+      final relative = Uri(path: current).resolveUri(uri).path;
+      final candidates = {
+        if (fromChapter != null) _normalizePath(relative),
+        _normalizePath(path),
+        if (fromChapter == null) _normalizePath(relative),
+      };
+      for (final candidate in candidates) {
+        final index = widget.epub.chapters.indexWhere(
+          (chapter) => _normalizePath(chapter.fileName) == candidate,
+        );
+        if (index >= 0) {
+          chapterIndex = index;
+          break;
+        }
+      }
+    }
+    if (chapterIndex == null || chapterIndex >= widget.epub.chapters.length) {
+      return null;
+    }
+    _parseChapter(chapterIndex);
+    final anchor = uri.hasFragment ? Uri.decodeComponent(uri.fragment) : null;
     return EpubLocation.fromPosition(
+      hasExactCharOffset: true,
       chapterIndex: chapterIndex,
-      charOffset: (chapterWeight * chapterFraction).round(),
-      scrollFraction: chapterFraction,
+      anchor: anchor,
+      charOffset: _chapterAnchors[chapterIndex]?[anchor] ?? 0,
     );
   }
 
-  double _estimateLocatorFraction(String locator, int chapterIndex) {
-    final fragmentIndex = locator.indexOf('#');
-    if (fragmentIndex < 0 || fragmentIndex == locator.length - 1) {
-      return 0.0;
-    }
-
-    final rawFragment = locator.substring(fragmentIndex + 1).trim();
-    if (rawFragment.isEmpty) return 0.0;
-
-    String fragment = rawFragment;
-    try {
-      fragment = Uri.decodeComponent(rawFragment);
-    } catch (_) {}
-
-    final html = widget.epub.chapters[chapterIndex].htmlContent;
-    if (html.isEmpty) return 0.0;
-
-    final patterns = [
-      RegExp(
-        'id\\s*=\\s*["\']${RegExp.escape(fragment)}["\']',
-        caseSensitive: false,
-      ),
-      RegExp(
-        'name\\s*=\\s*["\']${RegExp.escape(fragment)}["\']',
-        caseSensitive: false,
-      ),
-    ];
-
-    for (final pattern in patterns) {
-      final match = pattern.firstMatch(html);
-      if (match != null) {
-        return (match.start / html.length).clamp(0.0, 1.0);
-      }
-    }
-
-    return 0.0;
-  }
-
-  void _invalidateVerticalMetrics() {
-    _lastVerticalContentWidth = null;
-    _verticalChapterOffsets = null;
-    _verticalChapterHeights = null;
-  }
-
-  double? _currentVerticalContentWidth() {
-    final availableWidth = context.size?.width;
-    if (availableWidth == null ||
-        !availableWidth.isFinite ||
-        availableWidth <= 0) {
-      return null;
-    }
-
-    final maxContentWidth = math.min(availableWidth, 800.0);
-    final contentWidth =
-        maxContentWidth - widget.settings.horizontalPadding * 2;
-    if (!contentWidth.isFinite || contentWidth <= 0) {
-      return null;
-    }
-    return contentWidth;
-  }
-
-  double _estimateVerticalOffsetForLocation(
-    EpubLocation location,
-    double contentWidth,
-  ) {
-    _ensureVerticalMetrics(contentWidth);
-
-    final offsets = _verticalChapterOffsets;
-    final heights = _verticalChapterHeights;
-    if (offsets == null ||
-        heights == null ||
-        offsets.isEmpty ||
-        heights.isEmpty) {
-      final targetBookFraction =
-          location.bookScrollFraction ??
-          _computeBookFraction(
-            location.chapterIndex,
-            _extractChapterFraction(location),
-          );
-      return _scrollController.position.maxScrollExtent *
-          targetBookFraction.clamp(0.0, 1.0);
-    }
-
-    final chapterIndex = location.chapterIndex.clamp(0, offsets.length - 1);
-    final chapterStart = offsets[chapterIndex];
-    final chapterHeight = heights[chapterIndex];
-    final chapterFraction = _extractChapterFraction(location);
-    return chapterStart + chapterHeight * chapterFraction.clamp(0.0, 1.0);
-  }
-
-  void _ensureVerticalMetrics(double contentWidth) {
-    if (_lastVerticalContentWidth == contentWidth &&
-        _verticalChapterOffsets != null &&
-        _verticalChapterHeights != null &&
-        _verticalChapterOffsets!.length == widget.epub.chapters.length &&
-        _verticalChapterHeights!.length == widget.epub.chapters.length) {
+  Future<void> _openLink(String href, int chapterIndex) async {
+    final uri = Uri.tryParse(href);
+    if (uri == null) return;
+    if (uri.scheme == 'http' || uri.scheme == 'https') {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
       return;
     }
-
-    final topInset = _contentInsets().top;
-    final offsets = List<double>.filled(widget.epub.chapters.length, 0.0);
-    final heights = List<double>.filled(widget.epub.chapters.length, 0.0);
-
-    var accumulated = topInset;
-    for (
-      int chapterIndex = 0;
-      chapterIndex < widget.epub.chapters.length;
-      chapterIndex++
-    ) {
-      offsets[chapterIndex] = accumulated;
-      _parseChapter(chapterIndex);
-      final elements =
-          _parsedChapters[chapterIndex] ?? const <ContentElement>[];
-      final height = _estimateVerticalChapterHeight(elements, contentWidth);
-      heights[chapterIndex] = height;
-      accumulated += height;
-    }
-
-    _lastVerticalContentWidth = contentWidth;
-    _verticalChapterOffsets = offsets;
-    _verticalChapterHeights = heights;
-  }
-
-  double _estimateVerticalChapterHeight(
-    List<ContentElement> elements,
-    double contentWidth,
-  ) {
-    if (elements.isEmpty) {
-      return 48.0;
-    }
-
-    var total = 0.0;
-    for (final element in elements) {
-      total += _measureVerticalElementHeight(element, contentWidth);
-    }
-    return total;
-  }
-
-  double _measureVerticalElementHeight(
-    ContentElement element,
-    double contentWidth,
-  ) {
-    if (element is TextBlock) {
-      return _measureTextBlockHeight(element, contentWidth);
-    }
-    if (element is DividerBlock) {
-      return 49.0;
-    }
-    if (element is ImageBlock) {
-      return math.min(contentWidth * 0.75, 360.0) + 24.0;
-    }
-    return 0.0;
+    final location = _locationFromLocator(href, fromChapter: chapterIndex);
+    if (location != null && mounted) _jumpToLocation(location);
   }
 
   // ---------------------------------------------------------------------------
@@ -893,6 +1014,12 @@ class EpubNativeViewState extends State<EpubNativeView> {
     if (snapped != _currentPageIndex) {
       setState(() {
         _currentPageIndex = snapped;
+        final page = _paginatedPages[snapped];
+        _logicalLocation = EpubLocation.fromPosition(
+          hasExactCharOffset: true,
+          chapterIndex: page.chapterIndex,
+          charOffset: page.charStart,
+        );
       });
       _reportProgress();
     }
@@ -905,6 +1032,12 @@ class EpubNativeViewState extends State<EpubNativeView> {
     if (snapped != _currentPageIndex) {
       setState(() {
         _currentPageIndex = snapped;
+        final page = _paginatedPages[snapped];
+        _logicalLocation = EpubLocation.fromPosition(
+          hasExactCharOffset: true,
+          chapterIndex: page.chapterIndex,
+          charOffset: page.charStart,
+        );
       });
       _reportProgress();
     }
@@ -943,38 +1076,13 @@ class EpubNativeViewState extends State<EpubNativeView> {
     final size = Size(pageWidth, pageHeight);
     if (_lastPaginationSize == size && _paginatedPages.isNotEmpty) return;
 
-    // Remember position to restore
-    int? prevChapter;
-    double prevFraction = 0;
-    if (_paginatedPages.isNotEmpty &&
-        _currentPageIndex < _paginatedPages.length) {
-      final curPage = _paginatedPages[_currentPageIndex];
-      prevChapter = curPage.chapterIndex;
-      final chapterStartIdx = _paginatedPages.indexWhere(
-        (p) => p.chapterIndex == prevChapter,
-      );
-      final chapterPageCount = _paginatedPages
-          .where((p) => p.chapterIndex == prevChapter)
-          .length;
-      final pageInChapter = _currentPageIndex - chapterStartIdx;
-      prevFraction = chapterPageCount > 1
-          ? pageInChapter / (chapterPageCount - 1)
-          : 0;
-    }
-
-    final stalePageScopeIds = _selectionScopes.keys
-        .where((key) => key.startsWith('page_'))
-        .toList(growable: false);
-    for (final scopeId in stalePageScopeIds) {
-      _selectionScopes.remove(scopeId)?.notifier.dispose();
-    }
+    _pendingRestore ??= _captureLocation(ReadingMode.horizontal);
+    _hasActiveSelection = false;
 
     _paginatedPages = [];
     final contentWidth = pageWidth - paddingH * 2;
     final contentInsets = _contentInsets();
-    final contentHeight =
-        (pageHeight - contentInsets.vertical) *
-        0.92; // extra headroom for exact layout
+    final contentHeight = pageHeight - contentInsets.vertical;
 
     if (!contentWidth.isFinite ||
         !contentHeight.isFinite ||
@@ -1001,7 +1109,7 @@ class EpubNativeViewState extends State<EpubNativeView> {
         );
 
         for (final element in paginatedElements) {
-          final h = _measureElementHeight(element, contentWidth, pageHeight);
+          final h = _measureElementHeight(element, contentWidth, contentHeight);
 
           if (currentElements.isNotEmpty && currentHeight + h > contentHeight) {
             _paginatedPages.add(
@@ -1034,22 +1142,11 @@ class EpubNativeViewState extends State<EpubNativeView> {
       }
     }
 
-    // Restore reading position
-    if (prevChapter != null && _paginatedPages.isNotEmpty) {
-      final chapterStartIdx = _paginatedPages.indexWhere(
-        (p) => p.chapterIndex == prevChapter,
-      );
-      if (chapterStartIdx >= 0) {
-        final chapterPageCount = _paginatedPages
-            .where((p) => p.chapterIndex == prevChapter)
-            .length;
-        _currentPageIndex =
-            chapterStartIdx + (prevFraction * (chapterPageCount - 1)).round();
-        _currentPageIndex = _currentPageIndex.clamp(
-          0,
-          _paginatedPages.length - 1,
-        );
-      }
+    final target = _pendingRestore;
+    if (target != null) {
+      final index = _pageIndexForLocation(target);
+      if (index != null)
+        _currentPageIndex = _isDualPage ? (index ~/ 2) * 2 : index;
     }
 
     _lastPaginationSize = size;
@@ -1063,7 +1160,7 @@ class EpubNativeViewState extends State<EpubNativeView> {
     if (element is TextBlock) {
       return _measureTextBlockHeight(element, contentWidth);
     } else if (element is ImageBlock) {
-      return (pageHeight - 72) * 0.85 + 24;
+      return pageHeight;
     } else if (element is DividerBlock) {
       return 49.0;
     }
@@ -1101,17 +1198,25 @@ class EpubNativeViewState extends State<EpubNativeView> {
       return [block];
     }
 
+    final boundaries = <int>[0];
+    for (final grapheme in plainText.characters) {
+      boundaries.add(boundaries.last + grapheme.length);
+    }
     final chunks = <TextBlock>[];
-    var localStart = 0;
-
-    while (localStart < totalLength) {
-      var low = localStart + 1;
-      var high = totalLength;
-      var bestEnd = low;
+    var boundaryStart = 0;
+    while (boundaryStart + 1 < boundaries.length) {
+      final localStart = boundaries[boundaryStart];
+      var low = boundaryStart + 1;
+      var high = boundaries.length - 1;
+      var bestBoundary = low;
 
       while (low <= high) {
         final mid = (low + high) ~/ 2;
-        final candidateSpan = _sliceInlineSpan(block.span, localStart, mid);
+        final candidateSpan = _sliceInlineSpan(
+          block.span,
+          localStart,
+          boundaries[mid],
+        );
         if (candidateSpan == null) {
           high = mid - 1;
           continue;
@@ -1123,32 +1228,27 @@ class EpubNativeViewState extends State<EpubNativeView> {
           overrideSpan: candidateSpan,
         );
         if (candidateHeight <= contentHeight) {
-          bestEnd = mid;
+          bestBoundary = mid;
           low = mid + 1;
         } else {
           high = mid - 1;
         }
       }
 
-      if (bestEnd <= localStart) {
-        bestEnd = math.min(localStart + 1, totalLength);
+      if (bestBoundary < boundaries.length - 1) {
+        final minBoundary =
+            boundaryStart +
+            math.max(1, ((bestBoundary - boundaryStart) * 0.6).round());
+        for (var index = bestBoundary; index > minBoundary; index--) {
+          if (_isChunkBoundaryChar(plainText[boundaries[index] - 1])) {
+            bestBoundary = index;
+            break;
+          }
+        }
       }
+      final bestEnd = boundaries[bestBoundary];
 
-      bestEnd = _snapChunkEndToWordBoundary(
-        plainText: plainText,
-        block: block,
-        start: localStart,
-        end: bestEnd,
-        totalLength: totalLength,
-        contentWidth: contentWidth,
-        contentHeight: contentHeight,
-      );
-
-      final chunkSpan = _sliceInlineSpan(block.span, localStart, bestEnd);
-      if (chunkSpan == null) {
-        break;
-      }
-
+      final chunkSpan = _sliceInlineSpan(block.span, localStart, bestEnd)!;
       chunks.add(
         TextBlock(
           span: chunkSpan,
@@ -1158,47 +1258,10 @@ class EpubNativeViewState extends State<EpubNativeView> {
           charEnd: block.charStart + bestEnd,
         ),
       );
-      localStart = bestEnd;
+      boundaryStart = bestBoundary;
     }
 
     return chunks.isEmpty ? [block] : chunks;
-  }
-
-  int _snapChunkEndToWordBoundary({
-    required String plainText,
-    required TextBlock block,
-    required int start,
-    required int end,
-    required int totalLength,
-    required double contentWidth,
-    required double contentHeight,
-  }) {
-    if (end >= totalLength) {
-      return totalLength;
-    }
-
-    final minEnd = start + math.max(1, ((end - start) * 0.6).round());
-    for (int candidate = end; candidate > minEnd; candidate--) {
-      if (!_isChunkBoundaryChar(plainText[candidate - 1])) {
-        continue;
-      }
-
-      final candidateSpan = _sliceInlineSpan(block.span, start, candidate);
-      if (candidateSpan == null) {
-        continue;
-      }
-
-      if (_measureTextBlockHeight(
-            block,
-            contentWidth,
-            overrideSpan: candidateSpan,
-          ) <=
-          contentHeight) {
-        return candidate;
-      }
-    }
-
-    return end;
   }
 
   bool _isChunkBoundaryChar(String char) {
@@ -1220,9 +1283,13 @@ class EpubNativeViewState extends State<EpubNativeView> {
     }
 
     final tp = TextPainter(
-      text: span,
+      text: TextSpan(style: _baseTextStyle, children: [span]),
       textDirection: TextDirection.ltr,
       textScaler: TextScaler.noScaling,
+      textHeightBehavior: const TextHeightBehavior(),
+      textAlign: block.type == TextBlockType.blockquote
+          ? TextAlign.justify
+          : TextAlign.start,
     )..layout(maxWidth: math.max(1.0, contentWidth));
     final textHeight = tp.height;
     tp.dispose();
@@ -1324,6 +1391,13 @@ class EpubNativeViewState extends State<EpubNativeView> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        final viewportSize = constraints.biggest;
+        if (_lastViewportSize != null && _lastViewportSize != viewportSize) {
+          _pendingRestore ??= _captureLocation(widget.settings.readingMode);
+          _hasActiveSelection = false;
+          _layoutGeneration++;
+        }
+        _lastViewportSize = viewportSize;
         if (widget.settings.readingMode == ReadingMode.horizontal) {
           for (int i = 0; i < widget.epub.chapters.length; i++) {
             _parseChapter(i);
@@ -1337,6 +1411,7 @@ class EpubNativeViewState extends State<EpubNativeView> {
           onPointerSignal: _onPointerSignal,
           onPointerPanZoomUpdate: _onPointerPanZoomUpdate,
           child: Container(
+            key: _viewportKey,
             color: Color(widget.settings.backgroundColor),
             child: widget.settings.readingMode == ReadingMode.vertical
                 ? _buildVerticalMode(paddingH, constraints)
@@ -1369,9 +1444,7 @@ class EpubNativeViewState extends State<EpubNativeView> {
   // ---------------------------------------------------------------------------
 
   Widget _buildVerticalMode(double paddingH, BoxConstraints constraints) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _restoreInitialLocationIfNeeded();
-    });
+    _scheduleRestore();
 
     final availableWidth = constraints.maxWidth;
     final contentInsets = _contentInsets();
@@ -1384,25 +1457,33 @@ class EpubNativeViewState extends State<EpubNativeView> {
         width: maxContentWidth,
         child: _buildSelectionArea(
           onSelectionChanged: _handleSelectionChanged,
-          child: ListView.builder(
-            controller: _scrollController,
-            padding: EdgeInsets.fromLTRB(
-              paddingH,
-              contentInsets.top,
-              paddingH,
-              contentInsets.bottom,
-            ),
-            itemCount: widget.epub.chapters.length,
-            itemBuilder: (context, index) {
-              _parseChapter(index);
-              final elements = _parsedChapters[index] ?? [];
-              return _buildSelectableScope(
-                scopeId: 'chapter_$index',
-                chapterIndex: index,
-                elements: elements,
-                child: _buildChapterContent(elements, index),
-              );
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (notification) {
+              if (notification is ScrollUpdateNotification) _onScroll();
+              return false;
             },
+            child: ScrollablePositionedList.builder(
+              key: ValueKey(('vertical', _layoutGeneration)),
+              itemScrollController: _itemScrollController,
+              scrollOffsetController: _scrollOffsetController,
+              padding: EdgeInsets.fromLTRB(
+                paddingH,
+                contentInsets.top,
+                paddingH,
+                contentInsets.bottom,
+              ),
+              itemCount: widget.epub.chapters.length,
+              itemBuilder: (context, index) {
+                _parseChapter(index);
+                final elements = _parsedChapters[index] ?? [];
+                return _buildSelectableScope(
+                  chapterIndex: index,
+                  elements: elements,
+                  builder: (scope) =>
+                      _buildChapterContent(elements, index, scope),
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -1455,9 +1536,7 @@ class EpubNativeViewState extends State<EpubNativeView> {
     }
 
     _paginate(pageWidth, availableHeight, paddingH);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _restoreInitialLocationIfNeeded();
-    });
+    _scheduleRestore();
 
     if (_paginatedPages.isEmpty) return const SizedBox.shrink();
 
@@ -1517,18 +1596,10 @@ class EpubNativeViewState extends State<EpubNativeView> {
       );
     }
 
-    return Focus(
-      autofocus: true,
-      onKeyEvent: _onKeyEvent,
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        child: pageContent,
-      ),
-    );
+    return Focus(autofocus: true, onKeyEvent: _onKeyEvent, child: pageContent);
   }
 
   Widget _buildPageWidget(_PageInfo page, double paddingH) {
-    final scopeId = 'page_${page.pageIndex}';
     final contentInsets = _contentInsets();
     return ClipRect(
       child: Padding(
@@ -1538,23 +1609,16 @@ class EpubNativeViewState extends State<EpubNativeView> {
           paddingH,
           contentInsets.bottom,
         ),
-        child: _buildSelectionArea(
-          onSelectionChanged: (content) {
-            _handleScopedSelectionChanged(
-              scopeId: scopeId,
-              chapterIndex: page.chapterIndex,
-              elements: page.elements,
-              content: content,
-            );
-          },
-          child: _buildSelectableScope(
-            scopeId: scopeId,
-            chapterIndex: page.chapterIndex,
-            elements: page.elements,
-            child: SingleChildScrollView(
-              primary: false,
-              physics: const NeverScrollableScrollPhysics(),
-              child: _buildChapterContent(page.elements, page.chapterIndex),
+        child: _buildSelectableScope(
+          chapterIndex: page.chapterIndex,
+          elements: page.elements,
+          ownSelectionArea: true,
+          builder: (scope) => SingleChildScrollView(
+            primary: false,
+            child: _buildChapterContent(
+              page.elements,
+              page.chapterIndex,
+              scope,
             ),
           ),
         ),
@@ -1581,30 +1645,49 @@ class EpubNativeViewState extends State<EpubNativeView> {
   }
 
   Widget _buildSelectableScope({
-    required String scopeId,
     required int chapterIndex,
     required List<ContentElement> elements,
-    required Widget child,
+    required Widget Function(_SelectionScopeData) builder,
+    bool ownSelectionArea = false,
   }) {
-    final scope = _selectionScopes.putIfAbsent(
-      scopeId,
-      () => _SelectionScopeData(
-        notifier: SelectionListenerNotifier(),
-        chapterIndex: chapterIndex,
-        elements: elements,
-      ),
+    return _MountedContentScope(
+      chapterIndex: chapterIndex,
+      elements: elements,
+      onMount: (scope) {
+        _selectionScopes.add(scope);
+      },
+      onUnmount: (scope) {
+        _selectionScopes.remove(scope);
+      },
+      builder: (scope) {
+        final child = SelectionListener(
+          selectionNotifier: scope.notifier,
+          child: builder(scope),
+        );
+        return ownSelectionArea
+            ? _buildSelectionArea(
+                onSelectionChanged: (content) => _handleScopedSelectionChanged(
+                  scope: scope,
+                  chapterIndex: chapterIndex,
+                  elements: elements,
+                  content: content,
+                ),
+                child: child,
+              )
+            : child;
+      },
     );
-    scope.chapterIndex = chapterIndex;
-    scope.elements = elements;
-
-    return SelectionListener(selectionNotifier: scope.notifier, child: child);
   }
 
   // ---------------------------------------------------------------------------
   // Content rendering
   // ---------------------------------------------------------------------------
 
-  Widget _buildChapterContent(List<ContentElement> elements, int chapterIndex) {
+  Widget _buildChapterContent(
+    List<ContentElement> elements,
+    int chapterIndex,
+    _SelectionScopeData scope,
+  ) {
     if (elements.isEmpty) {
       return Center(
         child: Text(
@@ -1618,13 +1701,23 @@ class EpubNativeViewState extends State<EpubNativeView> {
 
     final children = <Widget>[];
     for (final element in elements) {
+      final Widget child;
       if (element is TextBlock) {
-        children.add(_buildTextBlock(element, chapterIndex));
+        child = _buildTextBlock(element, chapterIndex, scope);
       } else if (element is ImageBlock) {
-        children.add(_buildImageBlock(element));
-      } else if (element is DividerBlock) {
-        children.add(_buildDividerBlock());
+        child = _buildImageBlock(element);
+      } else {
+        child = _buildDividerBlock();
       }
+      children.add(
+        KeyedSubtree(
+          key: scope.elementKeys.putIfAbsent(
+            element.charStart,
+            () => GlobalKey(),
+          ),
+          child: child,
+        ),
+      );
     }
 
     return Column(
@@ -1634,12 +1727,16 @@ class EpubNativeViewState extends State<EpubNativeView> {
     );
   }
 
-  Widget _buildTextBlock(TextBlock block, int chapterIndex) {
-    final highlightedSpan = _applyHighlightsToSpan(
+  Widget _buildTextBlock(
+    TextBlock block,
+    int chapterIndex,
+    _SelectionScopeData scope,
+  ) {
+    scope.textEnds[block.charStart] = block.charEnd;
+    final highlightedSpan = applyHighlightRanges(
       block.span,
       block.charStart,
-      block.charEnd,
-      chapterIndex,
+      _highlightsByChapter[chapterIndex] ?? const [],
     );
 
     // Use Text.rich instead of RichText — Text.rich automatically registers
@@ -1652,6 +1749,10 @@ class EpubNativeViewState extends State<EpubNativeView> {
       ),
       child: Text.rich(
         highlightedSpan is TextSpan ? highlightedSpan : TextSpan(),
+        key: scope.textKeys.putIfAbsent(block.charStart, () => GlobalKey()),
+        style: _baseTextStyle,
+        textDirection: TextDirection.ltr,
+        textHeightBehavior: const TextHeightBehavior(),
         textAlign: block.type == TextBlockType.blockquote
             ? TextAlign.justify
             : TextAlign.start,
@@ -1662,7 +1763,7 @@ class EpubNativeViewState extends State<EpubNativeView> {
 
   Widget _buildImageBlock(ImageBlock block) {
     final maxImgHeight = widget.settings.readingMode == ReadingMode.horizontal
-        ? (_currentPageHeight - 72) * 0.85
+        ? math.max(0.0, _currentPageHeight - _contentInsets().vertical - 24)
         : null;
 
     return Padding(
@@ -1680,54 +1781,13 @@ class EpubNativeViewState extends State<EpubNativeView> {
       child: Divider(
         color: _computeTextColor(widget.settings.backgroundColor).withAlpha(60),
         thickness: 1,
+        height: 1,
       ),
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Highlights
-  // ---------------------------------------------------------------------------
-
-  InlineSpan _applyHighlightsToSpan(
-    InlineSpan span,
-    int blockStart,
-    int blockEnd,
-    int chapterIndex,
-  ) {
-    final highlightRanges = <HighlightRange>[];
-    for (final h in widget.highlights) {
-      final hChapterIndex = h['chapterIndex'] as int;
-      if (hChapterIndex != chapterIndex) continue;
-      highlightRanges.add(
-        HighlightRange(
-          startOffset: h['startOffset'] as int,
-          endOffset: h['endOffset'] as int,
-          color: h['color'] as String,
-        ),
-      );
-    }
-
-    final relevant = highlightRanges
-        .where((h) => h.startOffset < blockEnd && h.endOffset > blockStart)
-        .toList();
-
-    if (relevant.isEmpty) return span;
-
-    if (span is! TextSpan) return span;
-
-    return _highlightTextSpan(span, blockStart, relevant);
-  }
-
-  Color? _parseColor(String hex) {
-    final h = hex.replaceFirst('#', '');
-    if (h.length == 6) {
-      return Color(int.parse('FF$h', radix: 16));
-    }
-    return null;
-  }
-
   void _handleScopedSelectionChanged({
-    required String scopeId,
+    required _SelectionScopeData scope,
     required int chapterIndex,
     required List<ContentElement> elements,
     required SelectedContent? content,
@@ -1740,9 +1800,8 @@ class EpubNativeViewState extends State<EpubNativeView> {
       return;
     }
 
-    final scope = _selectionScopes[scopeId];
-    final range = scope?.notifier.registered == true
-        ? scope!.notifier.selection.range
+    final range = scope.notifier.registered
+        ? scope.notifier.selection.range
         : null;
     if (range == null) {
       widget.onTextSelected?.call('', '');
@@ -1763,6 +1822,7 @@ class EpubNativeViewState extends State<EpubNativeView> {
         : 0.0;
 
     final location = EpubLocation.fromPosition(
+      hasExactCharOffset: true,
       chapterIndex: chapterIndex,
       charOffset: startOffset,
       scrollFraction: scrollFraction,
@@ -1771,126 +1831,6 @@ class EpubNativeViewState extends State<EpubNativeView> {
     );
 
     widget.onTextSelected?.call(selectedText, location.toJson());
-  }
-
-  InlineSpan _highlightTextSpan(
-    TextSpan span,
-    int spanStartOffset,
-    List<HighlightRange> highlightRanges,
-  ) {
-    final segmentChildren = <InlineSpan>[];
-    var cursor = spanStartOffset;
-
-    final spanText = span.text;
-    if (spanText != null && spanText.isNotEmpty) {
-      segmentChildren.addAll(
-        _splitTextByHighlights(
-          text: spanText,
-          textStartOffset: cursor,
-          style: span.style,
-          highlightRanges: highlightRanges,
-        ),
-      );
-      cursor += spanText.length;
-    }
-
-    if (span.children != null && span.children!.isNotEmpty) {
-      for (final child in span.children!) {
-        final childLength = _inlineSpanLength(child);
-        if (childLength == 0) continue;
-
-        if (child is TextSpan) {
-          segmentChildren.add(
-            _highlightTextSpan(child, cursor, highlightRanges),
-          );
-        } else {
-          segmentChildren.add(child);
-        }
-        cursor += childLength;
-      }
-    }
-
-    if (segmentChildren.isEmpty) {
-      return span;
-    }
-
-    return TextSpan(
-      style: span.style,
-      locale: span.locale,
-      recognizer: span.recognizer,
-      semanticsLabel: span.semanticsLabel,
-      spellOut: span.spellOut,
-      mouseCursor: span.mouseCursor,
-      onEnter: span.onEnter,
-      onExit: span.onExit,
-      children: segmentChildren,
-    );
-  }
-
-  List<InlineSpan> _splitTextByHighlights({
-    required String text,
-    required int textStartOffset,
-    required TextStyle? style,
-    required List<HighlightRange> highlightRanges,
-  }) {
-    final textEndOffset = textStartOffset + text.length;
-    final segments = <InlineSpan>[];
-    final relevantRanges =
-        highlightRanges
-            .where(
-              (range) =>
-                  range.startOffset < textEndOffset &&
-                  range.endOffset > textStartOffset,
-            )
-            .toList()
-          ..sort((a, b) => a.startOffset.compareTo(b.startOffset));
-
-    if (relevantRanges.isEmpty) {
-      return [TextSpan(text: text, style: style)];
-    }
-
-    var cursor = textStartOffset;
-    for (final range in relevantRanges) {
-      final segmentStart = math.max(range.startOffset, textStartOffset);
-      final segmentEnd = math.min(range.endOffset, textEndOffset);
-      if (segmentEnd <= segmentStart) continue;
-
-      if (cursor < segmentStart) {
-        segments.add(
-          TextSpan(
-            text: text.substring(
-              cursor - textStartOffset,
-              segmentStart - textStartOffset,
-            ),
-            style: style,
-          ),
-        );
-      }
-
-      final highlightColor = _parseColor(range.color)?.withAlpha(90);
-      segments.add(
-        TextSpan(
-          text: text.substring(
-            segmentStart - textStartOffset,
-            segmentEnd - textStartOffset,
-          ),
-          style: highlightColor == null
-              ? style
-              : (style ?? const TextStyle()).copyWith(
-                  backgroundColor: highlightColor,
-                ),
-        ),
-      );
-      cursor = segmentEnd;
-    }
-
-    if (cursor < textEndOffset) {
-      segments.add(
-        TextSpan(text: text.substring(cursor - textStartOffset), style: style),
-      );
-    }
-
-    return segments;
   }
 
   int _inlineSpanLength(InlineSpan span) {
@@ -1909,7 +1849,7 @@ class EpubNativeViewState extends State<EpubNativeView> {
 
   ({int chapterIndex, int startOffset, int endOffset})?
   _resolveSelectionRange() {
-    for (final scope in _selectionScopes.values) {
+    for (final scope in _selectionScopes) {
       if (!scope.notifier.registered) continue;
 
       final range = scope.notifier.selection.range;

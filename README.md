@@ -6,9 +6,9 @@ Cross-platform (Android / iOS / Windows / Linux / macOS) offline book reader for
 
 - **Import books** — pick `.epub` or `.pdf` from the file system, metadata saved to local DB
 - **Library grid** — browse imported books with title, author, format
-- **Reader** — unified reader screen with engine abstraction (EPUB via `epub_view`, PDF via `pdfx`)
-- **Reading progress** — auto-saved to Drift (SQLite) on page change, restored on re-open
-- **Highlights** — select text in the reader to save highlights to local DB
+- **Reader** — native Flutter EPUB rendering and PDF viewing via `pdfrx`, behind a shared engine interface
+- **Reading progress** — debounced Drift (SQLite) persistence, flushed on close/suspend and restored on re-open
+- **Highlights** — EPUB text ranges and PDF page geometry saved locally, with notes and navigation back to the selection
 - **Dark theme** — `#121212` background, `#BB86FC` accent
 - **Localization** — English + Russian (l10n)
 
@@ -25,11 +25,13 @@ lib/
 ├── l10n/            # Localization ARB files
 └── main.dart
 packages/
-├── epub_engine/     # EpubBookReaderEngine
-└── pdf_engine/      # PdfBookReaderEngine
+├── epub_engine/     # EPUB parser + native Flutter renderer
+└── pdf_engine/      # pdfrx viewer + persistent PDF selections
 ```
 
 **Stack:** Flutter, Riverpod, Drift, GoRouter, Dio + Retrofit, Freezed, Injectable/GetIt
+
+Reader architecture, stored location formats and regression commands: [`READER.md`](READER.md).
 
 ## Getting Started
 

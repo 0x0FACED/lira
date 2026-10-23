@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:epub_engine/epub_engine.dart';
 import 'package:flutter/material.dart';
@@ -32,7 +33,8 @@ class ReaderScreen extends ConsumerStatefulWidget {
   ConsumerState<ReaderScreen> createState() => _ReaderScreenState();
 }
 
-class _ReaderScreenState extends ConsumerState<ReaderScreen> {
+class _ReaderScreenState extends ConsumerState<ReaderScreen>
+    with WidgetsBindingObserver {
   late Future<BookReaderEngine> _engineFuture;
   BookReaderEngine? _engine;
   bool _showUi = false;
@@ -41,6 +43,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     const _ReaderProgressState(fraction: 0, label: ''),
   );
   bool _didSeedProgressFromStorage = false;
+  BookLocation? _initialLocation;
+  late ReadingProgressController _progressController;
+  int _loadGeneration = 0;
+  int? _closingGeneration;
+  int? _highlightWriteGeneration;
+  List<HighlightDto>? _mappedHighlights;
+  List<Map<String, dynamic>> _highlightData = const [];
 
   String? _selectedText;
   String? _selectedLocation;
@@ -48,30 +57,112 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   @override
   void initState() {
     super.initState();
-    _engineFuture = _initEngine();
+    WidgetsBinding.instance.addObserver(this);
+    _startBook();
   }
 
-  Future<BookReaderEngine> _initEngine() async {
-    BookReaderEngine engine;
+  void _startBook() {
+    _mappedHighlights = null;
+    _highlightData = const [];
+    _progressController = ref.read(
+      readingProgressControllerProvider(widget.book.id).notifier,
+    );
+    _engineFuture = _initEngine(++_loadGeneration);
+  }
 
-    if (widget.book.format == 'epub') {
+  @override
+  void didUpdateWidget(covariant ReaderScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.book.id != widget.book.id ||
+        oldWidget.book.fileUrl != widget.book.fileUrl ||
+        oldWidget.book.format != widget.book.format) {
+      _flushProgressInBackground();
+      _engine?.dispose();
+      _engine = null;
+      _initialLocation = null;
+      _didSeedProgressFromStorage = false;
+      _selectedText = null;
+      _selectedLocation = null;
+      _showUi = false;
+      _startBook();
+    }
+  }
+
+  Future<BookReaderEngine> _initEngine(int generation) async {
+    final book = widget.book;
+    final BookReaderEngine engine;
+    if (book.format == 'epub') {
       engine = EpubBookReaderEngine();
-    } else if (widget.book.format == 'pdf') {
+    } else if (book.format == 'pdf') {
       engine = PdfBookReaderEngine();
     } else {
-      throw UnsupportedError('Format ${widget.book.format} is not supported');
+      throw UnsupportedError('Format ${book.format} is not supported');
     }
 
-    final file = File(widget.book.fileUrl!);
-    final bytes = await file.readAsBytes();
-    await engine.loadBook(bytes);
+    try {
+      final bytes = await File(book.fileUrl!).readAsBytes();
+      await engine.loadBook(bytes);
+      if (!mounted || generation != _loadGeneration) {
+        engine.dispose();
+        return engine;
+      }
+      _engine = engine;
+      return engine;
+    } catch (_) {
+      engine.dispose();
+      rethrow;
+    }
+  }
 
-    _engine = engine;
-    return engine;
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) _flushProgressInBackground();
+  }
+
+  void _flushProgressInBackground() {
+    unawaited(
+      _progressController.flush().catchError((Object error, StackTrace stack) {
+        FlutterError.reportError(
+          FlutterErrorDetails(
+            exception: error,
+            stack: stack,
+            library: 'Lira reader',
+            context: ErrorDescription('while saving the reading position'),
+          ),
+        );
+      }),
+    );
+  }
+
+  Future<void> _closeReader() async {
+    final generation = _loadGeneration;
+    if (_closingGeneration == generation) return;
+    _closingGeneration = generation;
+    final route = ModalRoute.of(context);
+    final navigator = Navigator.of(context);
+    try {
+      await _progressController.flush();
+      if (mounted &&
+          generation == _loadGeneration &&
+          route?.isCurrent == true) {
+        await navigator.maybePop();
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save reading position: $error')),
+        );
+      }
+    } finally {
+      if (_closingGeneration == generation) _closingGeneration = null;
+    }
   }
 
   @override
   void dispose() {
+    ++_loadGeneration;
+    WidgetsBinding.instance.removeObserver(this);
+    _flushProgressInBackground();
     _engine?.dispose();
     _progressNotifier.dispose();
     super.dispose();
@@ -92,6 +183,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final highlightsAsync = ref.watch(
       highlightsControllerProvider(widget.book.id),
     );
+    ref.listen(readingProgressControllerProvider(widget.book.id), (_, next) {
+      if (next.hasError && _initialLocation != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to save reading position: ${next.error}'),
+            ),
+          );
+        });
+      }
+    });
 
     return FutureBuilder<BookReaderEngine>(
       future: _engineFuture,
@@ -124,53 +227,27 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               Positioned.fill(
                 child: Container(
                   color: Color(settings.backgroundColor),
-                  child: progressAsyncValue.when(
-                    data: (progress) {
-                      _seedProgressIndicator(progress?.percentage);
-                      return engine.buildReaderWidget(
-                        context: context,
-                        settings: settings,
-                        theme: Theme.of(context),
-                        initialLocation: progress != null
-                            ? BookLocation(locator: progress.location)
-                            : const BookLocation(locator: ''),
-                        onCenterTapped: _toggleUi,
-                        highlights: _buildHighlightsData(highlightsAsync),
-                        onProgressChanged: (location, percentage) {
-                          _progressNotifier.value =
-                              _progressStateFromPercentage(percentage);
-                          ref
-                              .read(
-                                readingProgressControllerProvider(
-                                  widget.book.id,
-                                ).notifier,
-                              )
-                              .saveProgress(
-                                location: location.locator,
-                                percentage: percentage,
-                              );
-                        },
-                        onTextSelected: (text, location) {
-                          if (text.trim().isEmpty || location.locator.isEmpty) {
-                            setState(() {
-                              _selectedText = null;
-                              _selectedLocation = null;
-                            });
-                            return;
-                          }
-
-                          setState(() {
-                            _selectedText = text;
-                            _selectedLocation = location.locator;
-                          });
-                        },
-                      );
-                    },
-                    loading: () =>
-                        const Center(child: CircularProgressIndicator()),
-                    error: (e, st) =>
-                        const Center(child: Text('Error loading progress')),
-                  ),
+                  child: _initialLocation != null
+                      ? _buildReaderWidget(engine, settings, highlightsAsync)
+                      : progressAsyncValue.when(
+                          skipError: true,
+                          data: (progress) {
+                            _initialLocation = BookLocation(
+                              locator: progress?.location ?? '',
+                            );
+                            _seedProgressIndicator(progress?.percentage);
+                            return _buildReaderWidget(
+                              engine,
+                              settings,
+                              highlightsAsync,
+                            );
+                          },
+                          loading: () =>
+                              const Center(child: CircularProgressIndicator()),
+                          error: (e, st) => const Center(
+                            child: Text('Error loading progress'),
+                          ),
+                        ),
                 ),
               ),
               if (settings.brightness < 1.0)
@@ -203,7 +280,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                               color: Colors.white,
                               size: 20,
                             ),
-                            onPressed: () => Navigator.pop(context),
+                            onPressed: _closeReader,
                           ),
                           Expanded(
                             child: Text(
@@ -338,12 +415,55 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     );
   }
 
+  Widget _buildReaderWidget(
+    BookReaderEngine engine,
+    ReaderSettings settings,
+    AsyncValue<List<HighlightDto>> highlights,
+  ) {
+    return engine.buildReaderWidget(
+      context: context,
+      settings: settings,
+      theme: Theme.of(context),
+      initialLocation: _initialLocation!,
+      onCenterTapped: _toggleUi,
+      highlights: _buildHighlightsData(highlights),
+      onProgressChanged: (location, percentage) {
+        if (!mounted || _engine != engine) return;
+        _progressNotifier.value = _progressStateFromPercentage(percentage);
+        unawaited(
+          _progressController.saveProgress(
+            location: location.locator,
+            percentage: percentage,
+          ),
+        );
+      },
+      onTextSelected: (text, location) {
+        if (!mounted || _engine != engine) return;
+        setState(() {
+          final hasSelection =
+              text.trim().isNotEmpty && location.locator.isNotEmpty;
+          _selectedText = hasSelection ? text : null;
+          _selectedLocation = hasSelection ? location.locator : null;
+        });
+      },
+    );
+  }
+
   List<Map<String, dynamic>> _buildHighlightsData(
     AsyncValue<List<HighlightDto>> highlightsAsync,
   ) {
-    final highlights = highlightsAsync.valueOrNull ?? [];
+    final highlights = highlightsAsync.valueOrNull ?? const <HighlightDto>[];
+    if (identical(highlights, _mappedHighlights)) return _highlightData;
     final result = <Map<String, dynamic>>[];
     for (final h in highlights) {
+      if (widget.book.format == 'pdf') {
+        result.add({
+          'highlightId': h.id,
+          'location': h.location,
+          'color': h.color,
+        });
+        continue;
+      }
       final cfi = EpubCfi.fromJson(h.location);
       if (cfi == null || !cfi.hasRange) continue;
       result.add({
@@ -354,7 +474,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         'color': h.color,
       });
     }
-    return result;
+    _mappedHighlights = highlights;
+    return _highlightData = result;
   }
 
   void _seedProgressIndicator(double? percentage) {
@@ -426,25 +547,66 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     );
   }
 
-  void _saveHighlight(String color) {
-    if (_selectedText == null || _selectedLocation == null) return;
-    ref
-        .read(highlightsControllerProvider(widget.book.id).notifier)
-        .addHighlight(
-          text: _selectedText!,
-          location: _selectedLocation!,
-          color: color,
-        );
-    setState(() {
-      _selectedText = null;
-      _selectedLocation = null;
-    });
+  Future<void> _saveHighlight(String color) async {
+    final text = _selectedText;
+    final location = _selectedLocation;
+    if (text == null || location == null) return;
+    await _persistHighlight(text, location, color: color);
   }
 
-  void _addNote() {
-    if (_selectedText == null || _selectedLocation == null) return;
-    final noteController = TextEditingController();
-    showDialog(
+  Future<void> _persistHighlight(
+    String text,
+    String location, {
+    String color = '#BB86FC',
+    String? note,
+  }) async {
+    final generation = _loadGeneration;
+    if (_highlightWriteGeneration == generation) return;
+    _highlightWriteGeneration = generation;
+    final bookId = widget.book.id;
+    try {
+      await ref
+          .read(highlightsControllerProvider(bookId).notifier)
+          .addHighlight(
+            text: text,
+            location: location,
+            color: color,
+            note: note,
+          );
+      if (mounted &&
+          generation == _loadGeneration &&
+          widget.book.id == bookId &&
+          _selectedText == text &&
+          _selectedLocation == location) {
+        setState(() {
+          _selectedText = null;
+          _selectedLocation = null;
+        });
+        FocusManager.instance.primaryFocus?.unfocus();
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save highlight: $error')),
+        );
+      }
+    } finally {
+      if (_highlightWriteGeneration == generation)
+        _highlightWriteGeneration = null;
+    }
+  }
+
+  Future<void> _addNote() async {
+    final text = _selectedText;
+    final location = _selectedLocation;
+    if (text == null ||
+        location == null ||
+        _highlightWriteGeneration == _loadGeneration)
+      return;
+    final bookId = widget.book.id;
+    final generation = _loadGeneration;
+    var noteText = '';
+    final note = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Add note'),
@@ -453,7 +615,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '"${_selectedText!.length > 100 ? '${_selectedText!.substring(0, 100)}...' : _selectedText!}"',
+              '"${text.length > 100 ? '${text.substring(0, 100)}...' : text}"',
               style: TextStyle(
                 fontStyle: FontStyle.italic,
                 color: Theme.of(context).colorScheme.onSurface.withAlpha(150),
@@ -462,7 +624,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             ),
             const SizedBox(height: 12),
             TextField(
-              controller: noteController,
+              onChanged: (value) => noteText = value,
               autofocus: true,
               maxLines: 3,
               decoration: const InputDecoration(
@@ -478,27 +640,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () {
-              ref
-                  .read(highlightsControllerProvider(widget.book.id).notifier)
-                  .addHighlight(
-                    text: _selectedText!,
-                    location: _selectedLocation!,
-                    note: noteController.text.isNotEmpty
-                        ? noteController.text
-                        : null,
-                  );
-              Navigator.pop(ctx);
-              setState(() {
-                _selectedText = null;
-                _selectedLocation = null;
-              });
-            },
+            onPressed: () => Navigator.pop(ctx, noteText),
             child: const Text('Save'),
           ),
         ],
       ),
     );
+    if (note != null &&
+        mounted &&
+        generation == _loadGeneration &&
+        widget.book.id == bookId) {
+      await _persistHighlight(text, location, note: note.isEmpty ? null : note);
+    }
   }
 
   void _copySelection() {
@@ -508,6 +661,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         const SnackBar(content: Text('Copied'), duration: Duration(seconds: 1)),
       );
     }
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _selectedText = null;
       _selectedLocation = null;

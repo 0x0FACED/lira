@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- EPUB: восстановлены все документы в порядке OPF spine независимо от оглавления и имени файла; повреждённый spine больше не даёт частично успешную книгу.
+- EPUB: добавлено корректное чтение UTF-16 LE/BE; повреждённые текстовые последовательности не заменяются молча.
+- EPUB: позиция привязана к тексту и сохраняется при reflow, смене режима, шрифта, отступов и размера окна; переход на правую страницу разворота не сохраняет предыдущую главу.
+- EPUB: пересекающиеся highlights больше не дублируют текст; исправлены внутренние ссылки, fragments, encoded paths и Unicode hit-testing.
+- PDF: подключены панели, оглавление, native selection, сохранённые highlights и переход к их геометрии; controller не теряется после rebuild.
+- PDF: single tap не конфликтует с double-click selection, drag и long-press; native deselection очищает действия Lira.
+- PDF: исправлен upstream zero-area bug для абсолютно горизонтального выделения; нормализуются только активные edges, без подмены native текста или сохранённой геометрии.
+- PDF: переход к сохранённому выделению сохраняет текущий zoom, если диапазон помещается во viewport, вместо увеличения одной фразы на весь экран.
+- Reader: устранена потеря новой позиции при медленной предыдущей записи; close/suspend выполняют flush, а одновременные Back не закрывают предыдущий route.
+- Reader: повреждённые файлы показывают ошибку загрузки вместо подставной error-книги; выделение очищается после успешного сохранения.
+- CI: исправлены несовместимая версия Flutter и игнорирование выбранного debug/release режима.
+- Android: release больше не подменяет постоянный signing key debug-ключом; CI восстанавливает keystore из secrets без вывода паролей.
+
+### Changed
+- EPUB renderer окончательно переведён на native Flutter: удалены старый WebView, одноразовый patch script и неиспользуемые зависимости.
+- Новые EPUB-позиции используют versioned `v:2` offsets; legacy JSON остаётся читаемым без миграции схемы БД.
+- Добавлены reader-регрессии, включая настоящий PDFium; обновлены `READER.md` и документация пакетов.
+- GitHub Actions закреплён на Flutter 3.41.6; CI на push/PR и перед сборками запускает reader-регрессии с настоящим PDFium.
+- Релизный pipeline собирает Android, Linux, Windows и macOS; AAB создаётся только в release, неподдерживаемый Web исключён.
+- Единый draft GitHub Release создаётся только по тегу после успеха всех платформ; signing files удаляются после Android-сборки.
+
 ## [0.5.0] - 2026-04-12
 
 ### Added

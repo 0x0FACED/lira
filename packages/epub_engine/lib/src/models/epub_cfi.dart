@@ -1,18 +1,23 @@
 import 'dart:convert';
 
-/// EPUB Canonical Fragment Identifier (simplified for Flutter)
+/// Persistent native EPUB location in Lira's JSON format.
 ///
-/// Based on the EPUB CFI specification (https://www.w3.org/TR/epub-33/#sec-epubcfi).
-/// Adapted for Flutter scroll-based rendering.
+/// The historical class name does not imply a standard EPUB CFI string.
+/// Version 2 addresses parsed content; unversioned locations retain legacy
+/// coordinate semantics.
 ///
 /// - [spineIndex]: position in the EPUB spine (chapter order)
 /// - [anchor]: HTML element id for sub-chapter navigation (from TOC `#fragment`)
-/// - [charOffset]: approximate character offset within the chapter text
+/// - [charOffset]: parsed-content UTF-16 offset for v2; legacy HTML approximation otherwise
 /// - [scrollFraction]: fraction of chapter scrolled (0.0 = top, 1.0 = bottom)
 class EpubCfi {
   final int spineIndex;
   final String? anchor;
   final int charOffset;
+
+  /// v2 offsets address parsed content. Unversioned saves used HTML-length
+  /// approximations; selection ranges have always used their own text offsets.
+  final bool hasExactCharOffset;
   final double scrollFraction;
   final double? bookScrollOffset;
   final double? bookScrollFraction;
@@ -25,6 +30,7 @@ class EpubCfi {
     required this.spineIndex,
     this.anchor,
     this.charOffset = 0,
+    this.hasExactCharOffset = false,
     this.scrollFraction = 0.0,
     this.bookScrollOffset,
     this.bookScrollFraction,
@@ -37,6 +43,7 @@ class EpubCfi {
 
   String toJson() {
     return jsonEncode({
+      if (hasExactCharOffset) 'v': 2,
       's': spineIndex,
       if (anchor != null) 'a': anchor,
       'c': charOffset,
@@ -56,6 +63,7 @@ class EpubCfi {
         spineIndex: map['s'] as int? ?? 0,
         anchor: map['a'] as String?,
         charOffset: map['c'] as int? ?? 0,
+        hasExactCharOffset: map['v'] == 2,
         scrollFraction: (map['f'] as num?)?.toDouble() ?? 0.0,
         bookScrollOffset: (map['bo'] as num?)?.toDouble(),
         bookScrollFraction: (map['bf'] as num?)?.toDouble(),

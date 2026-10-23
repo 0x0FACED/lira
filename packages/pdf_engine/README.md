@@ -1,39 +1,43 @@
-<!--
-This README describes the package. If you publish this package to pub.dev,
-this README's contents appear on the landing page for your package.
+# pdf_engine
 
-For information about how to write a good package README, see the guide for
-[writing package pages](https://dart.dev/tools/pub/writing-package-pages).
+Native `pdfrx` PDF viewer integration for Lira.
 
-For general information about developing packages, see the Dart guide for
-[creating packages](https://dart.dev/guides/libraries/create-packages)
-and the Flutter guide for
-[developing packages and plugins](https://flutter.dev/to/develop-packages).
--->
+`PdfViewerWidget` owns a stable document reference and keeps its controller attached across progress, settings and highlight rebuilds. A new document/controller gets a new viewer identity.
 
-TODO: Put a short description of the package here that helps potential users
-know whether this package might be useful for them.
+## Selection and navigation
 
-## Features
+- Native text selection emits the selected text and an encoded `PdfReaderLocation`.
+- Empty selection clears the application-owned action bar.
+- Reader taps are observed without competing with native selection gestures; single taps wait for the double-click window.
+- Internal PDF annotations navigate to destinations; external HTTP(S) links use `url_launcher`.
+- Saved highlights are painted from native PDF fragment geometry, independent of zoom and viewport size.
+- Navigation centers saved selections without zooming in; it only zooms out when needed to fit the complete selected area.
+- After Copy/save, the application releases selection focus; Flutter clears the native selection.
 
-TODO: List what your package can do. Maybe include images, gifs, or videos.
+pdfrx 1.3.5 rejects non-collapsed edge selections with zero rectangular width/height. A PDF-local `SelectionContainerDelegate` gives only those degenerate active edges a 0.001 logical-pixel thickness. Collapsed carets and persisted native fragment geometry are unchanged.
 
-## Getting started
+`pdfrx 1.3.5` does not implement paragraph selection on triple-click. Multi-click is not converted into a reader single tap.
 
-TODO: List prerequisites and provide or point to information on how to
-start using the package.
+## Stored locations
 
-## Usage
+Progress remains a 1-based page-number string. Text selections use:
 
-TODO: Include short and useful examples for package users. Add longer examples
-to `/example` folder.
-
-```dart
-const like = 'sample';
+```json
+{"pdf":1,"p":3,"s":[{"p":3,"r":[[10,25]],"q":[[30,110,150,90]]}]}
 ```
 
-## Additional information
+- `p`: 1-based page number;
+- `r`: extracted-text ranges, zero-based and end-exclusive;
+- `q`: fragment rectangles `[left, top, right, bottom]` in PDF coordinates, Y up.
 
-TODO: Tell users more about the package: where to find more information, how to
-contribute to the package, how to file issues, what response they can expect
-from the package authors, and more.
+`PdfReaderLocation.tryParse` rejects malformed/unknown location data. Navigation clamps valid numeric pages to actual document bounds. Highlights enter the widget as `{highlightId, location, color}` maps; the PDF package decodes their location strings.
+
+## Verification
+
+Run from the Lira repository root:
+
+```bash
+flutter test packages/pdf_engine/test
+```
+
+Tests exercising the real PDFium library require `PDFIUM_PATH`; without it they explicitly skip rather than mock the native document. See `READER.md` for the macOS framework command and end-to-end reader test suite.

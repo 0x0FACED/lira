@@ -1,11 +1,13 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:epub_engine/epub_engine.dart';
+import 'package:epub_engine/src/epub_parser.dart';
 
 Future<void> main(List<String> args) async {
   if (args.isEmpty) {
-    stderr.writeln('Usage: dart run bin/debug_epub_parser.dart <epub-file> [...]');
+    stderr.writeln(
+      'Usage: dart run bin/debug_epub_parser.dart <epub-file> [...]',
+    );
     exit(64);
   }
 

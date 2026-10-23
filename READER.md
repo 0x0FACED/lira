@@ -1,126 +1,110 @@
-# Lira Universal Reader — Architecture Plan
+# Lira Reader
 
-## Проблема
+Ридер использует нативные Flutter-виджеты для EPUB и `pdfrx` для PDF. WebView-реализация и её зависимости удалены. Это не браузерный EPUB/CSS-движок и не извлечение PDF в EPUB-подобный текст.
 
-Текущие библиотеки не работают кросс-платформенно:
-- `pdfx` → **crash на Linux** (`MissingPluginException`)
-- `epub_view` → **2-3 FPS на Android** (рендер через `flutter_html`)
-- `epubx` → **crash** на некоторых EPUB файлах (`RangeError`)
+## Общий экран
 
-## Варианты решения
+`ReaderScreen` загружает локальный файл и выбирает реализацию `BookReaderEngine`:
 
-### Вариант A: Замена библиотек (быстрый фикс)
+- `EpubBookReaderEngine` → `packages/epub_engine`;
+- `PdfBookReaderEngine` → `packages/pdf_engine`.
 
-| Формат | Текущая | Замена | Плюсы | Минусы |
-|---|---|---|---|---|
-| PDF | `pdfx` | `pdfrx` | Поддержка Linux/Desktop, активный maintainer | Баги с шрифтами, pan-to-scroll |
-| EPUB | `epub_view` | `flutter_epub_viewer` | epub.js + InAppWebView, хайлайты, поиск | WebView-based → тяжёлый, нет Desktop |
+Экран отвечает за панели, оглавление, настройки, сохранение выделений/заметок и прогресса. Движок отвечает за содержимое, навигацию и координаты выделенного текста. `BookLocation.locator` — непрозрачная для общего интерфейса строка.
 
-**Время:** ~2-4 часа  
-**Риск:** Новые библиотеки могут иметь свои баги на нестандартных платформах.
+Начальная позиция применяется один раз при открытии книги. Сохранение прогресса не является командой повторной навигации. Переходы из оглавления и списка выделений идут через `goToLocation`.
 
----
+Прогресс-индикатор обновляется из событий движка. Записи в Drift объединяются с задержкой в одну секунду и сериализуются: завершение старой записи не может потерять новую позицию. `flush()` сохраняет последнее ожидающее значение при закрытии, смене книги, уходе приложения в фон и disposal. Кнопка возврата ожидает запись и проверяет исходный route, чтобы не закрыть предыдущий экран при одновременном системном Back. Ошибка записи не заменяет уже открытое содержимое экраном загрузки.
 
-### Вариант B: Универсальный ридер (свой рендер)
+Невалидный EPUB/PDF возвращает ошибку загрузки, а не подставную «главу с ошибкой».
 
-Пишем собственный рендер, который:
-1. **Парсит** EPUB/PDF → извлекает контент (текст, изображения, метаданные)
-2. **Нормализует** в единый `BookContent` формат
-3. **Рендерит** нативными Flutter виджетами
+## EPUB pipeline
 
-#### Архитектура
-
-```
-┌─────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│  EPUB File  │────▶│  ContentParser   │────▶│   BookContent   │
-│  PDF File   │     │  (epub/pdf)      │     │   (unified)     │
-│  FB2 (todo) │     │                  │     │                 │
-└─────────────┘     └──────────────────┘     └────────┬────────┘
-                                                       │
-                                              ┌────────▼────────┐
-                                              │  LiraReader     │
-                                              │  (Flutter UI)   │
-                                              │  - PageView     │
-                                              │  - Text/Images  │
-                                              │  - Highlights   │
-                                              └─────────────────┘
+```text
+ZIP → container.xml → OPF manifest/spine
+                         ├── главы в порядке spine
+                         ├── отдельное NCX / EPUB3 nav оглавление
+                         └── изображения и обложка
+XHTML → XhtmlParser → TextBlock / ImageBlock / DividerBlock
+                   → EpubNativeView
 ```
 
-#### Модель данных
+### Содержимое
 
-```dart
-class BookContent {
-  final BookMetadata metadata;    // title, author, cover, language
-  final List<Chapter> chapters;   // ordered list of chapters
-}
+- Порядок чтения задаёт OPF spine, не порядок manifest или TOC.
+- Несколько TOC anchors на один документ не дублируют его текст.
+- Имена вроде `stockholm.xhtml`, `cover.xhtml` или `copyright.xhtml` не являются причиной выбрасывать spine-документ.
+- Отсутствующий/пустой обязательный HTML-документ spine вызывает явную ошибку, а не частично успешное чтение.
+- При отсутствующем/пустом spine сохраняется восстановление по manifest без явного nav-документа.
+- XML/XHTML читается как UTF-8 или UTF-16 LE/BE; повреждённые последовательности не заменяются молча символами `�`.
 
-class Chapter {
-  final String title;
-  final List<ContentBlock> blocks; // text, image, table, etc.
-}
+### Отображение и позиция
 
-sealed class ContentBlock {}
-class TextBlock extends ContentBlock {  // paragraph, heading, etc.
-  final String text;
-  final TextStyle? style;
-  final TextBlockType type;  // paragraph, h1, h2, h3, quote, code
-}
-class ImageBlock extends ContentBlock {
-  final Uint8List imageData;
-  final String? altText;
-}
-class TableBlock extends ContentBlock { ... }
+Вертикальный режим использует `ScrollablePositionedList` с главами и точным размещением по геометрии `RenderParagraph`. Горизонтальный режим измеряет блоки через `TextPainter`, разбивает их на страницы и показывает одну страницу или разворот. Переключение страниц — `AnimatedSwitcher`, не WebView и не CSS columns.
+
+Перед изменением шрифта, интервала, отступов, размера viewport или режима сохраняется логическая позиция. После layout она восстанавливается в новой геометрии. Размер страницы не является сохранённым местом чтения. При переходе на правую страницу разворота сохраняется именно целевой текст, а не глава левой страницы.
+
+`EpubCfi` — историческое имя собственной JSON-модели, **не стандартная EPUB CFI-строка**:
+
+- `s`: индекс документа;
+- `a`: XHTML id / named anchor;
+- `c`: символьная координата;
+- `f`: доля главы;
+- `so` / `eo`: диапазон выделения, конец не включён;
+- `bo` / `bf`: старые пиксельные/общекнижные координаты;
+- `v: 2`: `c` задан точно в UTF-16 координатах разобранного содержимого `XhtmlParser`, включая генерируемые маркеры блоков.
+
+Без `v:2` запись остаётся legacy: при восстановлении учитываются anchor, диапазон выделения и прежние `f` / HTML-based `c`; пиксельные записи также читаются. Прочтение JSON само по себе не меняет его версию. После фактического восстановления native renderer публикует точную v2-позицию. Миграция схемы БД не требуется.
+
+Старые индексы из книги, которую прежний парсер читал не полностью или не по spine, не всегда однозначно сопоставимы исправленному содержимому: в старой записи нет идентификатора исходного документа. Совместимость формата не означает восстановления отсутствовавшей информации.
+
+### Выделения и ссылки
+
+Выделения адресуются диапазонами текста. Пересечения и вложенные диапазоны меняют фон spans, но не сам текст. Selection notifier и render keys принадлежат смонтированному scope, а не общему индексу главы: indexed jump может временно держать две копии главы.
+
+Внутренние ссылки и TOC fragments разрешаются относительно документа с нормализацией percent-encoded путей. Hit-test использует геометрию полного видимого диапазона ссылки, включая emoji и переносы. Внешние HTTP(S)-ссылки открываются через `url_launcher`.
+
+## PDF pipeline
+
+`pdfrx` сохраняет исходную PDF-вёрстку. Controller и document reference стабильны в пределах открытой книги; обновление прогресса, настроек или highlights не создаёт новый viewer.
+
+- Старый locator прогресса — строковый номер страницы, начиная с 1.
+- TOC и обычные PDF destinations переходят через controller; номера страниц ограничиваются документом.
+- Выделение берётся из реального `onTextSelectionChange`, а не из отдельного поиска совпавшей строки.
+- `PdfReaderLocation` хранит версию `pdf:1`, страницы, диапазоны извлечённого текста и геометрию фрагментов в PDF-координатах (Y направлен вверх). Zoom и размер окна не меняют сохранённые прямоугольники.
+- Highlights рисуются `pagePaintCallbacks`; удаление перестраивает overlay без переоткрытия файла.
+- Возврат к highlight центрирует его прямоугольник без увеличения текущего zoom. Если выделение не помещается, масштаб уменьшается ровно до необходимого; переход не превращает одну фразу в текст на весь экран.
+- Пустое native selection очищает панель Lira; успешные Copy/Highlight снимают native focus/selection.
+- Reader tap наблюдается через raw pointer events без competing tap recognizer. Single tap ожидает окно double-click; drag, long-press и multi-click не превращаются в переключение панелей.
+- Внутренние PDF links обрабатываются через destinations, внешние HTTP(S) — через `url_launcher`.
+
+В `pdfrx 1.3.5` нулевая высота/ширина прямоугольника edge selection ошибочно обнуляет непустое выделение. PDF-local `SelectionContainerDelegate` добавляет такому диапазону толщину 0.001 logical px перед передачей native selectable. Collapsed caret не изменяется; сохранённые ranges/fragment rectangles по-прежнему вычисляет сам `pdfrx`.
+
+`pdfrx 1.3.5` не реализует paragraph selection для triple-click. Lira не подменяет его одиночным reader tap.
+
+## Проверки
+
+Из корня проекта:
+
+```bash
+flutter pub get
+flutter test test packages/epub_engine/test packages/pdf_engine/test
 ```
 
-#### Парсеры
+Тесты с настоящим PDFium требуют `PDFIUM_PATH`, иначе они явно пропускаются. На macOS можно использовать framework после локальной debug-сборки:
 
-| Формат | Библиотека для парсинга | Что извлекаем |
-|---|---|---|
-| EPUB | `epubx` (парсинг ZIP) + дополнительный HTML-парсер | Главы → HTML → ContentBlock |
-| PDF | `syncfusion_flutter_pdf` (извлечение текста/изображений) | Страницы → текст/изображения → ContentBlock |
-
-#### Рендер (Flutter native)
-
-```dart
-class LiraReaderView extends StatefulWidget {
-  final BookContent content;
-  final BookLocation initialLocation;
-  final void Function(BookLocation, double) onProgressChanged;
-}
+```bash
+flutter build macos --debug
+PDFIUM_PATH="$PWD/build/macos/Build/Products/Debug/pdfrx/pdfrx.framework/pdfrx" \
+  flutter test --no-pub test packages/epub_engine/test packages/pdf_engine/test
 ```
 
-- `PageView` для постраничного листания (плавные анимации)
-- `RichText` / `Text.rich` для текста с поддержкой выделения
-- `Image.memory` для встроенных изображений
-- `SelectableText` для выделения текста → хайлайты
+Регрессии проверяют порядок и целостность EPUB, кодировки, reflow/позиции, Unicode-границы пагинации, перекрытия highlights, ссылки, закрытие/повторное открытие, гонки сохранения и реальные PDF selection/геометрию/навигацию/перерисовку.
 
-**Время:** ~2-3 дня  
-**Плюсы:** Полный контроль, единый UX, работает на ВСЕХ платформах, расширяемость (FB2, MOBI)  
-**Минусы:** Сложность парсинга PDF (layout-based), не все EPUB стили будут поддержаны
+Для диагностики содержимого EPUB без Flutter UI:
 
----
+```bash
+dart --packages=.dart_tool/package_config.json \
+  packages/epub_engine/bin/debug_epub_parser.dart path/to/book.epub
+```
 
-### Вариант C: Гибрид (рекомендуемый)
-
-Комбинация подходов:
-- **PDF** → заменить `pdfx` на `pdfrx` (поддержка Desktop, проверенный) 
-- **EPUB** → свой рендер: `epubx` для парсинга + `flutter_widget_from_html` для отображения HTML-глав нативно (без WebView)
-
-Это даёт:
-- ✅ PDF работает на всех платформах через `pdfrx`
-- ✅ EPUB рендерится нативно (без WebView) → производительность
-- ✅ Легко добавить FB2/MOBI позже
-- ✅ Быстрее реализовать чем полный Вариант B
-
-**Время:** ~4-6 часов
-
-## Рекомендация
-
-**Вариант C (гибрид)** — оптимальный баланс скорости и качества.
-
-### План реализации
-
-1. Заменить `pdfx` на `pdfrx` в `pdf_engine` (фикс Linux)
-2. Переписать `epub_engine`: `epubx` парсинг + `flutter_widget_from_html` для рендера глав
-3. Добавить error handling для невалидных EPUB/PDF
-4. Протестировать на Linux + Android
+Проверка на реальных Android/iOS устройствах и profile-замеры больших книг остаются отдельными от desktop regression tests. Общий performance roadmap находится в `PERF.md`.

@@ -1,9 +1,7 @@
-import 'dart:math' as math;
 import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
-import 'package:epubx/epubx.dart';
 import 'package:xml/xml.dart';
 
 /// Parsed EPUB content ready for rendering
@@ -51,7 +49,6 @@ class TOCItem {
   });
 }
 
-const _skipPatterns = ['nav', 'toc', 'ncx', 'cover', 'titlepage', 'copyright'];
 const _htmlMediaTypes = {
   'application/xhtml+xml',
   'text/html',
@@ -59,328 +56,14 @@ const _htmlMediaTypes = {
   'text/xml',
 };
 
-bool _isMetadataFile(String fileName) {
-  if (fileName.isEmpty) return true;
-  final lower = fileName.toLowerCase();
-  for (final pattern in _skipPatterns) {
-    if (lower.contains(pattern)) return true;
-  }
-  return false;
-}
-
 /// Parses EPUB bytes into structured content
 class EpubParser {
-  /// Parse EPUB from raw bytes
+  /// Parse EPUB from raw bytes.
+  ///
+  /// The package spine defines reading order; the TOC is only navigation and
+  /// may omit documents, reorder them, or point to several anchors in one file.
   static Future<ParsedEpub> parse(Uint8List data) async {
-    ParsedEpub? primaryResult;
-    Object? primaryError;
-
-    try {
-      final book = await EpubReader.readBook(data);
-      primaryResult = _normalizeParsedEpub(_buildFromEpubxBook(book));
-    } catch (error) {
-      primaryError = error;
-    }
-
-    if (primaryResult != null &&
-        !_shouldAttemptArchiveFallback(primaryResult)) {
-      return primaryResult;
-    }
-
-    ParsedEpub? fallbackResult;
-    Object? fallbackError;
-
-    try {
-      fallbackResult = _normalizeParsedEpub(_parseWithArchive(data));
-    } catch (error) {
-      fallbackError = error;
-    }
-
-    if (primaryResult != null && fallbackResult != null) {
-      return _qualityScore(fallbackResult) >= _qualityScore(primaryResult)
-          ? fallbackResult
-          : primaryResult;
-    }
-
-    if (primaryResult != null) {
-      return primaryResult;
-    }
-
-    if (fallbackResult != null) {
-      return fallbackResult;
-    }
-
-    throw Exception(
-      'Failed to parse EPUB. Primary parser error: $primaryError. '
-      'Fallback parser error: $fallbackError',
-    );
-  }
-
-  static ParsedEpub _normalizeParsedEpub(ParsedEpub parsed) {
-    return ParsedEpub(
-      title: parsed.title,
-      author: parsed.author,
-      coverImage: parsed.coverImage,
-      chapters: parsed.chapters,
-      toc: _normalizeToc(parsed.toc, parsed.title),
-      images: parsed.images,
-    );
-  }
-
-  static List<TOCItem> _normalizeToc(List<TOCItem> toc, String bookTitle) {
-    if (toc.length != 1) return toc;
-
-    final root = toc.first;
-    if (root.subItems.isEmpty) return toc;
-
-    final normalizedRoot = _normalizeTitle(root.title);
-    final normalizedBookTitle = _normalizeTitle(bookTitle);
-    final rootLooksLikeBookTitle =
-        normalizedBookTitle.isNotEmpty &&
-        (normalizedRoot == normalizedBookTitle ||
-            normalizedRoot.contains(normalizedBookTitle) ||
-            normalizedBookTitle.contains(normalizedRoot));
-
-    final distinctSubTargets = root.subItems
-        .map((item) => item.fileName.split('#').first)
-        .where((path) => path.isNotEmpty)
-        .toSet()
-        .length;
-
-    if (rootLooksLikeBookTitle && distinctSubTargets >= 2) {
-      return root.subItems;
-    }
-
-    return toc;
-  }
-
-  static bool _shouldAttemptArchiveFallback(ParsedEpub parsed) {
-    if (parsed.chapters.isEmpty) return true;
-
-    final chapterTitles = parsed.chapters
-        .map((chapter) => chapter.title)
-        .toList(growable: false);
-    if (_hasSuspiciousTitleDistribution(chapterTitles, parsed.title)) {
-      return true;
-    }
-
-    final tocTitles = _collectTocTitles(parsed.toc);
-    if (_hasSuspiciousTitleDistribution(tocTitles, parsed.title)) {
-      return true;
-    }
-
-    return false;
-  }
-
-  static bool _hasSuspiciousTitleDistribution(
-    List<String> titles,
-    String bookTitle,
-  ) {
-    final stats = _analyzeTitleDistribution(titles, bookTitle);
-    if (stats.total < 5) return false;
-
-    if (stats.uniqueCount <= math.max(2, (stats.total * 0.12).round())) {
-      return true;
-    }
-
-    if (stats.bookTitleMatchRatio >= 0.35) {
-      return true;
-    }
-
-    if (stats.dominantRatio >= 0.5) {
-      return true;
-    }
-
-    return false;
-  }
-
-  static int _qualityScore(ParsedEpub parsed) {
-    final chapterStats = _analyzeTitleDistribution(
-      parsed.chapters.map((chapter) => chapter.title).toList(growable: false),
-      parsed.title,
-    );
-    final tocStats = _analyzeTitleDistribution(
-      _collectTocTitles(parsed.toc),
-      parsed.title,
-    );
-
-    var score = 0;
-    score += parsed.chapters.isNotEmpty ? 80 : 0;
-    score += parsed.toc.isNotEmpty ? 40 : 0;
-    score += math.min(chapterStats.uniqueCount, 40) * 3;
-    score += math.min(tocStats.uniqueCount, 40) * 2;
-    score += math.min(_maxTocDepth(parsed.toc), 4) * 10;
-    score += math.min(
-      parsed.chapters
-          .where((chapter) => chapter.htmlContent.trim().isNotEmpty)
-          .length,
-      50,
-    );
-    score -= (chapterStats.bookTitleMatchRatio * 120).round();
-    score -= (tocStats.bookTitleMatchRatio * 80).round();
-    score -= (chapterStats.dominantRatio * 100).round();
-    score -= (tocStats.dominantRatio * 60).round();
-    return score;
-  }
-
-  static _TitleDistribution _analyzeTitleDistribution(
-    List<String> titles,
-    String bookTitle,
-  ) {
-    final normalizedBookTitle = _normalizeTitle(bookTitle);
-    final normalizedTitles = titles
-        .map(_normalizeTitle)
-        .where((title) => title.isNotEmpty)
-        .toList(growable: false);
-
-    if (normalizedTitles.isEmpty) {
-      return const _TitleDistribution(
-        total: 0,
-        uniqueCount: 0,
-        dominantRatio: 0,
-        bookTitleMatchRatio: 0,
-      );
-    }
-
-    final frequencies = <String, int>{};
-    var bookTitleMatches = 0;
-    for (final title in normalizedTitles) {
-      frequencies.update(title, (count) => count + 1, ifAbsent: () => 1);
-
-      if (normalizedBookTitle.isNotEmpty &&
-          (title == normalizedBookTitle ||
-              title.contains(normalizedBookTitle) ||
-              normalizedBookTitle.contains(title))) {
-        bookTitleMatches++;
-      }
-    }
-
-    final dominantCount = frequencies.values.fold<int>(
-      0,
-      (current, value) => value > current ? value : current,
-    );
-
-    return _TitleDistribution(
-      total: normalizedTitles.length,
-      uniqueCount: frequencies.length,
-      dominantRatio: dominantCount / normalizedTitles.length,
-      bookTitleMatchRatio: bookTitleMatches / normalizedTitles.length,
-    );
-  }
-
-  static List<String> _collectTocTitles(List<TOCItem> items) {
-    final titles = <String>[];
-
-    void visit(List<TOCItem> nodes) {
-      for (final node in nodes) {
-        if (node.title.trim().isNotEmpty) {
-          titles.add(node.title);
-        }
-        if (node.subItems.isNotEmpty) {
-          visit(node.subItems);
-        }
-      }
-    }
-
-    visit(items);
-    return titles;
-  }
-
-  static int _maxTocDepth(List<TOCItem> items) {
-    var depth = 0;
-
-    void visit(List<TOCItem> nodes, int currentDepth) {
-      if (nodes.isEmpty) return;
-      if (currentDepth > depth) {
-        depth = currentDepth;
-      }
-      for (final node in nodes) {
-        if (node.subItems.isNotEmpty) {
-          visit(node.subItems, currentDepth + 1);
-        }
-      }
-    }
-
-    visit(items, 1);
-    return depth;
-  }
-
-  static String _normalizeTitle(String value) {
-    return value
-        .toLowerCase()
-        .replaceAll(RegExp(r'[\p{P}\p{S}]+', unicode: true), ' ')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
-  }
-
-  static ParsedEpub _buildFromEpubxBook(EpubBook book) {
-    final title = book.Title ?? 'Unknown Title';
-    final author = book.Author ?? 'Unknown Author';
-
-    Uint8List? coverImage;
-    if (book.CoverImage != null) {
-      try {
-        final bytes = book.CoverImage!.getBytes();
-        if (bytes.isNotEmpty) {
-          coverImage = Uint8List.fromList(bytes);
-        }
-      } catch (_) {}
-    }
-
-    if (coverImage == null && book.Content?.Images != null) {
-      for (final entry in book.Content!.Images!.entries) {
-        final key = entry.key.toLowerCase();
-        if ((key.contains('cover') || key.contains('jacket')) &&
-            entry.value.Content != null &&
-            entry.value.Content!.isNotEmpty) {
-          coverImage = Uint8List.fromList(entry.value.Content!);
-          break;
-        }
-      }
-    }
-
-    final images = <String, Uint8List>{};
-    if (book.Content?.Images != null) {
-      for (final entry in book.Content!.Images!.entries) {
-        if (entry.value.Content != null) {
-          _registerBinaryAliases(images, entry.key, entry.value.Content!);
-        }
-      }
-    }
-
-    final flatChapters = <EpubChapter>[];
-    final toc = <TOCItem>[];
-    final seenFileNames = <String>{};
-
-    if (book.Chapters != null && book.Chapters!.isNotEmpty) {
-      for (final ch in book.Chapters!) {
-        _processEpubxChapter(ch, flatChapters, toc, seenFileNames);
-      }
-    } else if (book.Content?.Html != null) {
-      for (final entry in book.Content!.Html!.entries) {
-        if (_isMetadataFile(entry.key)) continue;
-        final htmlContent = entry.value.Content ?? '';
-        if (htmlContent.trim().isEmpty) continue;
-
-        flatChapters.add(
-          EpubChapter(
-            title: entry.key,
-            htmlContent: htmlContent,
-            fileName: entry.key,
-          ),
-        );
-        toc.add(TOCItem(title: entry.key, fileName: entry.key));
-      }
-    }
-
-    return ParsedEpub(
-      title: title,
-      author: author,
-      coverImage: coverImage,
-      chapters: flatChapters,
-      toc: toc,
-      images: images,
-    );
+    return _parseWithArchive(data);
   }
 
   static ParsedEpub _parseWithArchive(Uint8List data) {
@@ -491,83 +174,79 @@ class EpubParser {
       manifestItems: manifestItems,
       fileByPath: fileByPath,
       aliasToActualPath: aliasToActualPath,
-      opfDir: opfDir,
-      fallbackChapterTitles: const {},
     );
 
     final tocTitlesByPath = <String, String>{};
     _flattenTocTitles(toc, tocTitlesByPath);
 
     final flatChapters = <EpubChapter>[];
-    final seenFileNames = <String>{};
-    final spineIds = <String>[];
+    final seenPaths = <String>{};
+
+    void addChapter(_ManifestItem item, {bool requiredBySpine = false}) {
+      if (!_isHtmlManifestItem(item)) return;
+      final actualPath = _findArchivePath(item.resolvedPath, aliasToActualPath);
+      if (actualPath == null) {
+        if (requiredBySpine) {
+          throw FormatException(
+            'EPUB spine document not found: ${item.resolvedPath}',
+          );
+        }
+        return;
+      }
+      if (seenPaths.contains(actualPath)) return;
+
+      final htmlContent = _decodeTextFile(fileByPath[actualPath]!);
+      if (htmlContent.trim().isEmpty) {
+        if (requiredBySpine) {
+          throw FormatException(
+            'EPUB spine document is empty: ${item.resolvedPath}',
+          );
+        }
+        return;
+      }
+
+      flatChapters.add(
+        EpubChapter(
+          title:
+              tocTitlesByPath[item.resolvedPath] ??
+              _extractDocumentTitle(htmlContent) ??
+              item.id,
+          htmlContent: htmlContent,
+          fileName: item.resolvedPath,
+        ),
+      );
+      seenPaths.add(actualPath);
+    }
+
+    var hasSpineItems = false;
     if (spineNode != null) {
       for (final itemRefNode in spineNode.children.whereType<XmlElement>()) {
         if (itemRefNode.name.local.toLowerCase() != 'itemref') continue;
+        hasSpineItems = true;
         final idRef = _attributeValue(itemRefNode, 'idref');
-        if (idRef != null && idRef.isNotEmpty) {
-          spineIds.add(idRef);
+        if (idRef == null || idRef.isEmpty) {
+          throw const FormatException('EPUB spine itemref is missing idref');
         }
+        final item = manifestById[idRef];
+        if (item == null) {
+          throw FormatException(
+            'EPUB spine item "$idRef" is missing from the manifest',
+          );
+        }
+        addChapter(item, requiredBySpine: true);
       }
     }
 
-    if (spineIds.isNotEmpty) {
-      for (final spineId in spineIds) {
-        final item = manifestById[spineId];
-        if (item == null || !_isHtmlManifestItem(item)) continue;
-        final actualPath = _findArchivePath(
-          item.resolvedPath,
-          aliasToActualPath,
-        );
-        if (actualPath == null || seenFileNames.contains(item.resolvedPath)) {
-          continue;
-        }
-
-        final htmlContent = _decodeTextFile(fileByPath[actualPath]!);
-        if (htmlContent.trim().isEmpty) continue;
-
-        flatChapters.add(
-          EpubChapter(
-            title:
-                tocTitlesByPath[item.resolvedPath] ??
-                _extractDocumentTitle(htmlContent) ??
-                item.id,
-            htmlContent: htmlContent,
-            fileName: item.resolvedPath,
-          ),
-        );
-        seenFileNames.add(item.resolvedPath);
-      }
-    }
-
-    if (flatChapters.isEmpty) {
+    // Recover manifest order only when no spine items define reading order.
+    // Explicit navigation documents are excluded, never files named like them.
+    if (!hasSpineItems) {
       for (final item in manifestItems) {
-        if (!_isHtmlManifestItem(item) || _isMetadataFile(item.resolvedPath)) {
-          continue;
-        }
-        final actualPath = _findArchivePath(
-          item.resolvedPath,
-          aliasToActualPath,
-        );
-        if (actualPath == null || seenFileNames.contains(item.resolvedPath)) {
-          continue;
-        }
-
-        final htmlContent = _decodeTextFile(fileByPath[actualPath]!);
-        if (htmlContent.trim().isEmpty) continue;
-
-        flatChapters.add(
-          EpubChapter(
-            title:
-                tocTitlesByPath[item.resolvedPath] ??
-                _extractDocumentTitle(htmlContent) ??
-                item.id,
-            htmlContent: htmlContent,
-            fileName: item.resolvedPath,
-          ),
-        );
-        seenFileNames.add(item.resolvedPath);
+        if (item.properties.split(RegExp(r'\s+')).contains('nav')) continue;
+        addChapter(item);
       }
+    }
+    if (flatChapters.isEmpty) {
+      throw const FormatException('EPUB contains no readable documents');
     }
 
     final normalizedToc = toc.isNotEmpty
@@ -589,48 +268,15 @@ class EpubParser {
     );
   }
 
-  static void _processEpubxChapter(
-    dynamic ch,
-    List<EpubChapter> flatChapters,
-    List<TOCItem> tocList,
-    Set<String> seenFileNames,
-  ) {
-    final fileName = ch.ContentFileName ?? '';
-    final title = ch.Title ?? '';
-
-    final subToc = <TOCItem>[];
-    if (ch.SubChapters != null && ch.SubChapters.isNotEmpty) {
-      for (final sub in ch.SubChapters) {
-        _processEpubxChapter(sub, flatChapters, subToc, seenFileNames);
-      }
-    }
-
-    tocList.add(TOCItem(title: title, fileName: fileName, subItems: subToc));
-
-    if (fileName.isNotEmpty &&
-        !_isMetadataFile(fileName) &&
-        !seenFileNames.contains(fileName)) {
-      final htmlContent = ch.HtmlContent ?? '';
-      if (htmlContent.trim().isNotEmpty) {
-        flatChapters.add(
-          EpubChapter(
-            title: title,
-            htmlContent: htmlContent,
-            fileName: fileName,
-          ),
-        );
-        seenFileNames.add(fileName);
-      }
-    }
-  }
-
   static _ManifestItem? _resolveCoverItem(
     XmlElement? metadataNode,
     List<_ManifestItem> manifestItems,
     Map<String, _ManifestItem> manifestById,
   ) {
     final epub3Cover = manifestItems.firstWhere(
-      (item) => item.properties.toLowerCase().contains('cover-image'),
+      (item) =>
+          item.mediaType.toLowerCase().startsWith('image/') &&
+          item.properties.split(RegExp(r'\s+')).contains('cover-image'),
       orElse: () => _ManifestItem.empty,
     );
     if (epub3Cover != _ManifestItem.empty) {
@@ -643,13 +289,15 @@ class EpubParser {
         final name = _attributeValue(meta, 'name');
         if (name?.toLowerCase() != 'cover') continue;
         final content = _attributeValue(meta, 'content');
-        if (content != null && manifestById.containsKey(content)) {
-          return manifestById[content];
+        final item = manifestById[content];
+        if (item != null && item.mediaType.toLowerCase().startsWith('image/')) {
+          return item;
         }
       }
     }
 
     for (final item in manifestItems) {
+      if (!item.mediaType.toLowerCase().startsWith('image/')) continue;
       final lowerPath = item.resolvedPath.toLowerCase();
       if (lowerPath.contains('cover') || lowerPath.contains('jacket')) {
         return item;
@@ -663,8 +311,6 @@ class EpubParser {
     required List<_ManifestItem> manifestItems,
     required Map<String, ArchiveFile> fileByPath,
     required Map<String, String> aliasToActualPath,
-    required String opfDir,
-    required Map<String, String> fallbackChapterTitles,
   }) {
     final navItem = manifestItems.firstWhere(
       (item) => item.properties.toLowerCase().contains('nav'),
@@ -838,7 +484,49 @@ class EpubParser {
 
   static String _decodeTextFile(ArchiveFile file) {
     final bytes = _fileBytes(file);
-    return utf8.decode(bytes, allowMalformed: true);
+    Endian? endian;
+    var start = 0;
+    if (bytes.length >= 2) {
+      if (bytes[0] == 0xFF && bytes[1] == 0xFE) {
+        endian = Endian.little;
+        start = 2;
+      } else if (bytes[0] == 0xFE && bytes[1] == 0xFF) {
+        endian = Endian.big;
+        start = 2;
+      }
+    }
+    if (endian == null && bytes.length >= 4) {
+      if (bytes[0] == 0x3C && bytes[1] == 0 && bytes[3] == 0) {
+        endian = Endian.little;
+      } else if (bytes[0] == 0 && bytes[1] == 0x3C && bytes[2] == 0) {
+        endian = Endian.big;
+      }
+    }
+    if (endian == null) return utf8.decode(bytes);
+    if ((bytes.length - start).isOdd) {
+      throw FormatException('Truncated UTF-16 EPUB document: ${file.name}');
+    }
+    final data = ByteData.sublistView(bytes, start);
+    final units = Uint16List(data.lengthInBytes ~/ 2);
+    var expectingLowSurrogate = false;
+    for (var index = 0; index < units.length; index++) {
+      final unit = data.getUint16(index * 2, endian);
+      if (expectingLowSurrogate) {
+        if (unit < 0xDC00 || unit > 0xDFFF) {
+          throw FormatException('Invalid UTF-16 EPUB document: ${file.name}');
+        }
+        expectingLowSurrogate = false;
+      } else if (unit >= 0xD800 && unit <= 0xDBFF) {
+        expectingLowSurrogate = true;
+      } else if (unit >= 0xDC00 && unit <= 0xDFFF) {
+        throw FormatException('Invalid UTF-16 EPUB document: ${file.name}');
+      }
+      units[index] = unit;
+    }
+    if (expectingLowSurrogate) {
+      throw FormatException('Invalid UTF-16 EPUB document: ${file.name}');
+    }
+    return String.fromCharCodes(units);
   }
 
   static String? _findArchivePath(
@@ -1057,18 +745,4 @@ class _ManifestItem {
     mediaType: '',
     properties: '',
   );
-}
-
-class _TitleDistribution {
-  final int total;
-  final int uniqueCount;
-  final double dominantRatio;
-  final double bookTitleMatchRatio;
-
-  const _TitleDistribution({
-    required this.total,
-    required this.uniqueCount,
-    required this.dominantRatio,
-    required this.bookTitleMatchRatio,
-  });
 }

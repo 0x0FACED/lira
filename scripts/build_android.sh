@@ -18,25 +18,12 @@ echo ""
 echo -e "${YELLOW}Build type:${NC} $BUILD_TYPE"
 echo ""
 
-# Check if key.properties exists for release builds
-if [[ "$BUILD_TYPE" == "release" ]]; then
-    if [[ ! -f "android/key.properties" ]]; then
-        echo -e "${YELLOW}⚠ android/key.properties not found${NC}"
-        echo ""
-        echo "The APK will be signed with debug key."
-        echo "For production builds, create key.properties:"
-        echo ""
-        echo "  1. Run: ./scripts/generate_keystore.sh"
-        echo "  2. Copy android/key.properties.template to android/key.properties"
-        echo "  3. Fill in your credentials"
-        echo ""
-        read -p "Continue with debug signing? [y/N] " -n 1 -r
-        echo ""
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            echo -e "${YELLOW}Build cancelled${NC}"
-            exit 0
-        fi
-    fi
+# Release builds must use a configured, persistent signing key.
+if [[ "$BUILD_TYPE" == "release" && ! -f "android/key.properties" ]]; then
+    echo -e "${RED}Release signing requires android/key.properties.${NC}"
+    echo "Configure your keystore as described in RELEASE.md."
+    echo "Use './scripts/build_android.sh debug' for a debug-signed test APK."
+    exit 1
 fi
 
 # Build APK

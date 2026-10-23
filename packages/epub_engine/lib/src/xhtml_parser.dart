@@ -74,6 +74,15 @@ class HighlightRange {
   });
 }
 
+/// A link range in the same chapter character space as [ContentElement].
+class ContentLink {
+  final int startOffset;
+  final int endOffset;
+  final String href;
+
+  const ContentLink(this.startOffset, this.endOffset, this.href);
+}
+
 /// Parses XHTML into a list of ContentElement objects.
 class XhtmlParser {
   final String html;
@@ -82,6 +91,9 @@ class XhtmlParser {
   final TextStyle baseStyle;
   final double lineHeight;
 
+  /// Exact rendered-text offsets for XHTML ids and legacy named anchors.
+  final Map<String, int> anchors = {};
+  final List<ContentLink> links = [];
   int _charOffset = 0;
 
   XhtmlParser({
@@ -95,6 +107,8 @@ class XhtmlParser {
   /// Parse the XHTML and return a list of ContentElement.
   List<ContentElement> parse() {
     _charOffset = 0;
+    anchors.clear();
+    links.clear();
 
     final xmlElements = _parseXmlDocument();
     if (xmlElements != null && xmlElements.isNotEmpty) {
@@ -102,6 +116,8 @@ class XhtmlParser {
     }
 
     _charOffset = 0;
+    anchors.clear();
+    links.clear();
     final document = html_parser.parse(html);
     final body = document.body;
     if (body == null) return [];
@@ -133,13 +149,23 @@ class XhtmlParser {
     if (node is xml.XmlText || node is xml.XmlCDATA) {
       final text = node.value ?? '';
       if (text.trim().isEmpty) return;
+      final start = _charOffset;
       _charOffset += text.length;
+      elements.add(
+        TextBlock(
+          span: TextSpan(text: text, style: currentStyle),
+          type: TextBlockType.paragraph,
+          charStart: start,
+          charEnd: _charOffset,
+        ),
+      );
       return;
     }
 
     if (node is! xml.XmlElement) return;
 
     final tag = node.name.local.toLowerCase();
+    _recordAnchor(_xmlAttribute(node, 'id'), _xmlAttribute(node, 'name'));
     final effectiveStyle = _resolveXmlElementStyle(node, currentStyle);
 
     switch (tag) {
@@ -250,7 +276,7 @@ class XhtmlParser {
               child,
               elements,
               type: TextBlockType.listItem,
-              style: effectiveStyle,
+              style: _resolveXmlElementStyle(child, effectiveStyle),
               listIndex: idx,
             );
             idx++;
@@ -267,7 +293,7 @@ class XhtmlParser {
               child,
               elements,
               type: TextBlockType.listItem,
-              style: effectiveStyle,
+              style: _resolveXmlElementStyle(child, effectiveStyle),
               listIndex: idx,
             );
             idx++;
@@ -333,8 +359,13 @@ class XhtmlParser {
             style: effectiveStyle,
           );
         } else {
+          final linkStart = _charOffset;
           for (final child in node.children) {
             _parseXmlNode(child, elements, currentStyle: effectiveStyle);
+          }
+          final href = _xmlAttribute(node, 'href');
+          if (tag == 'a' && href != null && href.isNotEmpty) {
+            links.add(ContentLink(linkStart, _charOffset, href));
           }
         }
     }
@@ -348,13 +379,23 @@ class XhtmlParser {
     if (node is dom.Text) {
       final text = node.text;
       if (text.trim().isEmpty) return;
+      final start = _charOffset;
       _charOffset += text.length;
+      elements.add(
+        TextBlock(
+          span: TextSpan(text: text, style: currentStyle),
+          type: TextBlockType.paragraph,
+          charStart: start,
+          charEnd: _charOffset,
+        ),
+      );
       return;
     }
 
     if (node is! dom.Element) return;
 
     final tag = node.localName?.toLowerCase() ?? '';
+    _recordAnchor(node.attributes['id'], node.attributes['name']);
     final effectiveStyle = _resolveElementStyle(node, currentStyle);
 
     switch (tag) {
@@ -465,7 +506,7 @@ class XhtmlParser {
               child,
               elements,
               type: TextBlockType.listItem,
-              style: effectiveStyle,
+              style: _resolveElementStyle(child, effectiveStyle),
               listIndex: idx,
             );
             idx++;
@@ -482,7 +523,7 @@ class XhtmlParser {
               child,
               elements,
               type: TextBlockType.listItem,
-              style: effectiveStyle,
+              style: _resolveElementStyle(child, effectiveStyle),
               listIndex: idx,
             );
             idx++;
@@ -549,8 +590,13 @@ class XhtmlParser {
             style: effectiveStyle,
           );
         } else {
+          final linkStart = _charOffset;
           for (final child in node.nodes) {
             _parseNode(child, elements, currentStyle: effectiveStyle);
+          }
+          final href = node.attributes['href'];
+          if (tag == 'a' && href != null && href.isNotEmpty) {
+            links.add(ContentLink(linkStart, _charOffset, href));
           }
         }
     }
@@ -660,6 +706,7 @@ class XhtmlParser {
     int? listIndex,
   }) {
     final startOffset = _charOffset;
+    _recordAnchor(element.attributes['id'], element.attributes['name']);
     final spans = <InlineSpan>[];
 
     // Add list marker if needed
@@ -671,7 +718,7 @@ class XhtmlParser {
       _charOffset += marker.length;
     }
 
-    _buildSpans(element, spans, style);
+    _buildSpans(element, spans, style, resolveStyle: false);
 
     final endOffset = _charOffset;
     if (spans.isEmpty) return;
@@ -680,10 +727,10 @@ class XhtmlParser {
     final combinedSpan = spans.length == 1
         ? spans.first
         : TextSpan(children: spans);
-    final highlightedSpan = _applyHighlightsToSpan(
+    final highlightedSpan = applyHighlightRanges(
       combinedSpan,
       startOffset,
-      endOffset,
+      highlights,
     );
 
     elements.add(
@@ -706,6 +753,7 @@ class XhtmlParser {
   }) {
     final startOffset = _charOffset;
     final spans = <InlineSpan>[];
+    _recordAnchor(_xmlAttribute(element, 'id'), _xmlAttribute(element, 'name'));
 
     if (listIndex != null) {
       final marker = type == TextBlockType.listItem && listIndex > 0
@@ -715,7 +763,7 @@ class XhtmlParser {
       _charOffset += marker.length;
     }
 
-    _buildXmlSpans(element, spans, style);
+    _buildXmlSpans(element, spans, style, resolveStyle: false);
 
     final endOffset = _charOffset;
     if (spans.isEmpty) return;
@@ -723,10 +771,10 @@ class XhtmlParser {
     final combinedSpan = spans.length == 1
         ? spans.first
         : TextSpan(children: spans);
-    final highlightedSpan = _applyHighlightsToSpan(
+    final highlightedSpan = applyHighlightRanges(
       combinedSpan,
       startOffset,
-      endOffset,
+      highlights,
     );
 
     elements.add(
@@ -743,8 +791,9 @@ class XhtmlParser {
   void _buildSpans(
     dom.Node node,
     List<InlineSpan> spans,
-    TextStyle parentStyle,
-  ) {
+    TextStyle parentStyle, {
+    bool resolveStyle = true,
+  }) {
     if (node is dom.Text) {
       final text = node.text;
       if (text.isEmpty) return;
@@ -756,6 +805,7 @@ class XhtmlParser {
     if (node is! dom.Element) return;
 
     final tag = node.localName?.toLowerCase() ?? '';
+    _recordAnchor(node.attributes['id'], node.attributes['name']);
     if (tag == 'br') {
       _charOffset += 1;
       spans.add(TextSpan(text: '\n', style: parentStyle));
@@ -764,18 +814,26 @@ class XhtmlParser {
 
     if (tag == 'img') return;
 
-    final style = _resolveElementStyle(node, parentStyle);
+    final style = resolveStyle
+        ? _resolveElementStyle(node, parentStyle)
+        : parentStyle;
+    final linkStart = _charOffset;
 
     for (final child in node.nodes) {
       _buildSpans(child, spans, style);
+    }
+    final href = node.attributes['href'];
+    if (tag == 'a' && href != null && href.isNotEmpty) {
+      links.add(ContentLink(linkStart, _charOffset, href));
     }
   }
 
   void _buildXmlSpans(
     xml.XmlNode node,
     List<InlineSpan> spans,
-    TextStyle parentStyle,
-  ) {
+    TextStyle parentStyle, {
+    bool resolveStyle = true,
+  }) {
     if (node is xml.XmlText || node is xml.XmlCDATA) {
       final text = node.value ?? '';
       if (text.isEmpty) return;
@@ -787,6 +845,7 @@ class XhtmlParser {
     if (node is! xml.XmlElement) return;
 
     final tag = node.name.local.toLowerCase();
+    _recordAnchor(_xmlAttribute(node, 'id'), _xmlAttribute(node, 'name'));
     if (tag == 'br') {
       _charOffset += 1;
       spans.add(TextSpan(text: '\n', style: parentStyle));
@@ -795,9 +854,24 @@ class XhtmlParser {
 
     if (tag == 'img') return;
 
-    final style = _resolveXmlElementStyle(node, parentStyle);
+    final style = resolveStyle
+        ? _resolveXmlElementStyle(node, parentStyle)
+        : parentStyle;
+    final linkStart = _charOffset;
     for (final child in node.children) {
       _buildXmlSpans(child, spans, style);
+    }
+    final href = _xmlAttribute(node, 'href');
+    if (tag == 'a' && href != null && href.isNotEmpty) {
+      links.add(ContentLink(linkStart, _charOffset, href));
+    }
+  }
+
+  void _recordAnchor(String? id, String? name) {
+    for (final value in [id, name]) {
+      if (value != null && value.isNotEmpty) {
+        anchors.putIfAbsent(value, () => _charOffset);
+      }
     }
   }
 
@@ -1136,71 +1210,71 @@ class XhtmlParser {
     }
     return null;
   }
+}
 
-  /// Apply highlights to a span tree based on character offsets.
-  InlineSpan _applyHighlightsToSpan(
-    InlineSpan span,
-    int blockStart,
-    int blockEnd,
-  ) {
-    // Find highlights that overlap with this block
-    final relevant = highlights
-        .where((h) => h.startOffset < blockEnd && h.endOffset > blockStart)
-        .toList();
-
-    if (relevant.isEmpty) return span;
-
-    // For simplicity, we apply highlights by wrapping the span.
-    // A more sophisticated approach would split spans at highlight boundaries.
-    // For now, we check if the span is a TextSpan and apply the first matching highlight.
-    if (span is! TextSpan) return span;
-
-    // Calculate the offset of this span relative to the block start
-    final spanText = span.text ?? '';
-    if (spanText.isEmpty && span.children == null) return span;
-
-    // If the span has children, recursively apply highlights
-    if (span.children != null && span.children!.isNotEmpty) {
-      final newChildren = <InlineSpan>[];
-      var childOffset = blockStart;
-      for (final child in span.children!) {
-        final childSpan = _applyHighlightsToSpan(
-          child,
-          childOffset,
-          childOffset + (child is TextSpan ? (child.text?.length ?? 0) : 0),
-        );
-        newChildren.add(childSpan);
-        childOffset += child is TextSpan ? (child.text?.length ?? 0) : 0;
+/// Splits each original text run once. Later ranges win where colors overlap;
+/// nested, duplicate and crossing ranges never change the underlying text.
+InlineSpan applyHighlightRanges(
+  InlineSpan span,
+  int startOffset,
+  List<HighlightRange> ranges,
+) {
+  if (span is! TextSpan || ranges.isEmpty) return span;
+  final children = <InlineSpan>[];
+  final text = span.text ?? '';
+  final endOffset = startOffset + text.length;
+  final relevant = ranges
+      .where(
+        (range) =>
+            range.startOffset < endOffset &&
+            range.endOffset > startOffset &&
+            range.startOffset < range.endOffset,
+      )
+      .toList(growable: false);
+  if (text.isNotEmpty) {
+    final boundaries = <int>{startOffset, endOffset};
+    for (final range in relevant) {
+      boundaries.add(range.startOffset.clamp(startOffset, endOffset));
+      boundaries.add(range.endOffset.clamp(startOffset, endOffset));
+    }
+    final sorted = boundaries.toList()..sort();
+    for (var index = 0; index + 1 < sorted.length; index++) {
+      final start = sorted[index];
+      final end = sorted[index + 1];
+      Color? color;
+      for (final range in relevant) {
+        if (range.startOffset <= start && range.endOffset >= end) {
+          final hex = range.color.replaceFirst('#', '');
+          final value = hex.length == 6
+              ? int.tryParse('FF$hex', radix: 16)
+              : null;
+          if (value != null) color = Color(value).withAlpha(90);
+        }
       }
-      return TextSpan(
-        style: span.style,
-        recognizer: span.recognizer,
-        children: newChildren,
+      children.add(
+        TextSpan(
+          text: text.substring(start - startOffset, end - startOffset),
+          style: color == null ? null : TextStyle(backgroundColor: color),
+          recognizer: span.recognizer,
+          mouseCursor: span.mouseCursor,
+        ),
       );
     }
-
-    // Leaf span — check if it should be highlighted
-    final text = span.text ?? '';
-    if (text.isEmpty) return span;
-
-    // Find the highlight that covers this span's text
-    final highlight = relevant.firstWhere(
-      (h) => h.startOffset <= blockStart && h.endOffset >= blockEnd,
-      orElse: () => relevant.firstWhere(
-        (h) => h.startOffset < blockEnd && h.endOffset > blockStart,
-        orElse: () => relevant.first,
-      ),
-    );
-
-    final bgColor = _parseColor(highlight.color)?.withAlpha(90); // 35% opacity
-    if (bgColor == null) return span;
-
-    return TextSpan(
-      text: text,
-      style:
-          span.style?.copyWith(backgroundColor: bgColor) ??
-          TextStyle(backgroundColor: bgColor),
-      recognizer: span.recognizer,
-    );
   }
+  var cursor = endOffset;
+  for (final child in span.children ?? const <InlineSpan>[]) {
+    children.add(applyHighlightRanges(child, cursor, ranges));
+    cursor += child.toPlainText(includeSemanticsLabels: false).length;
+  }
+  return TextSpan(
+    style: span.style,
+    recognizer: span.recognizer,
+    mouseCursor: span.mouseCursor,
+    onEnter: span.onEnter,
+    onExit: span.onExit,
+    locale: span.locale,
+    semanticsLabel: span.semanticsLabel,
+    spellOut: span.spellOut,
+    children: children,
+  );
 }

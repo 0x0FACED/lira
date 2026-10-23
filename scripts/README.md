@@ -1,163 +1,98 @@
-# Build Scripts
+# Скрипты Lira
 
-## set_icon.sh
+Запускайте команды из корня репозитория. Основной release pipeline — `.github/workflows/build.yml` с Flutter **3.41.6**; локальные shell-скрипты не заменяют его.
 
-Скрипт для установки иконки приложения на все платформы.
-
-### Использование
+Сначала отправьте workflow **и необходимые изменения приложения** в GitHub. Первый запуск — manual без tag:
 
 ```bash
-# С путем к иконке
-./scripts/set_icon.sh /path/to/icon.png
-
-# Или скопируй иконку вручную в assets/icon/icon.png
-./scripts/set_icon.sh
+gh workflow run build.yml --ref main -f build_type=release --repo 0x0FACED/lira
 ```
 
-### Требования к иконке
+Для авторизации, настройки secrets без паролей в argv, targeted staging, ожидания и скачивания артефактов используйте [RELEASE.md](../RELEASE.md). Не используйте `git add .`; миграцию reader добавляйте отдельным осознанным набором проверенных файлов.
 
-- **Формат**: PNG
-- **Размер**: 1024x1024 или больше
-- **Форма**: Квадрат (не круглая!)
+## `configure_android_signing.py`
 
-### Что делает скрипт
+Python 3 helper для Android release signing. Читает из окружения:
 
-1. Копирует иконку в `assets/icon/icon.png`
-2. Запускает `flutter_launcher_icons` для генерации
-3. Предлагает пересобрать приложение
+| Переменная | Значение |
+|---|---|
+| `ANDROID_KEYSTORE` | Keystore в base64 |
+| `KEY_STORE_PASSWORD` | Пароль хранилища |
+| `KEY_PASSWORD` | Пароль ключа |
+| `KEY_ALIAS` | Alias ключа |
 
----
-
-## create_release.sh
-
-Скрипт для подготовки нового релиза.
-
-### Использование
+После безопасной передачи переменных в окружение:
 
 ```bash
-./scripts/create_release.sh
+python3 scripts/configure_android_signing.py
 ```
 
-Скрипт:
-1. Запросит новую версию (например, `0.5.0`)
-2. Обновит `pubspec.yaml`
-3. Обновит `CHANGELOG.md`
-4. Создаст Git tag (например, `v0.3.0`)
-5. Подскажет следующие шаги
+Helper создаёт:
 
-После запуска скрипта остаётся только сделать `git push` и GitHub Actions соберёт все билды.
+- `android/ci-release-key.jks`;
+- `android/key.properties` с **абсолютным** `storeFile`.
 
----
+Оба файла получают права `0600`. Значения экранируются в формате Java Properties, включая backslash и Unicode. Helper **не перезаписывает существующие файлы**; перед повторным локальным использованием сохраните нужные существующие ключи и конфигурацию. Не коммитьте signing files и не выводите содержимое secrets в логи.
 
-## build_all.sh
+GitHub Actions передаёт четыре repository secrets в окружение helper и удаляет созданные файлы после сборки, в том числе при ошибке. Debug не запускает release signing и не требует этих secrets. Release без правильного ключа завершается ошибкой: fallback на debug-подпись отсутствует.
 
-Скрипт для сборки приложения под все доступные платформы.
+### Ручная конфигурация вместо helper
 
-### Использование
-
-```bash
-# Сборка release-версии (по умолчанию)
-./scripts/build_all.sh
-
-# Сборка debug-версии
-./scripts/build_all.sh debug
-```
-
-### Выходные данные
-
-Все билды сохраняются в директорию `build_dist/`:
-
-- `lira-release-android.apk` — Android APK
-- `lira-release-android.aab` — Android App Bundle (для Google Play)
-- `lira-release-linux/` — Linux desktop
-- `lira-release-web/` — Web приложение
-- `lira-release-windows/` — Windows desktop
-- `Lira.app` — macOS приложение
-
-### Требования
-
-| Платформа | Требования |
-|-----------|------------|
-| Android | Android SDK, JDK |
-| Linux | clang, cmake, ninja |
-| Web | Браузер (для тестирования) |
-| Windows | Visual Studio с C++ workload |
-| macOS | Xcode |
-| iOS | macOS + Xcode |
-
-### Подпись Android (для release)
-
-#### 1. Создать keystore
-
-```bash
-./scripts/generate_keystore.sh
-```
-
-Или вручную:
-
-```bash
-keytool -genkey -v \
-  -keystore ~/lira-release-key.jks \
-  -keyalg RSA \
-  -keysize 2048 \
-  -validity 10000 \
-  -alias lira
-```
-
-#### 2. Создать `android/key.properties`
-
-Скопируйте `android/key.properties.template` в `android/key.properties` и заполните:
+`android/key.properties.template` — только шаблон. Для создания `android/key.properties` укажите абсолютный путь, например:
 
 ```properties
-storePassword=<your_password>
-keyPassword=<your_password>
+storeFile=/absolute/path/to/lira-release-key.jks
+storePassword=<escaped-keystore-password>
+keyPassword=<escaped-key-password>
 keyAlias=lira
-storeFile=/home/your_user/lira-release-key.jks
 ```
 
-⚠ **Важно:** `key.properties` и `.jks` файлы добавлены в `.gitignore` — не коммитьте их!
+Замените placeholders собственными значениями. Это **Java Properties**, не shell: `\` записывается как `\\`, Unicode — через соответствующие `\uXXXX` escape-последовательности. Также учитывайте правила escaping разделителей и пробелов. Не вставляйте сложный пароль без экранирования: загруженное значение может отличаться от исходного. Helper выполняет это преобразование автоматически.
 
-### Логи
+Храните `key.properties` с ограниченным доступом и никогда не добавляйте его или keystore в Git.
 
-Логи сборки сохраняются в `build_dist/build_*.log`
+## `generate_keystore.sh`
 
----
-
-## build_android.sh
-
-Упрощённый скрипт для сборки только Android APK/AAB.
-
-### Использование
+Интерактивное создание **нового** Android signing key через `keytool` (нужен JDK):
 
 ```bash
-# Release сборка
-./scripts/build_android.sh release
-
-# Debug сборка
-./scripts/build_android.sh debug
+bash scripts/generate_keystore.sh
 ```
 
-### Особенности
+Скрипт запрашивает путь и alias; `keytool` запрашивает пароли. Путь по умолчанию — `$HOME/lira-release-key.jks`. Если ключ уже существует, не генерируйте замену ради повторного запуска pipeline. Сохраните ключ и пароли в защищённом резервном хранилище.
 
-- Проверяет наличие `key.properties` для release сборок
-- Предлагает собрать App Bundle (.aab) для Google Play
-- Показывает команду для установки на устройство
+Загрузку secrets выполняйте командами из [RELEASE.md](../RELEASE.md#1-доступ-и-android-secrets), а не передачей паролей в аргументах.
 
----
+## `build_android.sh`
 
-## generate_keystore.sh
-
-Скрипт для генерации keystore для подписывания Android release сборок.
-
-### Использование
+Локальная Android-сборка; нужны Flutter, Android SDK и JDK:
 
 ```bash
-./scripts/generate_keystore.sh
+bash scripts/build_android.sh debug
+bash scripts/build_android.sh release
 ```
 
-Скрипт интерактивно запросит:
-- Путь к keystore файлу
-- Alias для ключа
-- Пароли (через keytool)
+- Debug создаёт APK без release secrets.
+- Release требует заранее настроенный `android/key.properties` и соответствующий ключ; без конфигурации сборка завершается ошибкой.
+- После release APK скрипт предлагает отдельно собрать AAB. AAB в этом сценарии — только release; загрузка в store не выполняется.
+- Результаты: `build/app/outputs/flutter-apk/app-debug.apk` или `app-release.apk`; release AAB — `build/app/outputs/bundle/release/app-release.aab`.
 
-После выполнения следуйте инструкциям для создания `key.properties`.
+## Legacy-скрипты
+
+### `create_release.sh`
+
+**Не используйте для текущего release-процесса.** Скрипт меняет версию/changelog, может выполнить широкий staging, commit и создать tag; использует GNU-совместимый `sed -i`, непереносимый на стандартный macOS `sed`. Вместо него вручную обновите версию и build number, проверьте точные staged-файлы и следуйте [RELEASE.md](../RELEASE.md). `v0.5.0` уже существует; tags не переиспользуются.
+
+### `build_all.sh`
+
+Legacy-скрипт с устаревшим набором целей, включая Web/iOS, и логикой копирования выходных файлов. Он не является поддерживаемым способом подготовки полного release и не гарантирует комплект артефактов. В текущем приложении Web несовместим с `dart:io` и native SQLite. Используйте нативный CI, а не этот скрипт.
+
+### `set_icon.sh`
+
+Вспомогательный legacy-скрипт: копирует исходную иконку в `assets/icon/icon.png`, вызывает генератор, копирует web-иконки и может предложить Android rebuild. Ошибка генератора в нём подавляется, поэтому сообщение об успехе не подтверждает корректность иконок. Проверяйте изменения вручную; скрипт не подтверждает поддержку Web или готовность release.
+
+## Границы CI
+
+После CI собираются Android, Linux, Windows и macOS. Artifacts: `android-apk`, `android-aab` (только release), `linux-zip`, `windows-zip`, `macos-dmg`. Manual-запуск не создаёт GitHub Release. На push нового tag `v*` один publish job создаёт единый draft только после успеха всех четырёх платформ.
+
+iOS и публикация в сторах не настроены. macOS DMG собирается без Developer ID и notarization; ограничения Gatekeeper этим pipeline не устраняются.
