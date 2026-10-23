@@ -77,6 +77,24 @@ bash scripts/build_android.sh release
 - После release APK скрипт предлагает отдельно собрать AAB. AAB в этом сценарии — только release; загрузка в store не выполняется.
 - Результаты: `build/app/outputs/flutter-apk/app-debug.apk` или `app-release.apk`; release AAB — `build/app/outputs/bundle/release/app-release.aab`.
 
+## `extract_release_notes.py`
+
+Извлекает Markdown из раздела `CHANGELOG.md`, соответствующего тегу, без заголовка версии:
+
+```bash
+python3 scripts/extract_release_notes.py v0.5.1
+```
+
+Для `v0.5.1` нужен один непустой раздел `## [0.5.1]`; содержимое `[Unreleased]` не подставляется. Извлечение останавливается на следующем заголовке второго уровня, но игнорирует заголовки внутри fenced code blocks. Отсутствующий, пустой или дублирующийся раздел приводит к ненулевому коду выхода.
+
+Workflow формирует описание из этого текста, дописывает предупреждения об установке iOS/macOS и передаёт файл в GitHub Release. Автоматические release notes по коммитам/PR отключены. Commit с описанием должен предшествовать тегу.
+
+Регрессии границ разделов и Markdown запускаются в CI:
+
+```bash
+python3 -m unittest discover -s scripts -p 'test_*.py'
+```
+
 ## Legacy-скрипты
 
 ### `create_release.sh`
@@ -93,6 +111,6 @@ Legacy-скрипт с устаревшим набором целей, вклю�
 
 ## Границы CI
 
-После CI собираются Android, Linux, Windows и macOS. Artifacts: `android-apk`, `android-aab` (только release), `linux-zip`, `windows-zip`, `macos-dmg`. Manual-запуск не создаёт GitHub Release. На push нового tag `v*` один publish job создаёт единый draft только после успеха всех четырёх платформ.
+После CI собираются Android, iOS, Windows, Linux и macOS. APK и AAB используют отдельные runners, чтобы не накапливать промежуточные файлы обеих сборок на одном диске; для Android debug запускается только APK. Artifacts: `android-apk`, `android-aab` (только release), `ios-ipa`, `linux-zip`, `windows-zip`, `macos-dmg`. Manual-запуск не создаёт GitHub Release. На push нового tag `v*` один publish job автоматически публикует релиз, не черновик, только после успеха всех пяти платформ.
 
-iOS и публикация в сторах не настроены. macOS DMG собирается без Developer ID и notarization; ограничения Gatekeeper этим pipeline не устраняются.
+iOS artifact — `lira-ios-unsigned.ipa` с device build в `Payload/Runner.app`, без Apple-секретов в CI. Для установки нужна последующая подпись, например через AltStore/Sideloadly; напрямую установить неподписанный IPA нельзя. Публикация в сторах не настроена. macOS DMG собирается без Developer ID и notarization; ограничения Gatekeeper этим pipeline не устраняются.

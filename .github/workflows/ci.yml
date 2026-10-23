@@ -23,6 +23,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Test release notes extraction
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:

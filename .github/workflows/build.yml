@@ -28,9 +28,13 @@ jobs:
     uses: ./.github/workflows/ci.yml
 
   build-android:
-    name: Build Android
+    name: Build Android (${{ matrix.package }})
     needs: verify
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.build_type == 'debug' && '["apk"]' || '["apk","appbundle"]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -59,31 +63,20 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: python3 scripts/configure_android_signing.py
 
-      - name: Build APK
-        run: flutter build apk --"$BUILD_TYPE" --no-pub
-
-      - name: Build App Bundle
-        if: env.BUILD_TYPE == 'release'
-        run: flutter build appbundle --release --no-pub
+      - name: Build Android package
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: flutter build "$PACKAGE" --"$BUILD_TYPE" --no-pub
 
       - name: Remove signing files
         if: always()
         run: rm -f android/ci-release-key.jks android/key.properties
 
-      - name: Upload APK artifact
+      - name: Upload Android artifact
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk
-          path: build/app/outputs/flutter-apk/app-${{ env.BUILD_TYPE }}.apk
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload AAB artifact
-        if: env.BUILD_TYPE == 'release'
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-aab
-          path: build/app/outputs/bundle/release/app-release.aab
+          name: ${{ matrix.package == 'apk' && 'android-apk' || 'android-aab' }}
+          path: ${{ matrix.package == 'apk' && format('build/app/outputs/flutter-apk/app-{0}.apk', env.BUILD_TYPE) || 'build/app/outputs/bundle/release/app-release.aab' }}
           if-no-files-found: error
           retention-days: 30
 
@@ -194,21 +187,74 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  build-ios:
+    name: Build iOS
+    needs: verify
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build unsigned iOS app
+        run: flutter build ios --"$BUILD_TYPE" --no-codesign --no-pub
+
+      - name: Prepare IPA payload
+        run: |
+          mkdir -p "$RUNNER_TEMP/lira-ios/Payload"
+          ditto build/ios/iphoneos/Runner.app "$RUNNER_TEMP/lira-ios/Payload/Runner.app"
+
+      - name: Create unsigned IPA
+        working-directory: ${{ runner.temp }}/lira-ios
+        run: ditto -c -k --keepParent Payload "$GITHUB_WORKSPACE/lira-ios-unsigned.ipa"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: lira-ios-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
+
   publish:
-    name: Create draft release
+    name: Publish release
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [build-android, build-linux, build-windows, build-macos]
+    needs: [build-android, build-linux, build-windows, build-macos, build-ios]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare release notes
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python3 scripts/extract_release_notes.py "$RELEASE_TAG" > "$RUNNER_TEMP/release-notes.md"
+          cat >> "$RUNNER_TEMP/release-notes.md" <<'EOF'
+
+          ## Установка
+
+          iOS: `lira-ios-unsigned.ipa` не подписан. Перед установкой подпишите IPA через AltStore, Sideloadly или другой инструмент.
+          macOS: DMG без Developer ID и notarization; возможны ограничения Gatekeeper.
+          EOF
+
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
           path: release-artifacts
           merge-multiple: true
 
-      - name: Create draft release
+      - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           files: |
@@ -217,6 +263,7 @@ jobs:
             release-artifacts/lira-linux.zip
             release-artifacts/lira-windows.zip
             release-artifacts/Lira.dmg
+            release-artifacts/lira-ios-unsigned.ipa
           fail_on_unmatched_files: true
-          generate_release_notes: true
-          draft: true
+          body_path: ${{ runner.temp }}/release-notes.md
+          draft: false

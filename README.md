@@ -33,6 +33,8 @@ packages/
 
 Reader architecture, stored location formats and regression commands: [`READER.md`](READER.md).
 
+Release automation for all five native platforms is described in [`RELEASE.md`](RELEASE.md). Pushing a `v*` tag builds APK/AAB, an unsigned iOS IPA, Windows/Linux ZIPs and a macOS DMG, then publishes one GitHub Release only after every build succeeds. The iOS IPA requires signing before installation; the macOS DMG is not notarized.
+
 ## Getting Started
 
 ```bash

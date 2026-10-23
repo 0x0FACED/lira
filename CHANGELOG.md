@@ -20,14 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reader: повреждённые файлы показывают ошибку загрузки вместо подставной error-книги; выделение очищается после успешного сохранения.
 - CI: исправлены несовместимая версия Flutter и игнорирование выбранного debug/release режима.
 - Android: release больше не подменяет постоянный signing key debug-ключом; CI восстанавливает keystore из secrets без вывода паролей.
+- Android CI: APK и AAB разделены на независимые runners после исчерпания диска при последовательной упаковке в одном job; готовый APK больше не теряется при ошибке AAB.
 
 ### Changed
 - EPUB renderer окончательно переведён на native Flutter: удалены старый WebView, одноразовый patch script и неиспользуемые зависимости.
 - Новые EPUB-позиции используют versioned `v:2` offsets; legacy JSON остаётся читаемым без миграции схемы БД.
 - Добавлены reader-регрессии, включая настоящий PDFium; обновлены `READER.md` и документация пакетов.
 - GitHub Actions закреплён на Flutter 3.41.6; CI на push/PR и перед сборками запускает reader-регрессии с настоящим PDFium.
-- Релизный pipeline собирает Android, Linux, Windows и macOS; AAB создаётся только в release, неподдерживаемый Web исключён.
-- Единый draft GitHub Release создаётся только по тегу после успеха всех платформ; signing files удаляются после Android-сборки.
+- Релизный pipeline собирает Android, iOS, Windows, Linux и macOS; iOS IPA предназначен для самостоятельной подписи, AAB создаётся только в release, неподдерживаемый Web исключён.
+- Push тега `v*` автоматически публикует единый GitHub Release, не черновик, только после успеха всех платформ; signing files удаляются после Android-сборок.
+- Описание GitHub Release берётся из раздела `CHANGELOG.md` с версией тега вместо списка коммитов; отсутствующий, пустой или дублирующийся раздел блокирует публикацию.
 
 ## [0.5.0] - 2026-04-12
 
