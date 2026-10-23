@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-24
+
 ### Added
 - Единая дизайн-система: тёплая светлая тема по палитре Anthropic/Claude, графитовая тёмная тема, локальные Inter/Lora и общие UI-компоненты.
 - Общая политика анимаций, диалогов и sheets с поддержкой reduced motion; новые профили чтения начинают с тёплой бумаги без изменения сохранённых настроек.
