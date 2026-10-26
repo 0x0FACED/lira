@@ -57,10 +57,10 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
         padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
+            AppSpacing.compact,
             AppSpacing.sm,
-            AppSpacing.lg,
-            AppSpacing.lg,
+            AppSpacing.compact,
+            AppSpacing.compact,
           ),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: AppLayout.formMaxWidth),
@@ -69,7 +69,7 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(l10n.readerSettings, style: theme.textTheme.headlineSmall),
-                const SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: AppSpacing.md),
                 Wrap(
                   spacing: AppSpacing.sm,
                   runSpacing: AppSpacing.sm,

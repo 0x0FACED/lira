@@ -77,7 +77,7 @@ class _MainShellState extends State<MainShell>
             children: [
               if (desktop) ...[
                 SizedBox(
-                  width: 220,
+                  width: 192,
                   child: ColoredBox(
                     color: colors.surface,
                     child: SafeArea(
@@ -87,10 +87,10 @@ class _MainShellState extends State<MainShell>
                         children: [
                           Padding(
                             padding: const EdgeInsets.fromLTRB(
-                              AppSpacing.lg,
-                              AppSpacing.xl,
+                              AppSpacing.compact,
                               AppSpacing.md,
-                              AppSpacing.xl,
+                              AppSpacing.compact,
+                              AppSpacing.md,
                             ),
                             child: Row(
                               children: [
@@ -119,7 +119,7 @@ class _MainShellState extends State<MainShell>
                           Expanded(
                             child: NavigationRail(
                               extended: true,
-                              minExtendedWidth: 220,
+                              minExtendedWidth: 192,
                               selectedIndex: _currentIndex,
                               onDestinationSelected: _selectTab,
                               destinations: [

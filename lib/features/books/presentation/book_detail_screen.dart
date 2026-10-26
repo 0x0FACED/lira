@@ -55,10 +55,10 @@ class BookDetailScreen extends ConsumerWidget {
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.lg,
+                      AppSpacing.compact,
                       0,
-                      AppSpacing.lg,
-                      AppSpacing.xl,
+                      AppSpacing.compact,
+                      AppSpacing.md,
                     ),
                     child: LayoutBuilder(
                       builder: (context, constraints) {
@@ -84,7 +84,7 @@ class BookDetailScreen extends ConsumerWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               cover,
-                              const SizedBox(width: AppSpacing.xl),
+                              const SizedBox(width: AppSpacing.lg),
                               Expanded(child: details),
                             ],
                           );
@@ -93,7 +93,7 @@ class BookDetailScreen extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Center(child: cover),
-                            const SizedBox(height: AppSpacing.lg),
+                            const SizedBox(height: AppSpacing.md),
                             details,
                           ],
                         );
@@ -123,7 +123,7 @@ class BookDetailScreen extends ConsumerWidget {
           alignment: Alignment.centerLeft,
           child: AppBadge(label: currentBook.format.toUpperCase()),
         ),
-        const SizedBox(height: AppSpacing.lg),
+        const SizedBox(height: AppSpacing.md),
         AppSurface(
           child: Column(
             children: [
@@ -135,7 +135,7 @@ class BookDetailScreen extends ConsumerWidget {
                     ? '${currentBook.pageCount}'
                     : l10n.unknown,
               ),
-              const Divider(height: AppSpacing.xl),
+              const Divider(height: AppSpacing.md),
               _buildDetailRow(
                 context,
                 Icons.sd_storage_outlined,
@@ -144,7 +144,7 @@ class BookDetailScreen extends ConsumerWidget {
                     ? _formatBytes(currentBook.fileSizeBytes)
                     : l10n.unknown,
               ),
-              const Divider(height: AppSpacing.xl),
+              const Divider(height: AppSpacing.md),
               _buildDetailRow(
                 context,
                 Icons.calendar_today_outlined,
@@ -154,7 +154,7 @@ class BookDetailScreen extends ConsumerWidget {
             ],
           ),
         ),
-        const SizedBox(height: AppSpacing.lg),
+        const SizedBox(height: AppSpacing.md),
         FilledButton.icon(
           onPressed: () => context.push('/reader', extra: currentBook),
           icon: const Icon(Icons.menu_book_outlined),
@@ -303,17 +303,12 @@ class BookDetailScreen extends ConsumerWidget {
   Widget _buildCover(BuildContext context, BookDto currentBook) {
     final path = currentBook.coverUrl;
     if (path != null && path.isNotEmpty) {
-      return ColoredBox(
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.compact),
-          child: Image.file(
-            File(path),
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) =>
-                _buildFormatFallback(context, currentBook),
-          ),
-        ),
+      return Image.file(
+        File(path),
+        fit: BoxFit.cover,
+        alignment: Alignment.topCenter,
+        errorBuilder: (context, error, stackTrace) =>
+            _buildFormatFallback(context, currentBook),
       );
     }
     return _buildFormatFallback(context, currentBook);

@@ -324,7 +324,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
-                                  const SizedBox(width: AppSpacing.md),
+                                  const SizedBox(width: AppSpacing.sm),
                                 ],
                               ),
                             ),
@@ -361,9 +361,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                               builder: (context, progressState, _) {
                                 return Padding(
                                   padding: const EdgeInsets.fromLTRB(
-                                    AppSpacing.md,
                                     AppSpacing.compact,
-                                    AppSpacing.md,
+                                    AppSpacing.sm,
+                                    AppSpacing.compact,
                                     AppSpacing.xs,
                                   ),
                                   child: Column(
@@ -403,7 +403,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                                         alignment: WrapAlignment.spaceEvenly,
                                         crossAxisAlignment:
                                             WrapCrossAlignment.center,
-                                        spacing: AppSpacing.lg,
+                                        spacing: AppSpacing.compact,
                                         children: [
                                           IconButton(
                                             icon: const Icon(
@@ -783,7 +783,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                       ),
                     )
                   : ListView.builder(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+                      padding: const EdgeInsets.only(
+                        bottom: AppSpacing.compact,
+                      ),
                       itemCount: toc.length,
                       itemBuilder: (context, index) {
                         return _buildTocItem(toc[index]);
@@ -797,11 +799,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   }
 
   Widget _buildTocItem(TOCItem item, {int depth = 0}) {
-    final padding = AppSpacing.md + (depth * AppSpacing.md);
+    final padding = AppSpacing.compact + (depth * AppSpacing.md);
 
     if (item.subItems.isEmpty) {
       return ListTile(
-        contentPadding: EdgeInsets.only(left: padding, right: AppSpacing.md),
+        contentPadding: EdgeInsets.only(
+          left: padding,
+          right: AppSpacing.compact,
+        ),
         title: Text(item.title, style: Theme.of(context).textTheme.bodyLarge),
         onTap: () {
           _engine?.goToLocation(BookLocation(locator: item.fileName));
@@ -866,7 +871,7 @@ class _ExpandableTocItemState extends State<_ExpandableTocItem> {
         ListTile(
           contentPadding: EdgeInsets.only(
             left: widget.padding,
-            right: AppSpacing.md,
+            right: AppSpacing.compact,
           ),
           leading: IconButton(
             tooltip: _expanded
@@ -901,7 +906,7 @@ class _ExpandableTocItemState extends State<_ExpandableTocItem> {
         return ListTile(
           contentPadding: EdgeInsets.only(
             left: widget.padding + AppSpacing.md,
-            right: AppSpacing.md,
+            right: AppSpacing.compact,
           ),
           title: Text(item.title, style: Theme.of(context).textTheme.bodyLarge),
           onTap: () => widget.onNavigate(item.fileName),
@@ -942,7 +947,7 @@ class _HighlightsPanel extends ConsumerWidget {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.lg,
+                  horizontal: AppSpacing.compact,
                   vertical: AppSpacing.sm,
                 ),
                 child: Row(
@@ -988,7 +993,8 @@ class _HighlightsPanel extends ConsumerWidget {
                 }
                 return SliverPadding(
                   padding: EdgeInsets.only(
-                    bottom: AppSpacing.lg + MediaQuery.paddingOf(ctx).bottom,
+                    bottom:
+                        AppSpacing.compact + MediaQuery.paddingOf(ctx).bottom,
                   ),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
@@ -1025,7 +1031,7 @@ class _HighlightsPanel extends ConsumerWidget {
       resizeDuration: AppMotion.duration(context),
       background: Container(
         alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: AppSpacing.lg),
+        padding: const EdgeInsets.only(right: AppSpacing.compact),
         color: theme.colorScheme.errorContainer,
         child: Icon(
           Icons.delete_outline,
@@ -1039,7 +1045,7 @@ class _HighlightsPanel extends ConsumerWidget {
       },
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.lg,
+          horizontal: AppSpacing.compact,
           vertical: AppSpacing.xs,
         ),
         leading: Container(

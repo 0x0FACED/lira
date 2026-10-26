@@ -75,10 +75,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.lg,
+                      AppSpacing.compact,
                       0,
-                      AppSpacing.lg,
-                      AppSpacing.lg,
+                      AppSpacing.compact,
+                      AppSpacing.md,
                     ),
                     child: AppSearchField(
                       controller: _searchController,
@@ -124,10 +124,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     }
                     return SliverPadding(
                       padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.lg,
+                        AppSpacing.compact,
                         0,
-                        AppSpacing.lg,
-                        AppSpacing.xl,
+                        AppSpacing.compact,
+                        AppSpacing.md,
                       ),
                       sliver: SliverGrid(
                         gridDelegate: ResponsiveGridDelegate(
@@ -137,10 +137,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                               ? 180
                               : 148,
                           maxCrossAxisExtent: 240,
-                          crossAxisSpacing: AppSpacing.md,
-                          mainAxisSpacing: AppSpacing.lg,
+                          crossAxisSpacing: AppSpacing.compact,
+                          mainAxisSpacing: AppSpacing.compact,
                           childAspectRatio:
-                              0.48 / (textScale < 1 ? 1 : textScale),
+                              0.53 / (textScale < 1 ? 1 : textScale),
                         ),
                         delegate: SliverChildBuilderDelegate((context, index) {
                           final book = filteredBooks[index];
@@ -158,7 +158,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   loading: () => _stateSliver(
                     const Padding(
                       key: ValueKey('library-loading'),
-                      padding: EdgeInsets.all(AppSpacing.lg),
+                      padding: EdgeInsets.all(AppSpacing.compact),
                       child: CircularProgressIndicator(),
                     ),
                   ),

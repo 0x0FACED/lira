@@ -23,142 +23,127 @@ class SearchBookCard extends ConsumerWidget {
     );
     final isDownloading = downloadProgress != null;
     final isAnna = book.source == SearchResultSource.anna;
-
-    return AppSurface(
-      margin: const EdgeInsets.only(bottom: AppSpacing.compact),
-      padding: const EdgeInsets.all(AppSpacing.md),
-      radius: AppRadius.md,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final inlineAction = constraints.maxWidth >= 600;
-          final action = AppStateTransition(
-            child: isDownloading
-                ? Row(
-                    key: ValueKey('downloading-${book.id}'),
+    final action = AppStateTransition(
+      child: isDownloading
+          ? Row(
+              key: ValueKey('downloading-${book.id}'),
+              children: [
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Expanded(
-                        child: LinearProgressIndicator(
-                          value: downloadProgress > 0 ? downloadProgress : null,
-                        ),
-                      ),
                       if (downloadProgress > 0) ...[
-                        const SizedBox(width: AppSpacing.compact),
                         Text(
                           '${(downloadProgress * 100).round()}%',
                           style: theme.textTheme.labelMedium,
-                        ),
-                      ],
-                      const SizedBox(width: AppSpacing.sm),
-                      IconButton(
-                        tooltip: l10n.cancelDownload,
-                        style: IconButton.styleFrom(
-                          foregroundColor: colors.error,
-                        ),
-                        icon: const Icon(Icons.close_rounded),
-                        onPressed: () => ref
-                            .read(downloadNotifierProvider.notifier)
-                            .cancelDownload(book.id),
-                      ),
-                    ],
-                  )
-                : Align(
-                    key: ValueKey('download-${book.id}'),
-                    alignment: Alignment.centerRight,
-                    child: IconButton.filledTonal(
-                      tooltip: l10n.downloadBook,
-                      icon: const Icon(Icons.download_rounded),
-                      onPressed: () => _handleDownload(context, ref),
-                    ),
-                  ),
-          );
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 80,
-                    height: 112,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                      child: ColoredBox(
-                        color: colors.surfaceContainer,
-                        child: book.imgUrl.isNotEmpty
-                            ? Image.network(
-                                book.imgUrl,
-                                fit: BoxFit.contain,
-                                headers: isAnna
-                                    ? const {
-                                        'User-Agent':
-                                            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                                      }
-                                    : null,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    _buildFallbackCover(theme),
-                              )
-                            : _buildFallbackCover(theme),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          book.title,
-                          style: theme.textTheme.titleMedium,
-                          maxLines: 3,
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          book.author,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: colors.onSurfaceVariant,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: AppSpacing.compact),
-                        Wrap(
-                          spacing: AppSpacing.sm,
-                          runSpacing: AppSpacing.sm,
-                          children: [
-                            AppBadge(label: book.format.toUpperCase()),
-                            AppBadge(
-                              label: isAnna ? "Anna's" : 'Z-Lib',
-                              color: isAnna
-                                  ? colors.tertiary
-                                  : colors.secondary,
-                            ),
-                            if (book.size.isNotEmpty)
-                              AppBadge(
-                                label: book.size,
-                                icon: Icons.storage_outlined,
-                              ),
-                          ],
-                        ),
                       ],
-                    ),
+                      LinearProgressIndicator(
+                        value: downloadProgress > 0 ? downloadProgress : null,
+                      ),
+                    ],
                   ),
-                  if (inlineAction) ...[
-                    const SizedBox(width: AppSpacing.lg),
-                    SizedBox(
-                      width: isDownloading ? 200 : AppLayout.minTouchTarget,
-                      child: action,
-                    ),
-                  ],
-                ],
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                IconButton(
+                  tooltip: l10n.cancelDownload,
+                  style: IconButton.styleFrom(
+                    foregroundColor: colors.error,
+                    minimumSize: const Size.square(AppLayout.minTouchTarget),
+                  ),
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () => ref
+                      .read(downloadNotifierProvider.notifier)
+                      .cancelDownload(book.id),
+                ),
+              ],
+            )
+          : Align(
+              key: ValueKey('download-${book.id}'),
+              alignment: Alignment.centerRight,
+              child: IconButton.filledTonal(
+                tooltip: l10n.downloadBook,
+                style: IconButton.styleFrom(
+                  minimumSize: const Size.square(AppLayout.minTouchTarget),
+                ),
+                icon: const Icon(Icons.download_rounded),
+                onPressed: () => _handleDownload(context, ref),
               ),
-              if (!inlineAction) ...[
+            ),
+    );
+
+    return AppSurface(
+      margin: EdgeInsets.zero,
+      padding: EdgeInsets.zero,
+      radius: AppRadius.md,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: ColoredBox(
+              color: colors.surfaceContainer,
+              child: book.imgUrl.isNotEmpty
+                  ? Image.network(
+                      book.imgUrl,
+                      fit: BoxFit.cover,
+                      alignment: Alignment.topCenter,
+                      headers: isAnna
+                          ? const {
+                              'User-Agent':
+                                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                            }
+                          : null,
+                      errorBuilder: (context, error, stackTrace) =>
+                          _buildFallbackCover(theme),
+                    )
+                  : _buildFallbackCover(theme),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  book.title,
+                  style: theme.textTheme.titleMedium,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  book.author,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 const SizedBox(height: AppSpacing.sm),
+                Wrap(
+                  spacing: AppSpacing.xs,
+                  runSpacing: AppSpacing.xs,
+                  children: [
+                    AppBadge(label: book.format.toUpperCase()),
+                    AppBadge(
+                      label: isAnna ? "Anna's" : 'Z-Lib',
+                      color: isAnna ? colors.tertiary : colors.secondary,
+                    ),
+                    if (book.size.isNotEmpty)
+                      AppBadge(label: book.size, icon: Icons.storage_outlined),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xs),
                 action,
               ],
-            ],
-          );
-        },
+            ),
+          ),
+        ],
       ),
     );
   }

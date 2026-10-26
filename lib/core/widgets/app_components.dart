@@ -6,7 +6,7 @@ class AppSurface extends StatelessWidget {
   const AppSurface({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(AppSpacing.lg),
+    this.padding = const EdgeInsets.all(AppSpacing.compact),
     this.margin = EdgeInsets.zero,
     this.color,
     this.radius = AppRadius.lg,
@@ -62,17 +62,17 @@ class AppPageHeader extends StatelessWidget {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.xl,
-        AppSpacing.lg,
-        AppSpacing.lg,
+        AppSpacing.compact,
+        AppSpacing.compact,
+        AppSpacing.compact,
+        AppSpacing.compact,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           if (leading != null) ...[
             leading!,
-            const SizedBox(width: AppSpacing.md),
+            const SizedBox(width: AppSpacing.sm),
           ],
           Expanded(
             child: Column(
@@ -117,7 +117,7 @@ class AppSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -126,13 +126,13 @@ class AppSection extends StatelessWidget {
               AppSpacing.xs,
               0,
               AppSpacing.xs,
-              AppSpacing.compact,
+              AppSpacing.sm,
             ),
             child: Text(title, style: theme.textTheme.titleMedium),
           ),
           if (subtitle != null)
             Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.compact),
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
               child: Text(
                 subtitle!,
                 style: theme.textTheme.bodyMedium?.copyWith(
@@ -141,7 +141,7 @@ class AppSection extends StatelessWidget {
               ),
             ),
           AppSurface(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
             child: Column(mainAxisSize: MainAxisSize.min, children: children),
           ),
         ],
@@ -172,14 +172,14 @@ class AppEmptyState extends StatelessWidget {
     final colors = theme.colorScheme;
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        padding: const EdgeInsets.all(AppSpacing.compact),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 380),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                padding: const EdgeInsets.all(AppSpacing.lg),
+                padding: const EdgeInsets.all(AppSpacing.md),
                 decoration: BoxDecoration(
                   color: colors.surfaceContainer,
                   borderRadius: BorderRadius.circular(AppRadius.xl),
@@ -187,14 +187,14 @@ class AppEmptyState extends StatelessWidget {
                 ),
                 child: Icon(icon, size: 32, color: iconColor ?? colors.primary),
               ),
-              const SizedBox(height: AppSpacing.lg),
+              const SizedBox(height: AppSpacing.md),
               Text(
                 title,
                 textAlign: TextAlign.center,
                 style: theme.textTheme.titleLarge,
               ),
               if (description != null) ...[
-                const SizedBox(height: AppSpacing.compact),
+                const SizedBox(height: AppSpacing.sm),
                 Text(
                   description!,
                   textAlign: TextAlign.center,
@@ -205,7 +205,7 @@ class AppEmptyState extends StatelessWidget {
                 ),
               ],
               if (action != null) ...[
-                const SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: AppSpacing.md),
                 action!,
               ],
             ],
@@ -244,9 +244,13 @@ class AppBadge extends StatelessWidget {
             Icon(icon, size: 12, color: foreground),
             const SizedBox(width: AppSpacing.xs),
           ],
-          Text(
-            label,
-            style: theme.textTheme.labelSmall?.copyWith(color: foreground),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(color: foreground),
+            ),
           ),
         ],
       ),

@@ -5,6 +5,7 @@ import '../../../core/providers/preferences_provider.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../books/presentation/widgets/responsive_grid_delegate.dart';
 import '../domain/models/search_result_item.dart';
 import '../domain/providers/search_provider.dart';
 import '../domain/providers/search_state.dart';
@@ -114,7 +115,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   ),
                 ..._buildContentSlivers(searchState, l10n, source),
                 const SliverToBoxAdapter(
-                  child: SizedBox(height: AppSpacing.xl),
+                  child: SizedBox(height: AppSpacing.md),
                 ),
               ],
             ),
@@ -127,10 +128,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Widget _buildSearchHeader(AppLocalizations l10n, SearchSource source) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
+        AppSpacing.compact,
         0,
-        AppSpacing.lg,
-        AppSpacing.lg,
+        AppSpacing.compact,
+        AppSpacing.compact,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -194,10 +195,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
+        AppSpacing.compact,
         0,
-        AppSpacing.lg,
-        AppSpacing.md,
+        AppSpacing.compact,
+        AppSpacing.sm,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -289,12 +290,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         _stateSliver(
           Padding(
             key: const ValueKey('search-loading'),
-            padding: const EdgeInsets.all(AppSpacing.lg),
+            padding: const EdgeInsets.all(AppSpacing.compact),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const CircularProgressIndicator(),
-                const SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: AppSpacing.md),
                 Text(
                   l10n.searchLoading,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -314,12 +315,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             SliverToBoxAdapter(
               child: AppSurface(
                 color: colors.secondaryContainer,
-                padding: const EdgeInsets.all(AppSpacing.md),
+                padding: const EdgeInsets.all(AppSpacing.compact),
                 margin: const EdgeInsets.fromLTRB(
-                  AppSpacing.lg,
+                  AppSpacing.compact,
                   0,
-                  AppSpacing.lg,
-                  AppSpacing.md,
+                  AppSpacing.compact,
+                  AppSpacing.compact,
                 ),
                 radius: AppRadius.md,
                 child: Row(
@@ -370,6 +371,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     AppLocalizations l10n,
   ) {
     final filtered = _applyFilters(books);
+    final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
     if (filtered.isEmpty) {
       return [
         _stateSliver(
@@ -393,8 +395,18 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     }
     return [
       SliverPadding(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-        sliver: SliverList(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.compact),
+        sliver: SliverGrid(
+          gridDelegate: ResponsiveGridDelegate(
+            minCrossAxisExtent:
+                MediaQuery.sizeOf(context).width >= AppLayout.desktopBreakpoint
+                ? 180
+                : 148,
+            maxCrossAxisExtent: 240,
+            crossAxisSpacing: AppSpacing.compact,
+            mainAxisSpacing: AppSpacing.compact,
+            childAspectRatio: 0.40 / (textScale < 1 ? 1 : textScale),
+          ),
           delegate: SliverChildBuilderDelegate(
             (context, index) => SearchBookCard(book: filtered[index]),
             childCount: filtered.length,

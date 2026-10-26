@@ -30,12 +30,12 @@ class SettingsScreen extends ConsumerWidget {
           child: SizedBox(
             width: AppLayout.formMaxWidth,
             child: ListView(
-              padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+              padding: const EdgeInsets.only(bottom: AppSpacing.md),
               children: [
                 AppPageHeader(title: l10n.settings),
                 Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.lg,
+                    horizontal: AppSpacing.compact,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -113,9 +113,9 @@ class SettingsScreen extends ConsumerWidget {
                           ),
                           Padding(
                             padding: const EdgeInsets.fromLTRB(
-                              AppSpacing.md,
+                              AppSpacing.compact,
                               AppSpacing.sm,
-                              AppSpacing.md,
+                              AppSpacing.compact,
                               AppSpacing.sm,
                             ),
                             child: SizedBox(
@@ -180,8 +180,8 @@ class SettingsScreen extends ConsumerWidget {
                               builder: (dialogContext) => SimpleDialog(
                                 title: Text(l10n.language),
                                 insetPadding: const EdgeInsets.symmetric(
-                                  horizontal: AppSpacing.md,
-                                  vertical: AppSpacing.lg,
+                                  horizontal: AppSpacing.compact,
+                                  vertical: AppSpacing.md,
                                 ),
                                 children: [
                                   for (final language in const [
@@ -264,9 +264,9 @@ class SettingsScreen extends ConsumerWidget {
               ? Padding(
                   key: const ValueKey('proxy-fields'),
                   padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.md,
+                    AppSpacing.compact,
                     AppSpacing.sm,
-                    AppSpacing.md,
+                    AppSpacing.compact,
                     AppSpacing.sm,
                   ),
                   child: Column(
@@ -286,7 +286,7 @@ class SettingsScreen extends ConsumerWidget {
                           }
                         },
                       ),
-                      const SizedBox(height: AppSpacing.md),
+                      const SizedBox(height: AppSpacing.compact),
                       TextFormField(
                         initialValue: proxyConfig.port.toString(),
                         keyboardType: TextInputType.number,
@@ -366,8 +366,8 @@ class _ZLibraryLoginDialogState extends ConsumerState<_ZLibraryLoginDialog> {
     return AlertDialog(
       scrollable: true,
       insetPadding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.lg,
+        horizontal: AppSpacing.compact,
+        vertical: AppSpacing.md,
       ),
       title: Text(l10n.zLibraryLogin),
       content: SizedBox(
@@ -385,7 +385,7 @@ class _ZLibraryLoginDialogState extends ConsumerState<_ZLibraryLoginDialog> {
                 autocorrect: false,
                 decoration: InputDecoration(labelText: l10n.zLibraryEmail),
               ),
-              const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.compact),
               TextField(
                 controller: _passwordController,
                 autofillHints: const [AutofillHints.password],
@@ -400,7 +400,7 @@ class _ZLibraryLoginDialogState extends ConsumerState<_ZLibraryLoginDialog> {
                 child: _error != null
                     ? Padding(
                         key: ValueKey(_error),
-                        padding: const EdgeInsets.only(top: AppSpacing.md),
+                        padding: const EdgeInsets.only(top: AppSpacing.compact),
                         child: Semantics(
                           liveRegion: true,
                           child: Text(

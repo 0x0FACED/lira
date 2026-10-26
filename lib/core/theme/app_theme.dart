@@ -167,8 +167,8 @@ class AppTheme {
       filled: true,
       fillColor: colors.surfaceContainerLow,
       contentPadding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.md,
+        horizontal: AppSpacing.compact,
+        vertical: AppSpacing.compact,
       ),
       border: inputBorder,
       enabledBorder: inputBorder,
@@ -190,8 +190,8 @@ class AppTheme {
       minimumSize: const WidgetStatePropertyAll(Size(48, 48)),
       padding: const WidgetStatePropertyAll(
         EdgeInsets.symmetric(
-          horizontal: AppSpacing.lg,
-          vertical: AppSpacing.compact,
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
         ),
       ),
       shape: const WidgetStatePropertyAll(controlShape),
@@ -211,7 +211,7 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        toolbarHeight: 72,
+        toolbarHeight: 56,
         titleTextStyle: text.headlineSmall,
       ),
       cardTheme: CardThemeData(
@@ -281,7 +281,7 @@ class AppTheme {
         ),
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.sm,
-          vertical: AppSpacing.sm,
+          vertical: AppSpacing.xs,
         ),
         pressElevation: 0,
         checkmarkColor: colors.primary,
@@ -330,11 +330,11 @@ class AppTheme {
       listTileTheme: ListTileThemeData(
         mouseCursor: _clickCursor,
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.xs,
+          horizontal: AppSpacing.compact,
         ),
         minLeadingWidth: 24,
-        minVerticalPadding: AppSpacing.compact,
+        minVerticalPadding: AppSpacing.sm,
+        minTileHeight: AppLayout.minTouchTarget,
         iconColor: colors.onSurfaceVariant,
         textColor: colors.onSurface,
         titleTextStyle: text.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
@@ -350,7 +350,7 @@ class AppTheme {
         shape: outlinedShape,
         titleTextStyle: text.headlineSmall,
         contentTextStyle: text.bodyMedium,
-        insetPadding: const EdgeInsets.all(AppSpacing.lg),
+        insetPadding: const EdgeInsets.all(AppSpacing.compact),
       ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: colors.surface,

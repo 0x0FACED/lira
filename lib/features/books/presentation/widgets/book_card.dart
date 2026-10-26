@@ -57,7 +57,7 @@ class BookCard extends StatelessWidget {
           children: [
             Expanded(child: _buildCover(context)),
             Padding(
-              padding: const EdgeInsets.all(AppSpacing.compact),
+              padding: const EdgeInsets.all(AppSpacing.sm),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -77,9 +77,9 @@ class BookCard extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: AppSpacing.compact),
+                  const SizedBox(height: AppSpacing.sm),
                   Wrap(
-                    spacing: AppSpacing.sm,
+                    spacing: AppSpacing.xs,
                     runSpacing: AppSpacing.xs,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
@@ -87,6 +87,8 @@ class BookCard extends StatelessWidget {
                       if (book.pageCount > 0)
                         Text(
                           '${l10n.pages}: ${book.pageCount}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
@@ -105,17 +107,12 @@ class BookCard extends StatelessWidget {
   Widget _buildCover(BuildContext context) {
     final path = book.coverUrl;
     if (path != null && path.isNotEmpty) {
-      return ColoredBox(
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.sm),
-          child: Image.file(
-            File(path),
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) =>
-                _buildFormatFallback(context),
-          ),
-        ),
+      return Image.file(
+        File(path),
+        fit: BoxFit.cover,
+        alignment: Alignment.topCenter,
+        errorBuilder: (context, error, stackTrace) =>
+            _buildFormatFallback(context),
       );
     }
     return _buildFormatFallback(context);

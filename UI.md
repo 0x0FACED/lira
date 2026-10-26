@@ -25,6 +25,7 @@ Book covers, PDF content, saved annotation colors and explicitly chosen reading 
 - Radii: `AppRadius` — 8, 12, 20, 28.
 - Content width: `AppLayout.contentMaxWidth` (1120); forms/sheets use `formMaxWidth` (640).
 - Interactive targets use `AppLayout.minTouchTarget` (48). Labels wrap rather than shrinking below the type scale.
+- Density: page gutters and header padding are 12; surface bodies default to 12, book-card bodies to 8; grid gaps are 12 and section gaps 16. Reserve 24+ for deliberate separation, not default padding. Compact chrome does not change reader content margins or saved reading preferences.
 
 Implementations live in `lib/core/theme/app_theme.dart` and `app_tokens.dart`. Themes are constructed once, not reallocated on every app rebuild.
 
@@ -32,11 +33,11 @@ Implementations live in `lib/core/theme/app_theme.dart` and `app_tokens.dart`. T
 
 `lib/core/widgets/app_components.dart` supplies:
 
-- `AppSurface`: outlined Material surface with optional InkWell interaction; no backdrop blur or colored glow.
-- `AppPageHeader`: shared editorial page heading, optional subtitle, leading control and actions.
+- `AppSurface`: outlined Material surface with 12 px default inner padding and optional InkWell interaction; no backdrop blur or colored glow.
+- `AppPageHeader`: shared editorial page heading with 12 px padding, optional subtitle, leading control and actions.
 - `AppSection`: settings/form grouping with a shared heading and surface.
 - `AppEmptyState`: empty, initial and error presentations with optional action.
-- `AppBadge`: metadata/source labels.
+- `AppBadge`: compact metadata/source labels; long labels ellipsize within the available width.
 - `AppSearchField`: common input decoration, clear action and optional search submission action.
 - `AppStateTransition`: keyed state changes; outgoing children cannot receive input or focus.
 - `showAppDialog` / `showAppBottomSheet`: shared presentation, insets and motion. Bottom sheets provide their own drag handle; content must not draw a second one.
@@ -45,7 +46,7 @@ Use the standard Material buttons, chips, switches, sliders, inputs, menus, prog
 
 ## Navigation and motion
 
-`MainShell` uses a navigation rail at widths of 900 or more and a normal bottom `NavigationBar` below that breakpoint. The scaffold reserves navigation space: pages must not add legacy padding for an overlaid glass navigation bar.
+`MainShell` uses a 192 px navigation rail at widths of 900 or more and a normal bottom `NavigationBar` below that breakpoint. The scaffold reserves navigation space: pages must not add legacy padding for an overlaid glass navigation bar.
 
 Tabs retain their subtree, scroll position and query state in an `IndexedStack`; only the selected tab's tickers run. A short fade/translation introduces a newly selected tab without recreating all tabs. Resizing between rail and bottom navigation preserves the content subtree.
 
@@ -60,9 +61,11 @@ Never wrap a live EPUB/PDF engine in a keyed `AnimatedSwitcher`: progress, selec
 - **Auth (`/login`)**: bounded form, local login/register state and guest entry. Backend authentication is still not implemented.
 - **Library (`/`)**: responsive shelf, local search, import, long-press deletion, navigation to book details; shared empty/error presentations.
 - **Book details (`/book-detail`)**: bounded adaptive cover/metadata layout, edit/delete actions and entry to the reader.
-- **Search tab**: Anna's Archive/Z-Library source selection, format/sort controls, results and partial/error/empty states, download progress and cancellation.
+- **Search tab**: Anna's Archive/Z-Library source selection, format/sort controls, responsive result grid and partial/error/empty states, download progress and cancellation.
 - **Settings tab**: profile/account, source credentials, appearance/language, proxy and application version, grouped on common surfaces.
 - **Reader (`/reader`)**: themed chrome, TOC, selections/notes, highlights and settings sheets. EPUB/PDF parsing, geometry and persistence remain the reader subsystem's responsibility; see [READER.md](READER.md).
+
+Library and search cards have full-bleed artwork above an inset metadata/action body. Images use top-centered `BoxFit.cover`, preserve their aspect ratio and may crop to fill the cover area; the card surface clips the top corners. Book details use the same artwork treatment. Library and search grids increase tile height with text scaling; progress and cancellation remain inside the search-card body.
 
 A fresh reader settings profile starts on warm paper. Saved reader settings, including old dark/white backgrounds, remain unchanged; app theme changes do not overwrite them. Resetting reader settings returns to warm paper. Reading controls and background swatches have localized semantic labels/tooltips.
 
@@ -71,7 +74,7 @@ A fresh reader settings profile starts on warm paper. Saved reader settings, inc
 Run the real application (`flutter run -d macos`, or a supported connected device), not a standalone gallery of copied components:
 
 1. Check light/dark and English/Russian on auth, library, details, search, settings and reader chrome.
-2. Resize through the 900 px breakpoint; check 360 px width and increased text size. Scroll settings and forms with the keyboard open.
+2. Resize through the 900 px breakpoint; check 360 px width and increased text size. Check full-bleed artwork, long titles/badges, missing covers and search-card progress/cancellation. Scroll settings and forms with the keyboard open.
 3. Preserve library/search input and scroll state when switching tabs and resizing. Check filters, partial results, errors and download controls.
 4. Open real EPUB/PDF, toggle chrome, use TOC/settings/highlights, then close and reopen without losing reading position.
 5. Change app theme with an explicitly chosen reading background and saved highlights; content preferences must remain intact.

@@ -94,7 +94,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.lg),
+            padding: const EdgeInsets.all(AppSpacing.compact),
             child: ConstrainedBox(
               constraints: const BoxConstraints(
                 maxWidth: AppLayout.formMaxWidth,
@@ -103,7 +103,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(AppSpacing.md),
+                    padding: const EdgeInsets.all(AppSpacing.compact),
                     decoration: BoxDecoration(
                       color: colors.primaryContainer,
                       borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -114,7 +114,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       color: colors.onPrimaryContainer,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.lg),
+                  const SizedBox(height: AppSpacing.md),
                   Text(l10n.appTitle, style: theme.textTheme.displaySmall),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
@@ -123,7 +123,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       color: colors.onSurfaceVariant,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.xl),
+                  const SizedBox(height: AppSpacing.md),
                   AppSurface(
                     child: AutofillGroup(
                       child: Column(
@@ -139,7 +139,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: AppSpacing.lg),
+                          const SizedBox(height: AppSpacing.md),
                           TextField(
                             controller: _usernameController,
                             autofillHints: const [AutofillHints.username],
@@ -149,7 +149,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                               prefixIcon: const Icon(Icons.person_outline),
                             ),
                           ),
-                          const SizedBox(height: AppSpacing.md),
+                          const SizedBox(height: AppSpacing.compact),
                           TextField(
                             controller: _passwordController,
                             autofillHints: [
@@ -165,7 +165,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                             ),
                             onSubmitted: (_) => _handleAuth(),
                           ),
-                          const SizedBox(height: AppSpacing.lg),
+                          const SizedBox(height: AppSpacing.md),
                           FilledButton(
                             onPressed: _isLoading ? null : _handleAuth,
                             child: AppStateTransition(
@@ -203,7 +203,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           ),
                           const Padding(
                             padding: EdgeInsets.symmetric(
-                              vertical: AppSpacing.md,
+                              vertical: AppSpacing.sm,
                             ),
                             child: Divider(),
                           ),
