@@ -9,6 +9,8 @@ import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../books/domain/models/book_dto.dart';
+import '../../bookmarks/domain/models/bookmark_dto.dart';
+import '../../bookmarks/domain/providers/bookmarks_provider.dart';
 import '../../highlights/domain/models/highlight_dto.dart';
 import '../../highlights/domain/providers/highlights_provider.dart';
 import '../../progress/domain/providers/reading_progress_provider.dart';
@@ -18,6 +20,7 @@ import '../domain/engine/book_reader_engine.dart';
 import '../domain/engine/epub_book_reader_engine.dart';
 import '../domain/engine/pdf_book_reader_engine.dart';
 import '../domain/models/book_location.dart';
+import 'reader_annotations_panel.dart';
 
 const _highlightColors = [
   // Reader annotations are content colors, independent of the app chrome.
@@ -51,6 +54,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   int _loadGeneration = 0;
   int? _closingGeneration;
   int? _highlightWriteGeneration;
+  int? _bookmarkWriteGeneration;
   List<HighlightDto>? _mappedHighlights;
   List<Map<String, dynamic>> _highlightData = const [];
 
@@ -65,6 +69,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   }
 
   void _startBook() {
+    _bookmarkWriteGeneration = null;
     _mappedHighlights = null;
     _highlightData = const [];
     _progressController = ref.read(
@@ -193,6 +198,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     final highlightsAsync = ref.watch(
       highlightsControllerProvider(widget.book.id),
     );
+    final bookmarksAsync = ref.watch(
+      bookmarksControllerProvider(widget.book.id),
+    );
     ref.listen(readingProgressControllerProvider(widget.book.id), (_, next) {
       if (next.hasError && _initialLocation != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -240,6 +248,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
         return Scaffold(
           key: _scaffoldKey,
+          // The note dialog handles the keyboard; keep the book's pagination
+          // and scroll viewport unchanged behind all annotation editors.
+          resizeToAvoidBottomInset: false,
           drawer: _buildTocDrawer(engine),
           body: Stack(
             children: [
@@ -282,50 +293,55 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                     ),
                   ),
                 ),
-              AnimatedPositioned(
-                duration: AppMotion.duration(context),
-                curve: AppMotion.curve,
-                top: _showUi ? 0 : -MediaQuery.sizeOf(context).height,
+              Positioned(
+                top: 0,
                 left: 0,
                 right: 0,
-                child: IgnorePointer(
-                  ignoring: !_showUi,
-                  child: ExcludeFocus(
-                    excluding: !_showUi,
-                    child: AppSurface(
-                      padding: EdgeInsets.zero,
-                      radius: 0,
-                      child: SafeArea(
-                        bottom: false,
-                        child: Center(
-                          heightFactor: 1,
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(
-                              maxWidth: AppLayout.contentMaxWidth,
-                              minHeight: AppLayout.minTouchTarget,
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(AppSpacing.xs),
-                              child: Row(
-                                children: [
-                                  IconButton(
-                                    tooltip: MaterialLocalizations.of(
-                                      context,
-                                    ).backButtonTooltip,
-                                    icon: const Icon(Icons.arrow_back),
-                                    onPressed: _closeReader,
-                                  ),
-                                  const SizedBox(width: AppSpacing.sm),
-                                  Expanded(
-                                    child: Text(
-                                      widget.book.title,
-                                      style: theme.textTheme.titleMedium,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                child: AnimatedSlide(
+                  duration: AppMotion.duration(context),
+                  curve: _showUi ? AppMotion.curve : Curves.easeInCubic,
+                  offset: _showUi ? Offset.zero : const Offset(0, -1),
+                  child: IgnorePointer(
+                    ignoring: !_showUi,
+                    child: ExcludeFocus(
+                      excluding: !_showUi,
+                      child: AppSurface(
+                        key: const ValueKey('reader-top-bar'),
+                        padding: EdgeInsets.zero,
+                        radius: 0,
+                        child: SafeArea(
+                          bottom: false,
+                          child: Center(
+                            heightFactor: 1,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(
+                                maxWidth: AppLayout.contentMaxWidth,
+                                minHeight: AppLayout.minTouchTarget,
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(AppSpacing.xs),
+                                child: Row(
+                                  children: [
+                                    IconButton(
+                                      tooltip: MaterialLocalizations.of(
+                                        context,
+                                      ).backButtonTooltip,
+                                      icon: const Icon(Icons.arrow_back),
+                                      onPressed: _closeReader,
                                     ),
-                                  ),
-                                  const SizedBox(width: AppSpacing.sm),
-                                ],
+                                    const SizedBox(width: AppSpacing.sm),
+                                    Expanded(
+                                      child: Text(
+                                        widget.book.title,
+                                        style: theme.textTheme.titleMedium,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: AppSpacing.sm),
+                                    _buildBookmarkAction(bookmarksAsync),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -335,105 +351,112 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                   ),
                 ),
               ),
-              AnimatedPositioned(
-                duration: AppMotion.duration(context),
-                curve: AppMotion.curve,
-                bottom: _showUi ? 0 : -MediaQuery.sizeOf(context).height,
+              Positioned(
+                bottom: 0,
                 left: 0,
                 right: 0,
-                child: IgnorePointer(
-                  ignoring: !_showUi,
-                  child: ExcludeFocus(
-                    excluding: !_showUi,
-                    child: AppSurface(
-                      padding: EdgeInsets.zero,
-                      radius: 0,
-                      child: SafeArea(
-                        top: false,
-                        child: Center(
-                          heightFactor: 1,
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(
-                              maxWidth: AppLayout.contentMaxWidth,
-                            ),
-                            child: ValueListenableBuilder<_ReaderProgressState>(
-                              valueListenable: _progressNotifier,
-                              builder: (context, progressState, _) {
-                                return Padding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    AppSpacing.compact,
-                                    AppSpacing.sm,
-                                    AppSpacing.compact,
-                                    AppSpacing.xs,
-                                  ),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: ClipRRect(
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                    AppRadius.sm,
-                                                  ),
-                                              child: LinearProgressIndicator(
-                                                value: progressState.fraction,
-                                                backgroundColor: colors
-                                                    .surfaceContainerHighest,
-                                                minHeight: AppSpacing.xs,
+                child: AnimatedSlide(
+                  duration: AppMotion.duration(context),
+                  curve: _showUi ? AppMotion.curve : Curves.easeInCubic,
+                  offset: _showUi ? Offset.zero : const Offset(0, 1),
+                  child: IgnorePointer(
+                    ignoring: !_showUi,
+                    child: ExcludeFocus(
+                      excluding: !_showUi,
+                      child: AppSurface(
+                        key: const ValueKey('reader-bottom-bar'),
+                        padding: EdgeInsets.zero,
+                        radius: 0,
+                        child: SafeArea(
+                          top: false,
+                          child: Center(
+                            heightFactor: 1,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(
+                                maxWidth: AppLayout.contentMaxWidth,
+                              ),
+                              child: ValueListenableBuilder<_ReaderProgressState>(
+                                valueListenable: _progressNotifier,
+                                builder: (context, progressState, _) {
+                                  return Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      AppSpacing.compact,
+                                      AppSpacing.sm,
+                                      AppSpacing.compact,
+                                      AppSpacing.xs,
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: ClipRRect(
+                                                borderRadius:
+                                                    BorderRadius.circular(
+                                                      AppRadius.sm,
+                                                    ),
+                                                child: LinearProgressIndicator(
+                                                  value: progressState.fraction,
+                                                  backgroundColor: colors
+                                                      .surfaceContainerHighest,
+                                                  minHeight: AppSpacing.xs,
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                          const SizedBox(
-                                            width: AppSpacing.compact,
-                                          ),
-                                          Text(
-                                            progressState.label,
-                                            style: theme.textTheme.labelMedium
-                                                ?.copyWith(
-                                                  color:
-                                                      colors.onSurfaceVariant,
-                                                ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: AppSpacing.xs),
-                                      Wrap(
-                                        alignment: WrapAlignment.spaceEvenly,
-                                        crossAxisAlignment:
-                                            WrapCrossAlignment.center,
-                                        spacing: AppSpacing.compact,
-                                        children: [
-                                          IconButton(
-                                            icon: const Icon(
-                                              Icons.format_list_bulleted,
+                                            const SizedBox(
+                                              width: AppSpacing.compact,
                                             ),
-                                            tooltip: l10n.tableOfContents,
-                                            onPressed: () => _scaffoldKey
-                                                .currentState
-                                                ?.openDrawer(),
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(
-                                              Icons.bookmark_outline,
+                                            Text(
+                                              progressState.label,
+                                              style: theme.textTheme.labelMedium
+                                                  ?.copyWith(
+                                                    color:
+                                                        colors.onSurfaceVariant,
+                                                  ),
                                             ),
-                                            tooltip: l10n.highlights,
-                                            onPressed: () =>
-                                                _showHighlightsPanel(context),
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(Icons.settings),
-                                            tooltip: l10n.readerSettings,
-                                            onPressed: () =>
-                                                _showSettings(context),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
+                                          ],
+                                        ),
+                                        const SizedBox(height: AppSpacing.xs),
+                                        Wrap(
+                                          alignment: WrapAlignment.spaceEvenly,
+                                          crossAxisAlignment:
+                                              WrapCrossAlignment.center,
+                                          spacing: AppSpacing.compact,
+                                          children: [
+                                            IconButton(
+                                              icon: const Icon(
+                                                Icons.format_list_bulleted,
+                                              ),
+                                              tooltip: l10n.tableOfContents,
+                                              onPressed: () => _scaffoldKey
+                                                  .currentState
+                                                  ?.openDrawer(),
+                                            ),
+                                            IconButton(
+                                              icon: const Icon(
+                                                Icons
+                                                    .collections_bookmark_outlined,
+                                              ),
+                                              tooltip: l10n.annotations,
+                                              onPressed: () =>
+                                                  _showAnnotationsPanel(
+                                                    context,
+                                                  ),
+                                            ),
+                                            IconButton(
+                                              icon: const Icon(Icons.settings),
+                                              tooltip: l10n.readerSettings,
+                                              onPressed: () =>
+                                                  _showSettings(context),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
                             ),
                           ),
                         ),
@@ -490,7 +513,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       highlights: _buildHighlightsData(highlights),
       onProgressChanged: (location, percentage) {
         if (!mounted || _engine != engine) return;
-        _progressNotifier.value = _progressStateFromPercentage(percentage);
+        _progressNotifier.value = _progressStateFromPercentage(
+          percentage,
+          location: location,
+        );
         unawaited(
           _progressController.saveProgress(
             location: location.locator,
@@ -545,12 +571,86 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     _didSeedProgressFromStorage = true;
   }
 
-  _ReaderProgressState _progressStateFromPercentage(double? percentage) {
+  _ReaderProgressState _progressStateFromPercentage(
+    double? percentage, {
+    BookLocation? location,
+  }) {
     final value = (percentage ?? 0).clamp(0.0, 100.0).toDouble();
     return _ReaderProgressState(
       fraction: value / 100,
       label: '${value.toStringAsFixed(1)}%',
+      location: location,
     );
+  }
+
+  Widget _buildBookmarkAction(AsyncValue<List<BookmarkDto>> bookmarks) {
+    return ValueListenableBuilder<_ReaderProgressState>(
+      valueListenable: _progressNotifier,
+      builder: (context, progress, _) {
+        final location = progress.location;
+        BookmarkDto? current;
+        for (final bookmark in bookmarks.valueOrNull ?? const <BookmarkDto>[]) {
+          if (bookmark.location == location?.locator) {
+            current = bookmark;
+            break;
+          }
+        }
+        final l10n = AppLocalizations.of(context)!;
+        return IconButton(
+          tooltip: current == null ? l10n.addBookmark : l10n.removeBookmark,
+          icon: Icon(
+            current == null ? Icons.bookmark_add_outlined : Icons.bookmark,
+          ),
+          onPressed:
+              location == null ||
+                  location.locator.isEmpty ||
+                  !bookmarks.hasValue ||
+                  _bookmarkWriteGeneration == _loadGeneration
+              ? null
+              : () =>
+                    _toggleBookmark(location, progress.fraction * 100, current),
+        );
+      },
+    );
+  }
+
+  Future<void> _toggleBookmark(
+    BookLocation location,
+    double percentage,
+    BookmarkDto? current,
+  ) async {
+    final generation = _loadGeneration;
+    if (_bookmarkWriteGeneration == generation) return;
+    final bookId = widget.book.id;
+    setState(() => _bookmarkWriteGeneration = generation);
+    try {
+      final controller = ref.read(bookmarksControllerProvider(bookId).notifier);
+      if (current == null) {
+        await controller.addBookmark(
+          location: location.locator,
+          percentage: percentage,
+        );
+      } else {
+        await controller.removeBookmark(current.id);
+      }
+    } catch (error) {
+      if (mounted && generation == _loadGeneration) {
+        final l10n = AppLocalizations.of(context)!;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              current == null
+                  ? l10n.bookmarkSaveError('$error')
+                  : l10n.bookmarkDeleteError('$error'),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted && _bookmarkWriteGeneration == generation) {
+        setState(() => _bookmarkWriteGeneration = null);
+      }
+    }
   }
 
   Widget _buildSelectionBar() {
@@ -749,10 +849,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     return '#${rgb.toUpperCase()}';
   }
 
-  void _showHighlightsPanel(BuildContext context) {
+  void _showAnnotationsPanel(BuildContext context) {
     showAppBottomSheet<void>(
       context: context,
-      builder: (ctx) => _HighlightsPanel(
+      builder: (ctx) => ReaderAnnotationsPanel(
         bookId: widget.book.id,
         onNavigate: (location) {
           _engine?.goToLocation(BookLocation(locator: location));
@@ -839,8 +939,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 class _ReaderProgressState {
   final double fraction;
   final String label;
+  final BookLocation? location;
 
-  const _ReaderProgressState({required this.fraction, required this.label});
+  const _ReaderProgressState({
+    required this.fraction,
+    required this.label,
+    this.location,
+  });
 }
 
 class _ExpandableTocItem extends StatefulWidget {
@@ -920,210 +1025,5 @@ class _ExpandableTocItemState extends State<_ExpandableTocItem> {
         onNavigate: widget.onNavigate,
       );
     }).toList();
-  }
-}
-
-class _HighlightsPanel extends ConsumerWidget {
-  final String bookId;
-  final void Function(String location) onNavigate;
-
-  const _HighlightsPanel({required this.bookId, required this.onNavigate});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final highlightsAsync = ref.watch(highlightsControllerProvider(bookId));
-    final theme = Theme.of(context);
-    final l10n = AppLocalizations.of(context)!;
-
-    return DraggableScrollableSheet(
-      initialChildSize: 0.5,
-      minChildSize: 0.3,
-      maxChildSize: 0.85,
-      expand: false,
-      builder: (ctx, scrollController) {
-        return CustomScrollView(
-          controller: scrollController,
-          slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.compact,
-                  vertical: AppSpacing.sm,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        l10n.highlights,
-                        style: theme.textTheme.titleLarge,
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    highlightsAsync.whenOrNull(
-                          data: (list) => AppBadge(label: '${list.length}'),
-                        ) ??
-                        const SizedBox.shrink(),
-                  ],
-                ),
-              ),
-            ),
-            const SliverToBoxAdapter(child: Divider()),
-            highlightsAsync.when(
-              loading: () => const SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(child: CircularProgressIndicator()),
-              ),
-              error: (e, _) => SliverToBoxAdapter(
-                child: AppEmptyState(
-                  icon: Icons.error_outline,
-                  title: l10n.highlightsLoadError,
-                  description: '$e',
-                  iconColor: theme.colorScheme.error,
-                ),
-              ),
-              data: (highlights) {
-                if (highlights.isEmpty) {
-                  return SliverToBoxAdapter(
-                    child: AppEmptyState(
-                      icon: Icons.bookmark_outline,
-                      title: l10n.highlightsEmpty,
-                      description: l10n.highlightsEmptyHint,
-                    ),
-                  );
-                }
-                return SliverPadding(
-                  padding: EdgeInsets.only(
-                    bottom:
-                        AppSpacing.compact + MediaQuery.paddingOf(ctx).bottom,
-                  ),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (ctx, i) => _buildHighlightTile(
-                        context,
-                        ref,
-                        highlights[i],
-                        theme,
-                      ),
-                      childCount: highlights.length,
-                    ),
-                  ),
-                );
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildHighlightTile(
-    BuildContext context,
-    WidgetRef ref,
-    HighlightDto highlight,
-    ThemeData theme,
-  ) {
-    final color = _parseHex(highlight.color);
-    final l10n = AppLocalizations.of(context)!;
-    return Dismissible(
-      key: Key(highlight.id),
-      direction: DismissDirection.endToStart,
-      movementDuration: AppMotion.duration(context),
-      resizeDuration: AppMotion.duration(context),
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: AppSpacing.compact),
-        color: theme.colorScheme.errorContainer,
-        child: Icon(
-          Icons.delete_outline,
-          color: theme.colorScheme.onErrorContainer,
-        ),
-      ),
-      onDismissed: (_) {
-        ref
-            .read(highlightsControllerProvider(bookId).notifier)
-            .removeHighlight(highlight.id);
-      },
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.compact,
-          vertical: AppSpacing.xs,
-        ),
-        leading: Container(
-          width: AppSpacing.xs,
-          height: AppSpacing.xxl,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(AppRadius.sm),
-          ),
-        ),
-        title: Text(
-          highlight.text,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.bodyMedium,
-        ),
-        subtitle: highlight.note != null
-            ? Text(
-                highlight.note!,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              )
-            : null,
-        trailing: IconButton(
-          tooltip: highlight.note != null ? l10n.editNote : l10n.addNote,
-          icon: Icon(
-            highlight.note != null ? Icons.edit_note : Icons.note_add_outlined,
-            size: 20,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-          onPressed: () => _editNote(context, ref, highlight),
-        ),
-        onTap: () => onNavigate(highlight.location),
-      ),
-    );
-  }
-
-  void _editNote(BuildContext context, WidgetRef ref, HighlightDto highlight) {
-    final controller = TextEditingController(text: highlight.note ?? '');
-    final l10n = AppLocalizations.of(context)!;
-    showAppDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.editNote),
-        scrollable: true,
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLines: 3,
-          decoration: InputDecoration(hintText: l10n.noteHint),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () {
-              ref
-                  .read(highlightsControllerProvider(bookId).notifier)
-                  .updateNote(
-                    highlight.id,
-                    controller.text.isNotEmpty ? controller.text : null,
-                  );
-              Navigator.pop(ctx);
-            },
-            child: Text(l10n.save),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Color _parseHex(String hex) {
-    final h = hex.replaceFirst('#', '');
-    return Color(int.parse('FF$h', radix: 16));
   }
 }

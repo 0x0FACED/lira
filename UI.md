@@ -63,7 +63,7 @@ Never wrap a live EPUB/PDF engine in a keyed `AnimatedSwitcher`: progress, selec
 - **Book details (`/book-detail`)**: bounded adaptive cover/metadata layout, edit/delete actions and entry to the reader.
 - **Search tab**: Anna's Archive/Z-Library source selection, format/sort controls, responsive result grid and partial/error/empty states, download progress and cancellation.
 - **Settings tab**: profile/account, source credentials, appearance/language, proxy and application version, grouped on common surfaces.
-- **Reader (`/reader`)**: themed chrome, TOC, selections/notes, highlights and settings sheets. EPUB/PDF parsing, geometry and persistence remain the reader subsystem's responsibility; see [READER.md](READER.md).
+- **Reader (`/reader`)**: themed chrome, TOC, selections/notes, an annotations sheet with separate Highlights/Bookmarks tabs, and settings. The top bar toggles a bookmark for the current reading position. Both bars animate in/out by their own height; note-editor keyboards do not resize the book behind the dialog. EPUB/PDF parsing, geometry and persistence remain the reader subsystem's responsibility; see [READER.md](READER.md).
 
 Library and search cards have full-bleed artwork above an inset metadata/action body. Images use top-centered `BoxFit.cover`, preserve their aspect ratio and may crop to fill the cover area; the card surface clips the top corners. Book details use the same artwork treatment. Library and search grids increase tile height with text scaling; progress and cancellation remain inside the search-card body.
 
@@ -76,7 +76,7 @@ Run the real application (`flutter run -d macos`, or a supported connected devic
 1. Check light/dark and English/Russian on auth, library, details, search, settings and reader chrome.
 2. Resize through the 900 px breakpoint; check 360 px width and increased text size. Check full-bleed artwork, long titles/badges, missing covers and search-card progress/cancellation. Scroll settings and forms with the keyboard open.
 3. Preserve library/search input and scroll state when switching tabs and resizing. Check filters, partial results, errors and download controls.
-4. Open real EPUB/PDF, toggle chrome, use TOC/settings/highlights, then close and reopen without losing reading position.
+4. Open real EPUB/PDF, toggle chrome in both directions, use TOC/settings/highlights/bookmarks, then close and reopen without losing reading position. In both EPUB modes, open/save/cancel a note with the keyboard visible: the underlying book must not resize or jump.
 5. Change app theme with an explicitly chosen reading background and saved highlights; content preferences must remain intact.
 6. Enable reduced motion and check navigation, dialogs, sheets and reader controls. Check keyboard focus and disabled states.
 

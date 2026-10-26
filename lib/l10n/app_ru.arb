@@ -152,6 +152,33 @@
   "highlightsEmpty": "Выделений пока нет",
   "highlightsEmptyHint": "Выделите текст в книге, чтобы сохранить выделение или заметку.",
   "highlightsLoadError": "Не удалось загрузить выделения",
+  "annotations": "Заметки и закладки",
+  "bookmarks": "Закладки",
+  "bookmarksEmpty": "Закладок пока нет",
+  "bookmarksEmptyHint": "Нажмите кнопку закладки в читалке, чтобы сохранить место чтения.",
+  "bookmarksLoadError": "Не удалось загрузить закладки",
+  "bookmarkPosition": "Позиция: {percentage}%",
+  "@bookmarkPosition": {
+    "placeholders": {"percentage": {"type": "String"}}
+  },
+  "addBookmark": "Добавить закладку",
+  "removeBookmark": "Удалить закладку",
+  "bookmarkSaveError": "Не удалось сохранить закладку: {error}",
+  "@bookmarkSaveError": {
+    "placeholders": {"error": {"type": "String"}}
+  },
+  "bookmarkDeleteError": "Не удалось удалить закладку: {error}",
+  "@bookmarkDeleteError": {
+    "placeholders": {"error": {"type": "String"}}
+  },
+  "highlightDeleteError": "Не удалось удалить выделение: {error}",
+  "@highlightDeleteError": {
+    "placeholders": {"error": {"type": "String"}}
+  },
+  "noteSaveError": "Не удалось сохранить заметку: {error}",
+  "@noteSaveError": {
+    "placeholders": {"error": {"type": "String"}}
+  },
   "addNote": "Добавить заметку",
   "editNote": "Изменить заметку",
   "noteHint": "Ваша заметка…",

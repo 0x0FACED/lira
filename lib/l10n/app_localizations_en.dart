@@ -337,6 +337,53 @@ class AppLocalizationsEn extends AppLocalizations {
   String get highlightsLoadError => 'Could not load highlights';
 
   @override
+  String get annotations => 'Annotations';
+
+  @override
+  String get bookmarks => 'Bookmarks';
+
+  @override
+  String get bookmarksEmpty => 'No bookmarks yet';
+
+  @override
+  String get bookmarksEmptyHint =>
+      'Use the bookmark button in the reader to save your place.';
+
+  @override
+  String get bookmarksLoadError => 'Could not load bookmarks';
+
+  @override
+  String bookmarkPosition(String percentage) {
+    return 'Position: $percentage%';
+  }
+
+  @override
+  String get addBookmark => 'Add bookmark';
+
+  @override
+  String get removeBookmark => 'Remove bookmark';
+
+  @override
+  String bookmarkSaveError(String error) {
+    return 'Could not save bookmark: $error';
+  }
+
+  @override
+  String bookmarkDeleteError(String error) {
+    return 'Could not remove bookmark: $error';
+  }
+
+  @override
+  String highlightDeleteError(String error) {
+    return 'Could not delete highlight: $error';
+  }
+
+  @override
+  String noteSaveError(String error) {
+    return 'Could not save note: $error';
+  }
+
+  @override
   String get addNote => 'Add note';
 
   @override

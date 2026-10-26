@@ -72,6 +72,9 @@ class BooksLocalRepository {
   }
 
   Future<void> deleteBook(String id) async {
-    await (_db.delete(_db.books)..where((t) => t.id.equals(id))).go();
+    await _db.transaction(() async {
+      await (_db.delete(_db.bookmarks)..where((t) => t.bookId.equals(id))).go();
+      await (_db.delete(_db.books)..where((t) => t.id.equals(id))).go();
+    });
   }
 }

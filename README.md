@@ -28,8 +28,8 @@ Read offline, keep the lines that matter, and make every page feel like yours.
 A good reader should make it easier to stay with a book. Lira keeps your library, your reading tools, and your next discoveries close—without making the interface the main event.
 
 - **Bring the books you already have.** Import EPUB and PDF files from your device and give them a home on your own shelf.
-- **Leave the connection behind.** Once a book is on your device, you can read it offline. Your progress, highlights, and notes are saved locally.
-- **Keep more than your place.** Highlight a passage, add a thought, and jump back to it when you need it. Close the book and return to where you left off.
+- **Leave the connection behind.** Once a book is on your device, you can read it offline. Your progress, highlights, notes, and bookmarks are saved locally.
+- **Keep more than your place.** Bookmark a reading position, highlight a passage, add a thought, and jump back when you need it. Highlights and bookmarks have separate tabs. Close the book and return to where you left off.
 - **Make the page yours.** For EPUBs, adjust the font, text size, line spacing, margins, and reading background. Scroll vertically, turn pages horizontally, or use a two-page spread when there is room.
 - **Read both formats their own way.** EPUB text adapts to your page; PDFs keep their original layout. Both share the same library and reading tools.
 - **Follow your curiosity.** Search Anna's Archive and Z-Library, filter results, and download books without leaving the app. Source availability and access requirements vary.
@@ -76,7 +76,7 @@ Yes. Imported and downloaded books can be read without an internet connection. B
 <details>
 <summary><strong>Will my library sync between devices?</strong></summary>
 
-Not currently. Your books, reading progress, highlights, and notes are stored on the device you are using. Lira is available on multiple platforms, but cloud sync is not implemented.
+Not currently. Your books, reading progress, highlights, notes, and bookmarks are stored on the device you are using. Lira is available on multiple platforms, but cloud sync is not implemented.
 
 </details>
 

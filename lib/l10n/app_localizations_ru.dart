@@ -341,6 +341,53 @@ class AppLocalizationsRu extends AppLocalizations {
   String get highlightsLoadError => 'Не удалось загрузить выделения';
 
   @override
+  String get annotations => 'Заметки и закладки';
+
+  @override
+  String get bookmarks => 'Закладки';
+
+  @override
+  String get bookmarksEmpty => 'Закладок пока нет';
+
+  @override
+  String get bookmarksEmptyHint =>
+      'Нажмите кнопку закладки в читалке, чтобы сохранить место чтения.';
+
+  @override
+  String get bookmarksLoadError => 'Не удалось загрузить закладки';
+
+  @override
+  String bookmarkPosition(String percentage) {
+    return 'Позиция: $percentage%';
+  }
+
+  @override
+  String get addBookmark => 'Добавить закладку';
+
+  @override
+  String get removeBookmark => 'Удалить закладку';
+
+  @override
+  String bookmarkSaveError(String error) {
+    return 'Не удалось сохранить закладку: $error';
+  }
+
+  @override
+  String bookmarkDeleteError(String error) {
+    return 'Не удалось удалить закладку: $error';
+  }
+
+  @override
+  String highlightDeleteError(String error) {
+    return 'Не удалось удалить выделение: $error';
+  }
+
+  @override
+  String noteSaveError(String error) {
+    return 'Не удалось сохранить заметку: $error';
+  }
+
+  @override
   String get addNote => 'Добавить заметку';
 
   @override

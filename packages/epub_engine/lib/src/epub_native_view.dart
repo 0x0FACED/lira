@@ -1494,10 +1494,11 @@ class EpubNativeViewState extends State<EpubNativeView>
   bool _beginPageTurn(bool forward) {
     final target = _adjacentPageIndex(forward);
     if (target == _currentPageIndex || _pendingRestore != null) return false;
+    // debugNeedsPaint throws in profile/release; keep it debug-only.
     final boundary = _pageBoundaryKey.currentContext?.findRenderObject();
     if (boundary is! RenderRepaintBoundary ||
         !boundary.hasSize ||
-        boundary.debugNeedsPaint) {
+        (kDebugMode && boundary.debugNeedsPaint)) {
       return false;
     }
     // Snapshot once per turn, never per frame. A spread also captures the
@@ -1532,7 +1533,7 @@ class EpubNativeViewState extends State<EpubNativeView>
           ?.findRenderObject();
       if (boundary is! RenderRepaintBoundary ||
           !boundary.hasSize ||
-          boundary.debugNeedsPaint) {
+          (kDebugMode && boundary.debugNeedsPaint)) {
         return;
       }
       setState(() {

@@ -152,6 +152,33 @@
   "highlightsEmpty": "No highlights yet",
   "highlightsEmptyHint": "Select text in the book to save a highlight or note.",
   "highlightsLoadError": "Could not load highlights",
+  "annotations": "Annotations",
+  "bookmarks": "Bookmarks",
+  "bookmarksEmpty": "No bookmarks yet",
+  "bookmarksEmptyHint": "Use the bookmark button in the reader to save your place.",
+  "bookmarksLoadError": "Could not load bookmarks",
+  "bookmarkPosition": "Position: {percentage}%",
+  "@bookmarkPosition": {
+    "placeholders": {"percentage": {"type": "String"}}
+  },
+  "addBookmark": "Add bookmark",
+  "removeBookmark": "Remove bookmark",
+  "bookmarkSaveError": "Could not save bookmark: {error}",
+  "@bookmarkSaveError": {
+    "placeholders": {"error": {"type": "String"}}
+  },
+  "bookmarkDeleteError": "Could not remove bookmark: {error}",
+  "@bookmarkDeleteError": {
+    "placeholders": {"error": {"type": "String"}}
+  },
+  "highlightDeleteError": "Could not delete highlight: {error}",
+  "@highlightDeleteError": {
+    "placeholders": {"error": {"type": "String"}}
+  },
+  "noteSaveError": "Could not save note: {error}",
+  "@noteSaveError": {
+    "placeholders": {"error": {"type": "String"}}
+  },
   "addNote": "Add note",
   "editNote": "Edit note",
   "noteHint": "Your note…",

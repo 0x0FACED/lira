@@ -5,16 +5,21 @@ import 'package:archive/archive.dart';
 import 'package:epub_engine/epub_engine.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:lira/core/di/injection.dart';
+import 'package:lira/core/theme/app_tokens.dart';
+import 'package:lira/features/bookmarks/data/repositories/bookmarks_local_repository.dart';
+import 'package:lira/features/bookmarks/domain/models/bookmark_dto.dart';
 import 'package:lira/features/books/domain/models/book_dto.dart';
 import 'package:lira/features/highlights/data/repositories/highlights_local_repository.dart';
 import 'package:lira/features/highlights/domain/models/highlight_dto.dart';
 import 'package:lira/features/progress/data/repositories/reading_progress_local_repository.dart';
 import 'package:lira/features/progress/domain/models/reading_progress_dto.dart';
 import 'package:lira/features/reader/presentation/reader_screen.dart';
+import 'package:lira/features/reader/presentation/reader_annotations_panel.dart';
 import 'package:lira/features/settings/data/settings_provider.dart';
 import 'package:lira/l10n/app_localizations.dart';
 
@@ -50,6 +55,31 @@ class _HighlightsStore implements HighlightsLocalRepository {
 
   @override
   Future<void> deleteHighlight(String id) async {
+    values.remove(id);
+  }
+}
+
+class _BookmarksStore implements BookmarksLocalRepository {
+  final values = <String, BookmarkDto>{};
+
+  @override
+  Future<List<BookmarkDto>> getBookmarksForBook(String bookId) async =>
+      values.values.where((value) => value.bookId == bookId).toList();
+
+  @override
+  Future<void> saveBookmark(BookmarkDto bookmark) async {
+    if (values.values.any(
+      (value) =>
+          value.bookId == bookmark.bookId &&
+          value.location == bookmark.location,
+    )) {
+      return;
+    }
+    values[bookmark.id] = bookmark;
+  }
+
+  @override
+  Future<void> deleteBookmark(String id) async {
     values.remove(id);
   }
 }
@@ -166,9 +196,49 @@ void _expectSavedTextVisible(WidgetTester tester, EpubLocation location) {
   );
 }
 
+List<(String, double)> _visibleParagraphs(WidgetTester tester) {
+  final reader = find.byType(EpubNativeView);
+  final viewport = tester.getRect(reader);
+  final paragraphs = <(String, double)>[];
+  for (final element
+      in find
+          .descendant(of: reader, matching: find.byType(RichText))
+          .evaluate()) {
+    final render = element.renderObject;
+    if (render is! RenderParagraph) continue;
+    final rect = render.localToGlobal(Offset.zero) & render.size;
+    if (rect.bottom > viewport.top && rect.top < viewport.bottom) {
+      paragraphs.add((render.text.toPlainText(), rect.top));
+    }
+  }
+  paragraphs.sort((a, b) => a.$2.compareTo(b.$2));
+  return paragraphs;
+}
+
+int _chromeTapCount = 0;
+
+Offset _chromeTapPosition(WidgetTester tester) {
+  // Distinct center-zone taps are not a native double-tap selection gesture.
+  final dx = (_chromeTapCount++).isEven ? -40.0 : 40.0;
+  return tester.getCenter(find.byType(EpubNativeView)) + Offset(dx, 0);
+}
+
+Future<void> _showControls(WidgetTester tester) async {
+  await tester.tapAt(_chromeTapPosition(tester));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _openAnnotations(WidgetTester tester) async {
+  final l10n = AppLocalizations.of(tester.element(find.byType(ReaderScreen)))!;
+  await tester.tap(find.byTooltip(l10n.annotations));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   late Directory directory;
   late _ProgressStore progress;
+  late _HighlightsStore highlights;
+  late _BookmarksStore bookmarks;
   late BookDto readable;
   late BookDto corrupt;
 
@@ -216,12 +286,194 @@ void main() {
   });
 
   tearDownAll(() => directory.deleteSync(recursive: true));
-  setUp(() {
+  setUp(() async {
+    _chromeTapCount = 0;
+    await sharedPrefs.clear();
     progress = _ProgressStore();
     getIt.registerSingleton<ReadingProgressLocalRepository>(progress);
-    getIt.registerSingleton<HighlightsLocalRepository>(_HighlightsStore());
+    highlights = _HighlightsStore();
+    bookmarks = _BookmarksStore();
+    getIt.registerSingleton<HighlightsLocalRepository>(highlights);
+    getIt.registerSingleton<BookmarksLocalRepository>(bookmarks);
   });
   tearDown(() => getIt.reset());
+
+  for (final mode in ReadingMode.values) {
+    testWidgets(
+      '$mode note editor keeps the book fixed while the keyboard opens and closes',
+      (tester) async {
+        final highlight = HighlightDto(
+          id: 'annotated-passage',
+          bookId: readable.id,
+          text: 'Paragraph 0.',
+          location: EpubLocation.fromPosition(
+            chapterIndex: 0,
+            charOffset: 0,
+            hasExactCharOffset: true,
+            startOffset: 0,
+            endOffset: 12,
+          ).toJson(),
+          createdAt: DateTime(2026),
+        );
+        highlights.values[highlight.id] = highlight;
+        await _open(tester, readable);
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(ReaderScreen)),
+        );
+        final settings = container.read(readerSettingsProvider);
+        await container
+            .read(readerSettingsProvider.notifier)
+            .updateSettings(
+              settings.copyWith(readingMode: mode, enableDualPageSpread: false),
+            );
+        await tester.pumpAndSettle();
+        if (mode == ReadingMode.vertical) {
+          await tester.drag(find.byType(EpubNativeView), const Offset(0, -900));
+          await tester.pumpAndSettle();
+        } else {
+          for (var page = 0; page < 4; page++) {
+            await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+            await tester.pumpAndSettle();
+          }
+        }
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pumpAndSettle();
+        final locationBefore = progress.persisted!.location;
+        expect(
+          EpubLocation.fromJson(locationBefore)!.charOffset,
+          greaterThan(0),
+        );
+        final viewport = tester.getRect(find.byType(EpubNativeView));
+        final paragraphs = _visibleParagraphs(tester);
+        await _showControls(tester);
+        await _openAnnotations(tester);
+        await tester.tap(
+          find.descendant(
+            of: find.byType(ReaderAnnotationsPanel),
+            matching: find.byTooltip('Add note'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        addTearDown(tester.view.resetViewInsets);
+        for (final inset in [120.0, 300.0, 180.0]) {
+          tester.view.viewInsets = FakeViewPadding(
+            bottom: inset * tester.view.devicePixelRatio,
+          );
+          for (var frame = 0; frame < 4; frame++) {
+            await tester.pump(const Duration(milliseconds: 16));
+            expect(tester.getRect(find.byType(EpubNativeView)), viewport);
+            expect(_visibleParagraphs(tester), paragraphs);
+          }
+        }
+        await tester.enterText(find.byType(TextField), 'Contextual note $mode');
+        await tester.tap(find.text('Save'));
+        await tester.pump();
+        tester.view.resetViewInsets();
+        for (var frame = 0; frame < 20; frame++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          expect(tester.getRect(find.byType(EpubNativeView)), viewport);
+          expect(_visibleParagraphs(tester), paragraphs);
+        }
+        await tester.pumpAndSettle();
+        expect(highlights.values[highlight.id]!.note, 'Contextual note $mode');
+        expect(progress.persisted!.location, locationBefore);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
+
+  testWidgets('both reader bars slide out before leaving the viewport', (
+    tester,
+  ) async {
+    await _open(tester, readable);
+    await _showControls(tester);
+    final viewport = tester.getRect(find.byType(EpubNativeView));
+    final top = find.byKey(const ValueKey('reader-top-bar'));
+    final bottom = find.byKey(const ValueKey('reader-bottom-bar'));
+    final shownTop = tester.getRect(top);
+    final shownBottom = tester.getRect(bottom);
+    final duration = AppMotion.duration(tester.element(top));
+    await tester.tapAt(_chromeTapPosition(tester));
+    await tester.pump();
+    await tester.pump(duration * 0.25);
+    final hidingTop = tester.getRect(top);
+    final hidingBottom = tester.getRect(bottom);
+    expect(hidingTop.top, lessThan(shownTop.top));
+    expect(hidingTop.bottom, greaterThan(viewport.top));
+    expect(hidingBottom.top, greaterThan(shownBottom.top));
+    expect(hidingBottom.top, lessThan(viewport.bottom));
+    await tester.pumpAndSettle();
+    expect(tester.getRect(top).bottom, lessThanOrEqualTo(viewport.top));
+    expect(tester.getRect(bottom).top, greaterThanOrEqualTo(viewport.bottom));
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets(
+    'bookmarks survive reopening and navigate separately from highlights',
+    (tester) async {
+      await _open(tester, readable);
+      await tester.drag(find.byType(EpubNativeView), const Offset(0, -800));
+      await tester.pumpAndSettle();
+      await _showControls(tester);
+      await tester.tap(find.byTooltip('Add bookmark'));
+      await tester.pumpAndSettle();
+      final bookmark = bookmarks.values.values.single;
+      final saved = EpubLocation.fromJson(bookmark.location)!;
+      expect(saved.charOffset, greaterThan(0));
+      await tester.tap(find.byIcon(Icons.arrow_back));
+      await tester.pumpAndSettle();
+      await _openReader(tester);
+      await tester.drag(find.byType(EpubNativeView), const Offset(0, -900));
+      await tester.pumpAndSettle();
+      await _showControls(tester);
+      await _openAnnotations(tester);
+      final panel = find.byType(ReaderAnnotationsPanel);
+      expect(
+        find.descendant(of: panel, matching: find.byType(ListTile)),
+        findsNothing,
+      );
+      await tester.tap(find.text('Bookmarks'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(of: panel, matching: find.byType(ListTile)),
+      );
+      await tester.pumpAndSettle();
+      _expectSavedTextVisible(tester, saved);
+      await _showControls(tester);
+      await _openAnnotations(tester);
+      await tester.tap(find.text('Bookmarks'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(of: panel, matching: find.byTooltip('Remove bookmark')),
+      );
+      await tester.pumpAndSettle();
+      expect(bookmarks.values, isEmpty);
+      expect(
+        find.descendant(of: panel, matching: find.byType(ListTile)),
+        findsNothing,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets('the current bookmark can be removed from the reading toolbar', (
+    tester,
+  ) async {
+    await _open(tester, readable);
+    await _showControls(tester);
+    await tester.tap(find.byTooltip('Add bookmark'));
+    await tester.pumpAndSettle();
+    expect(
+      EpubLocation.fromJson(
+        bookmarks.values.values.single.location,
+      )!.charOffset,
+      0,
+    );
+    await tester.tap(find.byTooltip('Remove bookmark'));
+    await tester.pumpAndSettle();
+    expect(bookmarks.values, isEmpty);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets('an invalid EPUB mounts no reader and preserves saved progress', (
     tester,

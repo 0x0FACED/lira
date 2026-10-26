@@ -42,3 +42,20 @@ class Highlights extends Table {
   @override
   Set<Column> get primaryKey => {id};
 }
+
+@DataClassName('BookmarkEntity')
+class Bookmarks extends Table {
+  TextColumn get id => text()();
+  TextColumn get bookId => text().references(Books, #id)();
+  TextColumn get location => text()();
+  RealColumn get percentage => real()();
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+
+  @override
+  List<Set<Column>> get uniqueKeys => [
+    {bookId, location},
+  ];
+}

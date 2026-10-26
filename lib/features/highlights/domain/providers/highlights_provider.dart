@@ -42,16 +42,16 @@ class HighlightsController
     );
 
     await _repository.saveHighlight(highlight);
-    state = await AsyncValue.guard(() => _repository.getHighlightsForBook(arg));
+    state = AsyncValue.data(await _repository.getHighlightsForBook(arg));
   }
 
   Future<void> updateNote(String highlightId, String? note) async {
     await _repository.updateHighlightNote(highlightId, note);
-    state = await AsyncValue.guard(() => _repository.getHighlightsForBook(arg));
+    state = AsyncValue.data(await _repository.getHighlightsForBook(arg));
   }
 
   Future<void> removeHighlight(String highlightId) async {
     await _repository.deleteHighlight(highlightId);
-    state = await AsyncValue.guard(() => _repository.getHighlightsForBook(arg));
+    state = AsyncValue.data(await _repository.getHighlightsForBook(arg));
   }
 }

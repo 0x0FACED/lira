@@ -716,6 +716,78 @@ abstract class AppLocalizations {
   /// **'Could not load highlights'**
   String get highlightsLoadError;
 
+  /// No description provided for @annotations.
+  ///
+  /// In en, this message translates to:
+  /// **'Annotations'**
+  String get annotations;
+
+  /// No description provided for @bookmarks.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmarks'**
+  String get bookmarks;
+
+  /// No description provided for @bookmarksEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No bookmarks yet'**
+  String get bookmarksEmpty;
+
+  /// No description provided for @bookmarksEmptyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the bookmark button in the reader to save your place.'**
+  String get bookmarksEmptyHint;
+
+  /// No description provided for @bookmarksLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load bookmarks'**
+  String get bookmarksLoadError;
+
+  /// No description provided for @bookmarkPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'Position: {percentage}%'**
+  String bookmarkPosition(String percentage);
+
+  /// No description provided for @addBookmark.
+  ///
+  /// In en, this message translates to:
+  /// **'Add bookmark'**
+  String get addBookmark;
+
+  /// No description provided for @removeBookmark.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove bookmark'**
+  String get removeBookmark;
+
+  /// No description provided for @bookmarkSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save bookmark: {error}'**
+  String bookmarkSaveError(String error);
+
+  /// No description provided for @bookmarkDeleteError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not remove bookmark: {error}'**
+  String bookmarkDeleteError(String error);
+
+  /// No description provided for @highlightDeleteError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not delete highlight: {error}'**
+  String highlightDeleteError(String error);
+
+  /// No description provided for @noteSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save note: {error}'**
+  String noteSaveError(String error);
+
   /// No description provided for @addNote.
   ///
   /// In en, this message translates to:
