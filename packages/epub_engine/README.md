@@ -9,7 +9,7 @@ Native Flutter EPUB rendering for Lira. No WebView or embedded JavaScript; EPUB 
 `XhtmlParser` produces styled text, image, table and divider blocks with character ranges, anchors and links. Valid XHTML and recovered HTML share one traversal. `EpubNativeView` renders them with native Flutter text selection:
 
 - chapter-indexed vertical scrolling;
-- measured horizontal pagination and optional two-page spreads;
+- measured horizontal pagination and optional two-page spreads, with finger-tracked cylindrical page curls, theme-aware paper/shadows and center-spine leaf turns;
 - content-position restoration across mode, typography and viewport changes;
 - overlapping highlights without modifying the original text;
 - internal document/fragment navigation and external HTTP(S) links;
@@ -25,6 +25,8 @@ This is a native block renderer, not a complete browser HTML/CSS implementation.
 CSS supports tag/class/id/universal, descendant and child selectors, specificity, source order and `!important`. The reader keeps the user's font family; remote resources, web fonts, floats/grid layout, negative/percentage margins and conditional media queries are not supported. SVG image references are resolved locally against each SVG's own document; nested vectors are inlined rather than passed to an unsupported SVG data-image decoder.
 
 Tables use equal-width columns. Cells keep source-order text offsets for selection/highlights even with rowspans. Ordinary rows paginate together; a group taller than the viewport scrolls within its page. Image dimensions update table layout without losing the logical position.
+
+Horizontal turns follow touch/stylus drags and settle or roll back on release. Edge taps, keyboard and trackpad navigation use the same animation; system reduced motion switches immediately. Progress is published only for completed turns, and navigation/reflow cancels an unfinished preview. Native long-press/mouse selection and vertical scrolling inside oversized pages remain available. Viewport snapshots are captured once per turn (an additional destination snapshot for spreads), capped at 2× pixel ratio; animation frames repaint cached images rather than rebuilding text.
 
 
 ## Locations

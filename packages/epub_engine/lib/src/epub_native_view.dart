@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -8,6 +9,7 @@ import 'package:flutter/rendering.dart'
         MatrixUtils,
         RenderObject,
         RenderParagraph,
+        RenderRepaintBoundary,
         Selectable,
         SelectionRegistrar,
         SelectedContent,
@@ -25,6 +27,7 @@ import 'epub_parser.dart';
 import 'epub_paths.dart';
 import 'models/reader_settings.dart';
 import 'models/epub_location.dart';
+import 'page_curl.dart';
 import 'xhtml_parser.dart';
 
 /// A single page of content in horizontal pagination mode.
@@ -358,7 +361,8 @@ class EpubNativeView extends StatefulWidget {
   State<EpubNativeView> createState() => EpubNativeViewState();
 }
 
-class EpubNativeViewState extends State<EpubNativeView> {
+class EpubNativeViewState extends State<EpubNativeView>
+    with SingleTickerProviderStateMixin {
   static const double _leftTapZoneFraction = 0.15;
   static const double _rightTapZoneStart = 0.85;
   static const double _trackpadPageThreshold = 280;
@@ -388,6 +392,16 @@ class EpubNativeViewState extends State<EpubNativeView> {
   int _currentPageIndex = 0;
   bool _isDualPage = false;
   Size? _lastPaginationSize;
+  final GlobalKey _pageBoundaryKey = GlobalKey();
+  final GlobalKey _destinationBoundaryKey = GlobalKey();
+  late final AnimationController _pageTurnController;
+  ui.Image? _pageTurnImage;
+  ui.Image? _pageTurnDestinationImage;
+  int? _pageTurnTargetIndex;
+  bool _pageTurnForward = true;
+  bool _pageTurnDragging = false;
+  bool _acceptPageDrag = false;
+  double _pageTurnVerticalBias = 0.65;
   Size? _lastViewportSize;
   EpubLocation? _logicalLocation;
   EpubLocation? _pendingRestore;
@@ -419,6 +433,7 @@ class EpubNativeViewState extends State<EpubNativeView> {
   @override
   void initState() {
     super.initState();
+    _pageTurnController = AnimationController(vsync: this);
     _pendingRestore =
         widget.initialLocation ??
         EpubLocation.fromPosition(chapterIndex: 0, hasExactCharOffset: true);
@@ -469,6 +484,7 @@ class EpubNativeViewState extends State<EpubNativeView> {
       _chapterLinks.clear();
     }
     if (needsRepagination) {
+      _clearPageTurn();
       _hasActiveSelection = false;
       _tableLayouts.clear();
       _paginatedPages.clear();
@@ -479,6 +495,9 @@ class EpubNativeViewState extends State<EpubNativeView> {
 
   @override
   void dispose() {
+    _pageTurnController.dispose();
+    _pageTurnImage?.dispose();
+    _pageTurnDestinationImage?.dispose();
     for (final image in _rasterImages.values) {
       image.stopListening();
     }
@@ -535,6 +554,7 @@ class EpubNativeViewState extends State<EpubNativeView> {
   // ---------------------------------------------------------------------------
 
   void _onPointerDown(PointerDownEvent e) {
+    if (_pageTurnImage != null) return;
     _pointerDownPos = e.localPosition;
     _pointerDownTime = DateTime.now();
     _pointerDownKind = e.kind;
@@ -651,16 +671,6 @@ class EpubNativeViewState extends State<EpubNativeView> {
       if (!isRepeatedTap && !_hasActiveSelection) {
         _handleTap(e.localPosition);
       }
-    } else if (widget.settings.readingMode == ReadingMode.horizontal &&
-        delta.dx.abs() > 50 &&
-        delta.dx.abs() > delta.dy.abs() * 1.5 &&
-        dur.inMilliseconds < 700) {
-      // Horizontal swipe (> 50px, mostly horizontal, < 700ms)
-      if (delta.dx < 0) {
-        _prevPage();
-      } else {
-        _nextPage();
-      }
     }
 
     _pointerDownPos = null;
@@ -772,26 +782,70 @@ class EpubNativeViewState extends State<EpubNativeView> {
 
   void _onTouchHorizontalDragStart(DragStartDetails details) {
     _touchHorizontalDragDx = 0;
+    _acceptPageDrag =
+        _pageTurnImage == null &&
+        !_hasActiveSelection &&
+        _pendingRestore == null;
+    _pageTurnDragging = _acceptPageDrag;
   }
 
   void _onTouchHorizontalDragUpdate(DragUpdateDetails details) {
+    if (!_acceptPageDrag) return;
     _touchHorizontalDragDx += details.delta.dx;
+    if (MediaQuery.disableAnimationsOf(context)) return;
+    final forward = _touchHorizontalDragDx < 0;
+    if (_pageTurnImage == null && !_beginPageTurn(forward)) return;
+    if (forward != _pageTurnForward) {
+      final target = _adjacentPageIndex(forward);
+      if (target != _currentPageIndex) {
+        final oldDestination = _pageTurnDestinationImage;
+        setState(() {
+          _pageTurnForward = forward;
+          _pageTurnTargetIndex = target;
+          _pageTurnDestinationImage = null;
+        });
+        if (oldDestination != null) {
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => oldDestination.dispose(),
+          );
+        }
+        if (_isDualPage) _captureTurnDestination();
+      }
+    }
+    final directedDx = _pageTurnForward
+        ? -_touchHorizontalDragDx
+        : _touchHorizontalDragDx;
+    final width = _lastViewportSize?.width ?? 1;
+    _pageTurnController.value = (directedDx / width).clamp(0.0, 1.0);
   }
 
   void _onTouchHorizontalDragEnd(DragEndDetails details) {
-    final velocityDx = details.velocity.pixelsPerSecond.dx;
+    if (!_acceptPageDrag) return;
+    _acceptPageDrag = false;
+    _pageTurnDragging = false;
+    final velocity = details.velocity.pixelsPerSecond.dx;
     final totalDx = _touchHorizontalDragDx;
     _touchHorizontalDragDx = 0;
-
-    if (totalDx.abs() <= 50 && velocityDx.abs() <= 500) {
+    if (_pageTurnImage == null) {
+      final width = _lastViewportSize?.width ?? 1;
+      if (totalDx.abs() >= width * 0.28 || velocity.abs() >= 600) {
+        _requestPageTurn(velocity.abs() >= 600 ? velocity < 0 : totalDx < 0);
+      }
       return;
     }
+    final directedVelocity = _pageTurnForward ? -velocity : velocity;
+    final complete = directedVelocity.abs() >= 600
+        ? directedVelocity > 0
+        : _pageTurnController.value >= 0.28;
+    _settlePageTurn(complete);
+  }
 
-    if (totalDx < 0 || velocityDx < -500) {
-      _nextPage();
-    } else {
-      _prevPage();
-    }
+  void _onTouchHorizontalDragCancel() {
+    _acceptPageDrag = false;
+    _touchHorizontalDragDx = 0;
+    if (!_pageTurnDragging) return;
+    _pageTurnDragging = false;
+    if (_pageTurnImage != null) _settlePageTurn(false);
   }
 
   bool _isTouchPointer(PointerDeviceKind? kind) {
@@ -832,6 +886,7 @@ class EpubNativeViewState extends State<EpubNativeView> {
   void _onHorizontalPageScroll(_SelectionScopeData scope) {
     if (widget.settings.readingMode != ReadingMode.horizontal ||
         _restoring ||
+        _pageTurnImage != null ||
         _pendingRestore != null ||
         _scrollReportScheduled) {
       return;
@@ -844,6 +899,7 @@ class EpubNativeViewState extends State<EpubNativeView> {
           generation != _layoutGeneration ||
           !_selectionScopes.contains(scope) ||
           widget.settings.readingMode != ReadingMode.horizontal ||
+          _pageTurnImage != null ||
           _restoring ||
           _pendingRestore != null) {
         return;
@@ -1111,6 +1167,7 @@ class EpubNativeViewState extends State<EpubNativeView> {
   }
 
   void _jumpToLocation(EpubLocation location) {
+    _clearPageTurn();
     _pendingRestore = location;
     setState(() {});
     _scheduleRestore();
@@ -1393,41 +1450,146 @@ class EpubNativeViewState extends State<EpubNativeView> {
   // Horizontal mode: page navigation
   // ---------------------------------------------------------------------------
 
-  void _nextPage() {
+  int _adjacentPageIndex(bool forward) {
+    if (_paginatedPages.isEmpty) return _currentPageIndex;
     final step = _isDualPage ? 2 : 1;
-    final maxIdx = _paginatedPages.length - 1;
-    if (maxIdx < 0) return;
-    final newIdx = math.min(_currentPageIndex + step, maxIdx);
-    final snapped = _isDualPage ? (newIdx ~/ 2) * 2 : newIdx;
-    if (snapped != _currentPageIndex) {
-      setState(() {
-        _currentPageIndex = snapped;
-        final page = _paginatedPages[snapped];
-        _logicalLocation = EpubLocation.fromPosition(
-          hasExactCharOffset: true,
-          chapterIndex: page.chapterIndex,
-          charOffset: page.charStart,
-        );
-      });
+    final index = (_currentPageIndex + (forward ? step : -step)).clamp(
+      0,
+      _paginatedPages.length - 1,
+    );
+    return _isDualPage ? (index ~/ 2) * 2 : index;
+  }
+
+  void _nextPage() => _requestPageTurn(true);
+
+  void _prevPage() => _requestPageTurn(false);
+
+  void _commitPageIndex(int index) {
+    _currentPageIndex = index;
+    final page = _paginatedPages[index];
+    _logicalLocation = EpubLocation.fromPosition(
+      hasExactCharOffset: true,
+      chapterIndex: page.chapterIndex,
+      charOffset: page.charStart,
+    );
+    _hasActiveSelection = false;
+  }
+
+  void _requestPageTurn(bool forward) {
+    if (widget.settings.readingMode != ReadingMode.horizontal ||
+        _pageTurnImage != null ||
+        _pendingRestore != null) {
+      return;
+    }
+    final target = _adjacentPageIndex(forward);
+    if (target == _currentPageIndex) return;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      setState(() => _commitPageIndex(target));
       _reportProgress();
+    } else if (_beginPageTurn(forward)) {
+      _settlePageTurn(true);
     }
   }
 
-  void _prevPage() {
-    final step = _isDualPage ? 2 : 1;
-    final newIdx = math.max(_currentPageIndex - step, 0);
-    final snapped = _isDualPage ? (newIdx ~/ 2) * 2 : newIdx;
-    if (snapped != _currentPageIndex) {
+  bool _beginPageTurn(bool forward) {
+    final target = _adjacentPageIndex(forward);
+    if (target == _currentPageIndex || _pendingRestore != null) return false;
+    final boundary = _pageBoundaryKey.currentContext?.findRenderObject();
+    if (boundary is! RenderRepaintBoundary ||
+        !boundary.hasSize ||
+        boundary.debugNeedsPaint) {
+      return false;
+    }
+    // Snapshot once per turn, never per frame. A spread also captures the
+    // destination so its left/right page can be printed on the leaf's back.
+    final image = boundary.toImageSync(
+      pixelRatio: math.min(MediaQuery.devicePixelRatioOf(context), 2.0),
+    );
+    final height = _lastViewportSize?.height ?? 1;
+    setState(() {
+      _pageTurnImage = image;
+      _pageTurnTargetIndex = target;
+      _pageTurnForward = forward;
+      _pageTurnVerticalBias = ((_pointerDownPos?.dy ?? height * 0.65) / height)
+          .clamp(0.0, 1.0);
+    });
+    _pageTurnController.value = 0;
+    if (_isDualPage) _captureTurnDestination();
+    return true;
+  }
+
+  void _captureTurnDestination() {
+    final image = _pageTurnImage;
+    final target = _pageTurnTargetIndex;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          !identical(image, _pageTurnImage) ||
+          target != _pageTurnTargetIndex ||
+          _pageTurnDestinationImage != null) {
+        return;
+      }
+      final boundary = _destinationBoundaryKey.currentContext
+          ?.findRenderObject();
+      if (boundary is! RenderRepaintBoundary ||
+          !boundary.hasSize ||
+          boundary.debugNeedsPaint) {
+        return;
+      }
       setState(() {
-        _currentPageIndex = snapped;
-        final page = _paginatedPages[snapped];
-        _logicalLocation = EpubLocation.fromPosition(
-          hasExactCharOffset: true,
-          chapterIndex: page.chapterIndex,
-          charOffset: page.charStart,
+        _pageTurnDestinationImage = boundary.toImageSync(
+          pixelRatio: math.min(MediaQuery.devicePixelRatioOf(context), 2.0),
         );
       });
-      _reportProgress();
+    });
+  }
+
+  Future<void> _settlePageTurn(bool complete) async {
+    final image = _pageTurnImage;
+    if (image == null) return;
+    final distance = complete
+        ? 1 - _pageTurnController.value
+        : _pageTurnController.value;
+    try {
+      await _pageTurnController
+          .animateTo(
+            complete ? 1 : 0,
+            duration: Duration(
+              milliseconds: (420 * distance).round().clamp(100, 420),
+            ),
+            curve: Curves.easeOutCubic,
+          )
+          .orCancel;
+    } on TickerCanceled {
+      return;
+    }
+    if (!mounted || !identical(image, _pageTurnImage)) return;
+    final target = _pageTurnTargetIndex!;
+    setState(() {
+      _clearPageTurn();
+      if (complete) _commitPageIndex(target);
+    });
+    if (complete) _reportProgress();
+  }
+
+  // Also called by reflow/navigation: an interrupted preview never saves a
+  // destination that the reader has not actually reached.
+  void _clearPageTurn() {
+    _pageTurnController.stop(canceled: true);
+    final image = _pageTurnImage;
+    final destination = _pageTurnDestinationImage;
+    _pageTurnImage = null;
+    _pageTurnDestinationImage = null;
+    _pageTurnTargetIndex = null;
+    _pageTurnDragging = false;
+    _acceptPageDrag = false;
+    if (image != null) {
+      // The previous painter can remain in the tree until this frame rebuilds.
+      WidgetsBinding.instance.addPostFrameCallback((_) => image.dispose());
+    }
+    if (destination != null) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => destination.dispose(),
+      );
     }
   }
 
@@ -1954,10 +2116,14 @@ class EpubNativeViewState extends State<EpubNativeView> {
         final viewportSize = constraints.biggest;
         if (_lastViewportSize != null && _lastViewportSize != viewportSize) {
           _pendingRestore ??= _captureLocation(widget.settings.readingMode);
+          _clearPageTurn();
           _hasActiveSelection = false;
           _layoutGeneration++;
         }
         _lastViewportSize = viewportSize;
+        if (MediaQuery.disableAnimationsOf(context) && _pageTurnImage != null) {
+          _clearPageTurn();
+        }
         if (widget.settings.readingMode == ReadingMode.horizontal) {
           for (int i = 0; i < widget.epub.chapters.length; i++) {
             _parseChapter(i);
@@ -1968,6 +2134,12 @@ class EpubNativeViewState extends State<EpubNativeView> {
         final content = Listener(
           onPointerDown: _onPointerDown,
           onPointerUp: _onPointerUp,
+          onPointerCancel: (_) {
+            _pointerDownPos = null;
+            _pointerDownTime = null;
+            _pointerDownKind = null;
+            _onTouchHorizontalDragCancel();
+          },
           onPointerSignal: _onPointerSignal,
           onPointerPanZoomUpdate: _onPointerPanZoomUpdate,
           child: Container(
@@ -1978,21 +2150,6 @@ class EpubNativeViewState extends State<EpubNativeView> {
                 : _buildHorizontalMode(paddingH, constraints),
           ),
         );
-
-        if (widget.settings.readingMode == ReadingMode.horizontal) {
-          return GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            supportedDevices: const {
-              PointerDeviceKind.touch,
-              PointerDeviceKind.stylus,
-              PointerDeviceKind.invertedStylus,
-            },
-            onHorizontalDragStart: _onTouchHorizontalDragStart,
-            onHorizontalDragUpdate: _onTouchHorizontalDragUpdate,
-            onHorizontalDragEnd: _onTouchHorizontalDragEnd,
-            child: content,
-          );
-        }
 
         return content;
       },
@@ -2105,18 +2262,93 @@ class EpubNativeViewState extends State<EpubNativeView> {
       _currentPageIndex = (_currentPageIndex ~/ 2) * 2;
     }
 
-    // Build page content wrapped in SelectionArea with unique key per page,
-    // so selection state resets on page turn and doesn't conflict during animation.
-    Widget pageContent;
+    final background = Color(widget.settings.backgroundColor);
+    final image = _pageTurnImage;
+    final target = _pageTurnTargetIndex;
+    return Focus(
+      autofocus: true,
+      onKeyEvent: _onKeyEvent,
+      child: ClipRect(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            ExcludeSemantics(
+              excluding: image != null,
+              child: IgnorePointer(
+                ignoring: image != null,
+                child: RepaintBoundary(
+                  key: _pageBoundaryKey,
+                  child: ColoredBox(
+                    color: background,
+                    child: _buildHorizontalPages(
+                      _currentPageIndex,
+                      paddingH,
+                      availableWidth,
+                      availableHeight,
+                      pageWidth,
+                      gapWidth,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (image != null && target != null)
+              Positioned.fill(
+                child: ExcludeSemantics(
+                  child: IgnorePointer(
+                    child: RepaintBoundary(
+                      child: CustomPaint(
+                        foregroundPainter: PageCurlPainter(
+                          page: image,
+                          destinationPage: _pageTurnDestinationImage,
+                          progress: _pageTurnController,
+                          forward: _pageTurnForward,
+                          paperColor: background,
+                          dualPage: _isDualPage,
+                          verticalBias: _pageTurnVerticalBias,
+                        ),
+                        child: RepaintBoundary(
+                          key: _destinationBoundaryKey,
+                          child: ColoredBox(
+                            color: background,
+                            child: _buildHorizontalPages(
+                              target,
+                              paddingH,
+                              availableWidth,
+                              availableHeight,
+                              pageWidth,
+                              gapWidth,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHorizontalPages(
+    int index,
+    double paddingH,
+    double availableWidth,
+    double availableHeight,
+    double pageWidth,
+    double gapWidth,
+  ) {
     if (_isDualPage) {
-      final leftIdx = _currentPageIndex;
+      final leftIdx = index;
       final rightIdx = leftIdx + 1;
 
       final dividerColor = _computeTextColor(
         widget.settings.backgroundColor,
       ).withAlpha(30);
 
-      pageContent = SizedBox(
+      return SizedBox(
         key: ValueKey('sel_spread_$leftIdx'),
         width: availableWidth,
         height: availableHeight,
@@ -2145,42 +2377,40 @@ class EpubNativeViewState extends State<EpubNativeView> {
         ),
       );
     } else {
-      pageContent = Align(
-        key: ValueKey('sel_page_$_currentPageIndex'),
+      return Align(
+        key: ValueKey('sel_page_$index'),
         alignment: Alignment.center,
         child: SizedBox(
           width: pageWidth,
           height: availableHeight,
-          child: _buildPageWidget(_paginatedPages[_currentPageIndex], paddingH),
+          child: _buildPageWidget(_paginatedPages[index], paddingH),
         ),
       );
     }
-
-    return Focus(autofocus: true, onKeyEvent: _onKeyEvent, child: pageContent);
   }
 
   Widget _buildPageWidget(_PageInfo page, double paddingH) {
     final contentInsets = _contentInsets();
     return ClipRect(
       key: ValueKey((_layoutGeneration, page.pageIndex)),
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          paddingH,
-          contentInsets.top,
-          paddingH,
-          contentInsets.bottom,
-        ),
-        child: _buildSelectableScope(
-          chapterIndex: page.chapterIndex,
-          elements: page.elements,
-          ownSelectionArea: true,
-          builder: (scope) {
-            if (scope.pageScrollController == null) {
-              scope.pageScrollController = ScrollController()
-                ..addListener(() => _onHorizontalPageScroll(scope));
-            }
-            scope.pageScrollKey ??= GlobalKey();
-            return SingleChildScrollView(
+      child: _buildSelectableScope(
+        chapterIndex: page.chapterIndex,
+        elements: page.elements,
+        ownSelectionArea: true,
+        builder: (scope) {
+          if (scope.pageScrollController == null) {
+            scope.pageScrollController = ScrollController()
+              ..addListener(() => _onHorizontalPageScroll(scope));
+          }
+          scope.pageScrollKey ??= GlobalKey();
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+              paddingH,
+              contentInsets.top,
+              paddingH,
+              contentInsets.bottom,
+            ),
+            child: SingleChildScrollView(
               key: scope.pageScrollKey,
               controller: scope.pageScrollController,
               primary: false,
@@ -2189,9 +2419,9 @@ class EpubNativeViewState extends State<EpubNativeView> {
                 page.chapterIndex,
                 scope,
               ),
-            );
-          },
-        ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -2210,7 +2440,26 @@ class EpubNativeViewState extends State<EpubNativeView> {
       contextMenuBuilder: (context, selectableRegionState) {
         return const SizedBox.shrink();
       },
-      child: child,
+      // Inside SelectionArea so its touch-drag selection recognizer cannot
+      // claim horizontal swipes first. Long press and mouse selection keep
+      // their native recognizers; the inner vertical scroll view still wins
+      // vertical drags on oversized content.
+      child: widget.settings.readingMode == ReadingMode.horizontal
+          ? GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              dragStartBehavior: DragStartBehavior.down,
+              supportedDevices: const {
+                PointerDeviceKind.touch,
+                PointerDeviceKind.stylus,
+                PointerDeviceKind.invertedStylus,
+              },
+              onHorizontalDragStart: _onTouchHorizontalDragStart,
+              onHorizontalDragUpdate: _onTouchHorizontalDragUpdate,
+              onHorizontalDragEnd: _onTouchHorizontalDragEnd,
+              onHorizontalDragCancel: _onTouchHorizontalDragCancel,
+              child: child,
+            )
+          : child,
     );
   }
 
@@ -2442,6 +2691,7 @@ class EpubNativeViewState extends State<EpubNativeView> {
       _imageLayoutScheduled = false;
       if (!mounted) return;
       _pendingRestore ??= _captureLocation(widget.settings.readingMode);
+      _clearPageTurn();
       setState(() {
         _tableLayouts.clear();
         _paginatedPages.clear();

@@ -2,7 +2,7 @@ name: lira
 description: "Lira is your free feature-rich library"
 publish_to: 'none'
 
-version: 0.6.0+5
+version: 0.6.2+6
 
 environment:
   sdk: ^3.9.4

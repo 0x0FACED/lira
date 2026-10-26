@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add interactive cylindrical paper curls in horizontal mode, including center-spine spread turns, theme-aware shadows, cancellation and reduced motion; publish progress only after a completed turn and retain native selection/oversized-page scrolling.
 - Use OPF spine as the authoritative reading order; preserve front matter, documents absent from TOC, and hierarchical navigation anchors.
 - Decode UTF-8/UTF-16 without silent character replacement; reject damaged required spine documents explicitly.
 - Preserve exact, versioned content positions across scrolling, pagination, reflow and navigation while retaining legacy location decoding.
