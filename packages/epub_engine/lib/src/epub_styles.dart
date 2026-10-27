@@ -12,7 +12,6 @@ class EpubStyle {
   final EdgeInsets? margin;
   final bool hidden;
   final String? display;
-  final double? _absoluteLineHeight;
 
   const EpubStyle._({
     required this.textStyle,
@@ -20,8 +19,7 @@ class EpubStyle {
     this.margin,
     this.hidden = false,
     this.display,
-    double? absoluteLineHeight,
-  }) : _absoluteLineHeight = absoluteLineHeight;
+  });
 }
 
 /// A local-only author cascade for typography and basic reader layout.
@@ -177,28 +175,10 @@ class EpubStyleResolver {
       style = style.copyWith(fontFeatures: const []);
     }
 
-    var absoluteLineHeight = parent._absoluteLineHeight;
-    final lineHeight = value('line-height');
-    if (lineHeight != null && lineHeight != 'inherit') {
-      if (lineHeight == 'normal') {
-        absoluteLineHeight = null;
-        // A null height resets to the reader's default, rather than retaining
-        // a semantic or inherited author override via TextStyle.copyWith.
-        style = style.merge(TextStyle(height: root.textStyle.height ?? 1.5));
-      } else {
-        final number = double.tryParse(lineHeight);
-        absoluteLineHeight = number == null
-            ? _length(lineHeight, style.fontSize ?? 16, _rootFontSize)
-            : null;
-        style = style.copyWith(height: number);
-      }
-    }
-    if (absoluteLineHeight != null) {
-      final size = style.fontSize ?? 16;
-      if (size > 0) style = style.copyWith(height: absoluteLineHeight / size);
-    } else if (lineHeight == 'inherit') {
-      style = style.copyWith(height: parent.textStyle.height);
-    }
+    // Reader spacing is a multiplier of each run's computed font size. Author
+    // line-height (including !important and absolute lengths) must not defeat
+    // it, or a book's body rule makes the spacing control ineffective.
+    style = style.copyWith(height: root.textStyle.height ?? 1.5);
     if (element.localName == 'html') _rootFontSize = style.fontSize ?? 16;
 
     final alignment = value('text-align');
@@ -243,7 +223,6 @@ class EpubStyleResolver {
           visibility == 'hidden' ||
           visibility == 'collapse',
       display: display == 'inherit' ? parent.display : display,
-      absoluteLineHeight: absoluteLineHeight,
     );
   }
 
@@ -317,7 +296,13 @@ class EpubStyleResolver {
     if (value == 'smaller') return inherited / 1.2;
     final scale = _fontSizeKeywords[value];
     if (scale != null) return (root.textStyle.fontSize ?? 16) * scale;
-    return _length(value, inherited, _rootFontSize) ?? inherited;
+    final length = _length(value, inherited, _rootFontSize);
+    if (length == null) return inherited;
+    if (value.endsWith('em') || value.endsWith('%')) return length;
+    // CSS absolute sizes describe document proportions at the CSS default
+    // 16px, not fixed reader pixels. Scale all absolute units with the reader's
+    // choice while leaving em/rem/% relative to their already-scaled parents.
+    return length * (root.textStyle.fontSize ?? 16) / 16;
   }
 }
 
@@ -481,7 +466,6 @@ const _supportedProperties = {
   'font-weight',
   'font-style',
   'text-decoration',
-  'line-height',
   'text-align',
   'margin',
   'margin-top',
@@ -525,10 +509,6 @@ bool _supportedValue(String property, String value) {
                   'line-through',
                 ].contains(token),
               );
-    case 'line-height':
-      return value == 'inherit' ||
-          value == 'normal' ||
-          _isLength(value, nonnegative: true, allowNumber: true);
     case 'text-align':
       return value == 'inherit' || _textAlignments.containsKey(value);
     case 'margin-top':
@@ -566,17 +546,13 @@ final _lengthPattern = RegExp(
   r'^([+-]?(?:\d+(?:\.\d*)?|\.\d+))(px|em|rem|pt|pc|in|cm|mm|%)?$',
 );
 
-bool _isLength(
-  String value, {
-  bool nonnegative = false,
-  bool allowNumber = false,
-}) {
+bool _isLength(String value, {bool nonnegative = false}) {
   final match = _lengthPattern.firstMatch(value);
   if (match == null) return false;
   final number = double.parse(match[1]!);
   return number.isFinite &&
       (!nonnegative || number >= 0) &&
-      (allowNumber || match[2] != null || number == 0);
+      (match[2] != null || number == 0);
 }
 
 bool _isMargin(String value) =>

@@ -250,6 +250,175 @@ void main() {
     }
   });
 
+  group('EpubParser navigation recovery', () {
+    for (final useNav in [true, false]) {
+      test(
+        'preserves ${useNav ? 'EPUB3' : 'NCX'} titles, hierarchy and Unicode fragments',
+        () async {
+          final documents = {
+            'text/second.xhtml': _document(
+              'second.xhtml',
+              '<p>Продолжение.</p>',
+            ),
+            'text/глава первая.xhtml': _document(
+              'ch001.xhtml',
+              '<p id="раздел-первый">Первый.</p>'
+                  '<p id="пункт">Второй.</p>'
+                  '<p id="пункт второй">Третий.</p>'
+                  '<p id="100%">Четвертый.</p>'
+                  '<p id="пункт%2G">Пятый.</p>',
+            ),
+          };
+          final spine = ['text/глава первая.xhtml', 'text/second.xhtml'];
+          final hrefs = {
+            'раздел-первый': 'text/глава%20первая.xhtml#раздел-первый',
+            'пункт': 'text/глава%20первая.xhtml#%D0%BF%D1%83%D0%BD%D0%BA%D1%82',
+            'пункт второй': 'text/%D0%B3лава%20первая.xhtml#пункт%20второй',
+            '100%': 'text/глава%20первая.xhtml#100%',
+            'пункт%2G': 'text/глава%20первая.xhtml#пункт%2G',
+          };
+          final navSections = hrefs.entries
+              .map(
+                (entry) =>
+                    '<li><a href="${entry.value}">'
+                    'Подраздел ${entry.key}</a></li>',
+              )
+              .join();
+          final ncxSections = hrefs.entries
+              .map(
+                (entry) =>
+                    '<navPoint><navLabel><text>'
+                    'Подраздел ${entry.key}</text></navLabel>'
+                    '<content src="${entry.value}"/></navPoint>',
+              )
+              .join();
+          final parsed = await EpubParser.parse(
+            _epub(
+              documents: documents,
+              spine: spine,
+              navigation: useNav
+                  ? '''
+                    <nav epub:type="toc" id="toc">
+                      <h1>Оглавление</h1>
+                      <ol class="toc">
+                        <li>
+                          <a href="text/глава%20первая.xhtml">Глава 1. Начало</a>
+                          <ol class="toc">$navSections</ol>
+                        </li>
+                        <li><a href="text/second.xhtml">Глава 2. Продолжение</a></li>
+                      </ol>
+                    </nav>
+                  '''
+                  : null,
+              ncxPoints:
+                  '''
+                <navPoint>
+                  <navLabel><text>${useNav ? 'NCX fallback' : 'Глава 1. Начало'}</text></navLabel>
+                  <content src="text/глава%20первая.xhtml"/>
+                  $ncxSections
+                </navPoint>
+                <navPoint>
+                  <navLabel><text>Глава 2. Продолжение</text></navLabel>
+                  <content src="text/second.xhtml"/>
+                </navPoint>
+              ''',
+            ),
+          );
+
+          _expectChapters(parsed, documents, spine, [
+            'Первый.Второй.Третий.Четвертый.Пятый.',
+            'Продолжение.',
+          ]);
+          expect(parsed.toc.map((item) => item.title), [
+            'Глава 1. Начало',
+            'Глава 2. Продолжение',
+          ]);
+          expect(parsed.chapters.map((chapter) => chapter.title), [
+            'Глава 1. Начало',
+            'Глава 2. Продолжение',
+          ]);
+          final sections = parsed.toc.first.subItems;
+          expect(sections.map((item) => item.title), [
+            'Подраздел раздел-первый',
+            'Подраздел пункт',
+            'Подраздел пункт второй',
+            'Подраздел 100%',
+            'Подраздел пункт%2G',
+          ]);
+          final chapter = parsed.chapters.first;
+          final ids = XmlDocument.parse(chapter.htmlContent).descendants
+              .whereType<XmlElement>()
+              .map((element) => element.getAttribute('id'))
+              .whereType<String>()
+              .toSet();
+          expect(
+            sections.map(
+              (item) => Uri.decodeComponent(Uri.parse(item.fileName).fragment),
+            ),
+            hrefs.keys,
+          );
+          for (final section in sections) {
+            expect(resolveEpubPath('', section.fileName), chapter.fileName);
+            expect(
+              ids,
+              contains(
+                Uri.decodeComponent(Uri.parse(section.fileName).fragment),
+              ),
+            );
+          }
+        },
+      );
+    }
+
+    for (final navigation in {
+      'empty': '<nav epub:type="toc"><ol/></nav>',
+      'missing': '<div>No navigation</div>',
+      'malformed': '<nav epub:type="toc"><ol>',
+      'unlinked':
+          '<nav epub:type="toc"><ol><li><a>No target</a></li></ol></nav>',
+      'remote-only':
+          '<nav epub:type="toc"><ol><li>'
+          '<a href="https://example.com/chapter">Remote</a></li></ol></nav>',
+    }.entries) {
+      test('uses NCX after ${navigation.key} EPUB3 navigation', () async {
+        final document = _document(
+          'chapter.xhtml',
+          '<p id="подраздел">Текст подраздела.</p>',
+        );
+        final parsed = await EpubParser.parse(
+          _epub(
+            documents: {'chapter.xhtml': document},
+            spine: ['chapter.xhtml'],
+            navigation: navigation.value,
+            ncxPoints: '''
+              <navPoint>
+                <navLabel><text>Основной раздел</text></navLabel>
+                <content src="chapter.xhtml"/>
+                <navPoint>
+                  <navLabel><text>Подраздел</text></navLabel>
+                  <content src="chapter.xhtml#подраздел"/>
+                </navPoint>
+              </navPoint>
+            ''',
+          ),
+        );
+
+        expect(parsed.chapters.single.htmlContent, document);
+        expect(parsed.chapters.single.title, 'Основной раздел');
+        final root = parsed.toc.single;
+        expect(root.title, 'Основной раздел');
+        expect(root.fileName, 'OEBPS/chapter.xhtml');
+        final section = root.subItems.single;
+        expect(section.title, 'Подраздел');
+        expect(resolveEpubPath('', section.fileName), 'OEBPS/chapter.xhtml');
+        expect(
+          Uri.decodeComponent(Uri.parse(section.fileName).fragment),
+          'подраздел',
+        );
+      });
+    }
+  });
+
   group('EpubParser corrupted content', () {
     test(
       'rejects a missing manifest item instead of returning partial text',

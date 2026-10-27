@@ -5,19 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart'
-    show
-        MatrixUtils,
-        RenderObject,
-        RenderParagraph,
-        RenderRepaintBoundary,
-        Selectable,
-        SelectionRegistrar,
-        SelectedContent,
-        SelectedContentRange,
-        SelectionEdgeUpdateEvent,
-        SelectionEvent,
-        SelectionEventType,
-        SelectionResult;
+    show MatrixUtils, RenderObject, RenderParagraph, RenderRepaintBoundary, Selectable, SelectionRegistrar, SelectedContent, SelectedContentRange, SelectionEdgeUpdateEvent, SelectionEvent, SelectionEventType, SelectionResult, ScrollDirection;
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
@@ -251,8 +239,8 @@ class _SelectionScopeData {
   });
 }
 
-/// A positioned-list jump can mount two copies of one chapter during a frame.
-/// Render keys and selection notifiers belong to each mounted copy.
+/// Render keys and selection notifiers belong to each mounted chapter/page,
+/// independently of other copies in the lazy list or page-turn destination.
 class _MountedContentScope extends StatefulWidget {
   final int chapterIndex;
   final List<ContentElement> elements;
@@ -377,9 +365,6 @@ class EpubNativeViewState extends State<EpubNativeView>
   final Map<Uint8List, _RasterImageData> _rasterImages = Map.identity();
   bool _imageLayoutScheduled = false;
 
-  final ItemScrollController _itemScrollController = ItemScrollController();
-  final ScrollOffsetController _scrollOffsetController =
-      ScrollOffsetController();
   final GlobalKey _viewportKey = GlobalKey();
   final Map<int, List<HighlightRange>> _highlightsByChapter = {};
   List<int>? _bookOffsets;
@@ -391,7 +376,7 @@ class EpubNativeViewState extends State<EpubNativeView>
   List<_PageInfo> _paginatedPages = [];
   int _currentPageIndex = 0;
   bool _isDualPage = false;
-  Size? _lastPaginationSize;
+  (Size, EdgeInsets)? _lastPaginationGeometry;
   final GlobalKey _pageBoundaryKey = GlobalKey();
   final GlobalKey _destinationBoundaryKey = GlobalKey();
   late final AnimationController _pageTurnController;
@@ -406,8 +391,8 @@ class EpubNativeViewState extends State<EpubNativeView>
   EpubLocation? _logicalLocation;
   EpubLocation? _pendingRestore;
   bool _restoreScheduled = false;
-  bool _restoring = false;
   bool _scrollReportScheduled = false;
+  bool _verticalUserScroll = false;
   ContentLink? _pointerDownLink;
   int? _pointerDownLinkChapter;
 
@@ -488,7 +473,7 @@ class EpubNativeViewState extends State<EpubNativeView>
       _hasActiveSelection = false;
       _tableLayouts.clear();
       _paginatedPages.clear();
-      _lastPaginationSize = null;
+      _lastPaginationGeometry = null;
       _layoutGeneration++;
     }
   }
@@ -532,21 +517,6 @@ class EpubNativeViewState extends State<EpubNativeView>
 
     if (root != null) visit(root);
     return paragraph;
-  }
-
-  RenderObject? _renderForPosition(
-    int chapter,
-    int start, {
-    bool text = false,
-  }) {
-    for (final scope in _selectionScopes) {
-      if (scope.chapterIndex != chapter) continue;
-      final render = text
-          ? _paragraphForKey(scope.textKeys[start])
-          : scope.elementKeys[start]?.currentContext?.findRenderObject();
-      if (render != null && render.attached) return render;
-    }
-    return null;
   }
 
   // ---------------------------------------------------------------------------
@@ -858,9 +828,26 @@ class EpubNativeViewState extends State<EpubNativeView>
   // Scroll & progress
   // ---------------------------------------------------------------------------
 
+  bool _onVerticalScrollNotification(ScrollNotification notification) {
+    if (notification is UserScrollNotification &&
+        notification.direction != ScrollDirection.idle) {
+      _verticalUserScroll = true;
+    } else if (notification is ScrollStartNotification &&
+        notification.dragDetails != null) {
+      _verticalUserScroll = true;
+    } else if (notification is ScrollEndNotification) {
+      _verticalUserScroll = false;
+    }
+    // A remounted short book can spring back to its physical scroll bounds.
+    // That layout correction must not replace an explicit navigation target.
+    if (notification is ScrollUpdateNotification && _verticalUserScroll) {
+      _onScroll();
+    }
+    return false;
+  }
+
   void _onScroll() {
     if (widget.settings.readingMode != ReadingMode.vertical ||
-        _restoring ||
         _pendingRestore != null ||
         _scrollReportScheduled) {
       return;
@@ -868,12 +855,13 @@ class EpubNativeViewState extends State<EpubNativeView>
     // ScrollPosition dispatches updates as soon as pixels change, before the
     // viewport lays out its new offset. Read glyph positions after that layout,
     // coalescing all drag/ballistic updates in the same frame.
+    final generation = _layoutGeneration;
     _scrollReportScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollReportScheduled = false;
       if (!mounted ||
+          generation != _layoutGeneration ||
           widget.settings.readingMode != ReadingMode.vertical ||
-          _restoring ||
           _pendingRestore != null) {
         return;
       }
@@ -885,7 +873,6 @@ class EpubNativeViewState extends State<EpubNativeView>
 
   void _onHorizontalPageScroll(_SelectionScopeData scope) {
     if (widget.settings.readingMode != ReadingMode.horizontal ||
-        _restoring ||
         _pageTurnImage != null ||
         _pendingRestore != null ||
         _scrollReportScheduled) {
@@ -900,7 +887,6 @@ class EpubNativeViewState extends State<EpubNativeView>
           !_selectionScopes.contains(scope) ||
           widget.settings.readingMode != ReadingMode.horizontal ||
           _pageTurnImage != null ||
-          _restoring ||
           _pendingRestore != null) {
         return;
       }
@@ -1137,7 +1123,6 @@ class EpubNativeViewState extends State<EpubNativeView>
       stylesheets: widget.epub.stylesheets,
       highlights: const [],
       baseStyle: baseStyle,
-      lineHeight: widget.settings.lineHeight,
     );
 
     _parsedChapters[index] = parser.parse();
@@ -1169,7 +1154,9 @@ class EpubNativeViewState extends State<EpubNativeView>
   void _jumpToLocation(EpubLocation location) {
     _clearPageTurn();
     _pendingRestore = location;
-    setState(() {});
+    setState(() {
+      _layoutGeneration++;
+    });
     _scheduleRestore();
   }
 
@@ -1190,10 +1177,37 @@ class EpubNativeViewState extends State<EpubNativeView>
     return _paginatedPages.isEmpty ? null : _paginatedPages.length - 1;
   }
 
+  EpubLocation _restoreTarget(EpubLocation location) {
+    final resolved = _resolveLegacyFraction(location);
+    final chapter = resolved.chapterIndex.clamp(
+      0,
+      widget.epub.chapters.length - 1,
+    );
+    return EpubLocation.fromPosition(
+      hasExactCharOffset: true,
+      chapterIndex: chapter,
+      anchor: resolved.anchor,
+      charOffset: _locationCharOffset(resolved.copyWith(chapterIndex: chapter)),
+    );
+  }
+
+  double? _legacyPixelOffset(EpubLocation location) {
+    if (!location.hasExactCharOffset &&
+        !location.cfi.hasRange &&
+        location.chapterIndex == 0 &&
+        location.anchor == null &&
+        location.charOffset == 0 &&
+        location.scrollFraction == 0 &&
+        (location.bookScrollOffset ?? 0) > 0) {
+      return location.bookScrollOffset;
+    }
+    return null;
+  }
+
   void _scheduleRestore() {
-    if (_pendingRestore == null || _restoreScheduled || _restoring) return;
+    if (_pendingRestore == null || _restoreScheduled) return;
     _restoreScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       _restoreScheduled = false;
       if (!mounted || _pendingRestore == null) return;
       final location = _pendingRestore!;
@@ -1201,19 +1215,7 @@ class EpubNativeViewState extends State<EpubNativeView>
         _pendingRestore = null;
         return;
       }
-      final resolved = _resolveLegacyFraction(location);
-      final chapter = resolved.chapterIndex.clamp(
-        0,
-        widget.epub.chapters.length - 1,
-      );
-      final target = EpubLocation.fromPosition(
-        hasExactCharOffset: true,
-        chapterIndex: chapter,
-        anchor: resolved.anchor,
-        charOffset: _locationCharOffset(
-          resolved.copyWith(chapterIndex: chapter),
-        ),
-      );
+      final target = _restoreTarget(location);
       if (widget.settings.readingMode == ReadingMode.horizontal) {
         final page = _pageIndexForLocation(target);
         if (page == null) {
@@ -1231,164 +1233,20 @@ class EpubNativeViewState extends State<EpubNativeView>
                 hasExactCharOffset: true,
               );
         _pendingRestore = null;
-        setState(() {
-          _currentPageIndex = _isDualPage ? (page ~/ 2) * 2 : page;
-          _logicalLocation = resolvedTarget;
-        });
-        final generation = _layoutGeneration;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted ||
-              generation != _layoutGeneration ||
-              _pendingRestore != null ||
-              !identical(_logicalLocation, resolvedTarget)) {
-            return;
-          }
-          _restoring = true;
-          try {
-            _revealHorizontalPosition(resolvedTarget);
-          } finally {
-            _restoring = false;
-          }
-        });
+        _logicalLocation = resolvedTarget;
         _reportProgress();
         return;
       }
-      if (!_itemScrollController.isAttached) return;
-      _restoring = true;
-      final generation = _layoutGeneration;
-      _itemScrollController.jumpTo(index: chapter);
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        if (!mounted) return;
-        if (generation != _layoutGeneration ||
-            !identical(_pendingRestore, location)) {
-          _restoring = false;
-          _scheduleRestore();
-          return;
-        }
-        final elements = _parsedChapters[chapter]!;
-        ContentElement? element;
-        for (final candidate in contentLeaves(elements)) {
-          element = candidate;
-          if (candidate.charEnd > target.charOffset) break;
-        }
-        final viewport = _viewportKey.currentContext?.findRenderObject();
-        double? delta;
-        final pixelOnly =
-            !location.hasExactCharOffset &&
-            !location.cfi.hasRange &&
-            chapter == 0 &&
-            location.anchor == null &&
-            location.charOffset == 0 &&
-            location.scrollFraction == 0 &&
-            (location.bookScrollOffset ?? 0) > 0;
-        if (pixelOnly) {
-          delta = location.bookScrollOffset;
-        } else if (element != null && viewport is RenderBox) {
-          final render = _renderForPosition(
-            chapter,
-            element.charStart,
-            text: true,
-          );
-          if (element is TextBlock && render is RenderParagraph) {
-            final local = (target.charOffset - element.charStart).clamp(
-              0,
-              element.charEnd - element.charStart,
-            );
-            final caret = render.getOffsetForCaret(
-              TextPosition(offset: local),
-              Rect.zero,
-            );
-            delta = render.localToGlobal(caret).dy;
-          } else {
-            final render = _renderForPosition(chapter, element.charStart);
-            if (render is RenderBox) {
-              delta = render.localToGlobal(Offset.zero).dy;
-            }
-          }
-          if (delta != null) {
-            delta -=
-                viewport.localToGlobal(Offset.zero).dy + _contentInsets().top;
-          }
-        }
-        if (delta != null && delta.abs() > 0.5) {
-          await _scrollOffsetController.animateScroll(
-            offset: delta,
-            duration: const Duration(milliseconds: 1),
-          );
-        }
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          _restoring = false;
-          if (generation != _layoutGeneration ||
-              !identical(_pendingRestore, location)) {
-            _scheduleRestore();
-            return;
-          }
-          _pendingRestore = null;
-          _logicalLocation = pixelOnly
-              ? (_captureVerticalLocation() ?? target)
-              : target;
-          _reportProgress();
-        });
-        WidgetsBinding.instance.ensureVisualUpdate();
-      });
+      // Vertical layout starts at this exact measured chapter/caret in its
+      // first frame. There is no visible chapter-zero -> chapter -> pixel
+      // scroll sequence, and no intermediate position is published.
+      _pendingRestore = null;
+      _logicalLocation = _legacyPixelOffset(location) != null
+          ? (_captureVerticalLocation() ?? target)
+          : target;
+      _reportProgress();
     });
     WidgetsBinding.instance.ensureVisualUpdate();
-  }
-
-  void _revealHorizontalPosition(EpubLocation target) {
-    for (final scope in _selectionScopes) {
-      final controller = scope.pageScrollController;
-      final viewport = scope.pageScrollKey?.currentContext?.findRenderObject();
-      if (scope.chapterIndex != target.chapterIndex ||
-          controller == null ||
-          !controller.hasClients ||
-          viewport is! RenderBox) {
-        continue;
-      }
-      ContentElement? targetLeaf;
-      for (final leaf in contentLeaves(scope.elements)) {
-        targetLeaf = leaf;
-        if (target.charOffset < leaf.charEnd) break;
-      }
-      if (targetLeaf == null ||
-          target.charOffset < targetLeaf.charStart ||
-          target.charOffset > targetLeaf.charEnd) {
-        continue;
-      }
-      if (target.charOffset == targetLeaf.charEnd &&
-          target.charOffset != _chapterWeight(target.chapterIndex)) {
-        continue;
-      }
-      final paragraph = _paragraphForKey(scope.textKeys[targetLeaf.charStart]);
-      final render =
-          paragraph ??
-          scope.elementKeys[targetLeaf.charStart]?.currentContext
-              ?.findRenderObject();
-      if (render is! RenderBox) return;
-      final caret =
-          paragraph?.getOffsetForCaret(
-            TextPosition(offset: target.charOffset - targetLeaf.charStart),
-            Rect.zero,
-          ) ??
-          Offset(
-            0,
-            target.charOffset == targetLeaf.charEnd ? render.size.height : 0,
-          );
-      final targetY = render.localToGlobal(caret).dy;
-      final viewportY = viewport.localToGlobal(Offset.zero).dy;
-      if (targetY >= viewportY && targetY < viewportY + viewport.size.height) {
-        return;
-      }
-      final delta = targetY - viewportY;
-      controller.jumpTo(
-        (controller.offset + delta).clamp(
-          controller.position.minScrollExtent,
-          controller.position.maxScrollExtent,
-        ),
-      );
-      return;
-    }
   }
 
   EpubLocation? _locationFromLocator(String locator, {int? fromChapter}) {
@@ -1620,12 +1478,23 @@ class EpubNativeViewState extends State<EpubNativeView>
         !pageHeight.isFinite ||
         pageWidth <= 0 ||
         pageHeight <= 0) {
-      _lastPaginationSize = null;
+      _lastPaginationGeometry = null;
       return;
     }
 
-    final size = Size(pageWidth, pageHeight);
-    if (_lastPaginationSize == size && _paginatedPages.isNotEmpty) return;
+    final contentInsets = _contentInsets();
+    final geometry = (
+      Size(pageWidth, pageHeight),
+      EdgeInsets.fromLTRB(
+        paddingH,
+        contentInsets.top,
+        paddingH,
+        contentInsets.bottom,
+      ),
+    );
+    if (_lastPaginationGeometry == geometry && _paginatedPages.isNotEmpty) {
+      return;
+    }
 
     _pendingRestore ??= _captureLocation(ReadingMode.horizontal);
     _hasActiveSelection = false;
@@ -1633,14 +1502,13 @@ class EpubNativeViewState extends State<EpubNativeView>
     _paginatedPages = [];
     _tableLayouts.clear();
     final contentWidth = pageWidth - paddingH * 2;
-    final contentInsets = _contentInsets();
     final contentHeight = pageHeight - contentInsets.vertical;
 
     if (!contentWidth.isFinite ||
         !contentHeight.isFinite ||
         contentWidth <= 0 ||
         contentHeight <= 0) {
-      _lastPaginationSize = null;
+      _lastPaginationGeometry = null;
       return;
     }
 
@@ -1694,14 +1562,7 @@ class EpubNativeViewState extends State<EpubNativeView>
       }
     }
 
-    final target = _pendingRestore;
-    if (target != null) {
-      final index = _pageIndexForLocation(target);
-      if (index != null)
-        _currentPageIndex = _isDualPage ? (index ~/ 2) * 2 : index;
-    }
-
-    _lastPaginationSize = size;
+    _lastPaginationGeometry = geometry;
   }
 
   double _measureElementHeight(
@@ -1831,37 +1692,110 @@ class EpubNativeViewState extends State<EpubNativeView>
     return RegExp(r'[\s\.\,\!\?\:\;\)\]\}]').hasMatch(char);
   }
 
+  TextPainter _layoutTextBlock(
+    TextBlock block,
+    double contentWidth, {
+    InlineSpan? overrideSpan,
+  }) {
+    return TextPainter(
+      text: TextSpan(
+        style: _baseTextStyle,
+        children: [overrideSpan ?? block.span],
+      ),
+      textDirection: TextDirection.ltr,
+      textScaler: TextScaler.noScaling,
+      textHeightBehavior: const TextHeightBehavior(),
+      textAlign: block.textAlign,
+    )..layout(
+      maxWidth: math.max(
+        1.0,
+        contentWidth - _textBlockInsets(block).horizontal,
+      ),
+    );
+  }
+
   double _measureTextBlockHeight(
     TextBlock block,
     double contentWidth, {
     InlineSpan? overrideSpan,
   }) {
-    if (!contentWidth.isFinite || contentWidth <= 0) {
-      return 24.0;
-    }
+    final painter = _layoutTextBlock(
+      block,
+      contentWidth,
+      overrideSpan: overrideSpan,
+    );
+    final height = painter.height + _textBlockInsets(block).vertical;
+    painter.dispose();
+    return height;
+  }
 
-    final span = overrideSpan ?? block.span;
-    if (span is! TextSpan) {
-      return 24.0;
-    }
-
-    final tp =
-        TextPainter(
-          text: TextSpan(style: _baseTextStyle, children: [span]),
-          textDirection: TextDirection.ltr,
-          textScaler: TextScaler.noScaling,
-          textHeightBehavior: const TextHeightBehavior(),
-          textAlign: block.textAlign,
-        )..layout(
-          maxWidth: math.max(
-            1.0,
-            contentWidth - _textBlockInsets(block).horizontal,
-          ),
+  double _contentOffsetForPosition(
+    List<ContentElement> elements,
+    int charOffset,
+    double contentWidth, {
+    double? imageExtent,
+  }) {
+    var offset = 0.0;
+    for (final element in elements) {
+      if (charOffset < element.charEnd || identical(element, elements.last)) {
+        if (element is TextBlock) {
+          final painter = _layoutTextBlock(element, contentWidth);
+          final caret = painter.getOffsetForCaret(
+            TextPosition(
+              offset: (charOffset - element.charStart).clamp(
+                0,
+                element.charEnd - element.charStart,
+              ),
+            ),
+            Rect.zero,
+          );
+          painter.dispose();
+          return offset + _textBlockInsets(element).top + caret.dy;
+        }
+        if (element is TableBlock) {
+          final layout = _layoutTable(element, contentWidth);
+          final columnWidth = layout.width / math.max(1, element.columnCount);
+          for (final cell in element.cells) {
+            if (cell.elements.isEmpty) continue;
+            if (charOffset < cell.elements.last.charEnd ||
+                identical(cell, element.cells.last)) {
+              return offset +
+                  layout.rowOffsets[cell.row] +
+                  _tableCellInsets.top +
+                  _contentOffsetForPosition(
+                    cell.elements,
+                    charOffset,
+                    math.max(
+                      1.0,
+                      columnWidth * cell.columnSpan -
+                          _tableCellInsets.horizontal,
+                    ),
+                    imageExtent: layout.imageExtent,
+                  );
+            }
+          }
+        }
+        return offset;
+      }
+      if (element is ImageBlock && imageExtent == null) {
+        final ratio = _imageAspectRatio(element, forLayout: true);
+        // An unresolved raster has no intrinsic extent yet. Its decoded size
+        // schedules a fresh anchored layout, just as it does inside tables.
+        offset +=
+            24 +
+            (ratio == null
+                ? 0
+                : math.max(0.0, contentWidth - element.indent) / ratio);
+      } else {
+        offset += _measureElementHeight(
+          element,
+          contentWidth,
+          imageExtent ?? 0,
+          inTable: imageExtent != null,
         );
-    final textHeight = tp.height;
-    tp.dispose();
-
-    return textHeight + _textBlockInsets(block).vertical;
+      }
+    }
+    return offset;
   }
 
   EdgeInsets _textBlockInsets(TextBlock block) {
@@ -2161,14 +2095,42 @@ class EpubNativeViewState extends State<EpubNativeView>
   // Vertical mode
   // ---------------------------------------------------------------------------
 
+  double _effectivePadding(double pageWidth, double requested) {
+    final readableWidth = math.min(160.0, pageWidth);
+    return requested.clamp(0.0, math.max(0.0, (pageWidth - readableWidth) / 2));
+  }
+
   Widget _buildVerticalMode(double paddingH, BoxConstraints constraints) {
     _scheduleRestore();
 
     final availableWidth = constraints.maxWidth;
     final contentInsets = _contentInsets();
 
-    // Cap at comfortable reading width — no jump, text simply stops expanding
+    // Cap the page, not its content: the margin control still applies inside.
     final maxContentWidth = math.min(availableWidth, 800.0);
+    paddingH = _effectivePadding(maxContentWidth, paddingH);
+    final pending = _pendingRestore;
+    if (pending != null) _verticalUserScroll = false;
+    final target = pending == null || widget.epub.chapters.isEmpty
+        ? null
+        : _restoreTarget(pending);
+    final chapter = target?.chapterIndex ?? 0;
+    final targetOffset = target == null
+        ? 0.0
+        : _legacyPixelOffset(pending!) ??
+              _contentOffsetForPosition(
+                _parsedChapters[chapter]!,
+                target.charOffset,
+                maxContentWidth - paddingH * 2,
+              );
+    // PositionedList uses an unbounded anchor, so even a caret several
+    // viewports into a chapter can be correct before its first paint.
+    final alignment = target == null || constraints.maxHeight <= 0
+        ? 0.0
+        : (contentInsets.top -
+                  targetOffset -
+                  (chapter == 0 ? contentInsets.top : 0)) /
+              constraints.maxHeight;
 
     return Center(
       child: SizedBox(
@@ -2176,14 +2138,13 @@ class EpubNativeViewState extends State<EpubNativeView>
         child: _buildSelectionArea(
           onSelectionChanged: _handleSelectionChanged,
           child: NotificationListener<ScrollNotification>(
-            onNotification: (notification) {
-              if (notification is ScrollUpdateNotification) _onScroll();
-              return false;
-            },
+            onNotification: _onVerticalScrollNotification,
             child: ScrollablePositionedList.builder(
-              key: ValueKey(('vertical', _layoutGeneration)),
-              itemScrollController: _itemScrollController,
-              scrollOffsetController: _scrollOffsetController,
+              // The list prefers PageStorage over initialScrollIndex. Isolate
+              // reflow/navigation seeds from the previous mounted position.
+              key: PageStorageKey(('vertical', _layoutGeneration)),
+              initialScrollIndex: chapter,
+              initialAlignment: alignment,
               padding: EdgeInsets.fromLTRB(
                 paddingH,
                 contentInsets.top,
@@ -2249,14 +2210,19 @@ class EpubNativeViewState extends State<EpubNativeView>
       pageWidth = math.min(availableWidth, 800.0);
     }
 
-    if (!pageWidth.isFinite || pageWidth <= paddingH * 2) {
-      return const SizedBox.shrink();
-    }
+    paddingH = _effectivePadding(pageWidth, paddingH);
 
     _paginate(pageWidth, availableHeight, paddingH);
     _scheduleRestore();
 
     if (_paginatedPages.isEmpty) return const SizedBox.shrink();
+    final restore = _pendingRestore;
+    if (restore != null) {
+      final page = _pageIndexForLocation(_restoreTarget(restore));
+      if (page != null) {
+        _currentPageIndex = _isDualPage ? (page ~/ 2) * 2 : page;
+      }
+    }
 
     _currentPageIndex = _currentPageIndex.clamp(0, _paginatedPages.length - 1);
     if (_isDualPage) {
@@ -2393,15 +2359,39 @@ class EpubNativeViewState extends State<EpubNativeView>
   Widget _buildPageWidget(_PageInfo page, double paddingH) {
     final contentInsets = _contentInsets();
     return ClipRect(
-      key: ValueKey((_layoutGeneration, page.pageIndex)),
+      key: ValueKey((
+        _layoutGeneration,
+        page.pageIndex,
+        _lastPaginationGeometry,
+      )),
       child: _buildSelectableScope(
         chapterIndex: page.chapterIndex,
         elements: page.elements,
         ownSelectionArea: true,
         builder: (scope) {
           if (scope.pageScrollController == null) {
-            scope.pageScrollController = ScrollController()
-              ..addListener(() => _onHorizontalPageScroll(scope));
+            var initialOffset = 0.0;
+            final restore = _pendingRestore;
+            if (restore != null) {
+              final target = _restoreTarget(restore);
+              if (target.chapterIndex == page.chapterIndex &&
+                  target.charOffset >= page.charStart &&
+                  (target.charOffset < page.charEnd ||
+                      target.charOffset == _chapterWeight(page.chapterIndex))) {
+                final contentHeight =
+                    _currentPageHeight - contentInsets.vertical;
+                final targetY = _contentOffsetForPosition(
+                  page.elements,
+                  target.charOffset,
+                  _lastPaginationGeometry!.$1.width - paddingH * 2,
+                  imageExtent: contentHeight,
+                );
+                if (targetY >= contentHeight) initialOffset = targetY;
+              }
+            }
+            scope.pageScrollController = ScrollController(
+              initialScrollOffset: initialOffset,
+            )..addListener(() => _onHorizontalPageScroll(scope));
           }
           scope.pageScrollKey ??= GlobalKey();
           return Padding(
@@ -2696,7 +2686,7 @@ class EpubNativeViewState extends State<EpubNativeView>
       setState(() {
         _tableLayouts.clear();
         _paginatedPages.clear();
-        _lastPaginationSize = null;
+        _lastPaginationGeometry = null;
         _hasActiveSelection = false;
         _layoutGeneration++;
       });

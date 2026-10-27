@@ -2,7 +2,7 @@ name: lira
 description: "Lira is your free feature-rich library"
 publish_to: 'none'
 
-version: 0.6.3+7
+version: 0.6.4+8
 
 environment:
   sdk: ^3.9.4
@@ -73,14 +73,84 @@ flutter:
   assets:
     - assets/fonts/Inter-OFL.txt
     - assets/fonts/Lora-OFL.txt
+    - assets/fonts/Literata-OFL.txt
+    - assets/fonts/SourceSerif4-OFL.txt
+    - assets/fonts/PTSerif-OFL.txt
+    - assets/fonts/NotoSerif-OFL.txt
+    - assets/fonts/Merriweather-OFL.txt
+    - assets/fonts/RobotoSlab-LICENSE.txt
+    - assets/fonts/PTSans-OFL.txt
+    - assets/fonts/NotoSans-OFL.txt
+    - assets/fonts/Roboto-OFL.txt
 
   fonts:
     - family: Inter
       fonts:
         - asset: assets/fonts/Inter-Variable.ttf
+        - asset: assets/fonts/Inter-Italic-Variable.ttf
+          style: italic
     - family: Lora
       fonts:
         - asset: assets/fonts/Lora-Variable.ttf
+        - asset: assets/fonts/Lora-Italic-Variable.ttf
+          style: italic
+    - family: Literata
+      fonts:
+        - asset: assets/fonts/Literata-Variable.ttf
+        - asset: assets/fonts/Literata-Italic-Variable.ttf
+          style: italic
+    - family: Source Serif 4
+      fonts:
+        - asset: assets/fonts/SourceSerif4-Variable.ttf
+        - asset: assets/fonts/SourceSerif4-Italic-Variable.ttf
+          style: italic
+    - family: PT Serif
+      fonts:
+        - asset: assets/fonts/PTSerif-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/PTSerif-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/PTSerif-Italic.ttf
+          weight: 400
+          style: italic
+        - asset: assets/fonts/PTSerif-BoldItalic.ttf
+          weight: 700
+          style: italic
+    - family: Noto Serif
+      fonts:
+        - asset: assets/fonts/NotoSerif-Variable.ttf
+        - asset: assets/fonts/NotoSerif-Italic-Variable.ttf
+          style: italic
+    - family: Merriweather
+      fonts:
+        - asset: assets/fonts/Merriweather-Variable.ttf
+        - asset: assets/fonts/Merriweather-Italic-Variable.ttf
+          style: italic
+    - family: Roboto Slab
+      fonts:
+        - asset: assets/fonts/RobotoSlab-Variable.ttf
+    - family: PT Sans
+      fonts:
+        - asset: assets/fonts/PTSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/PTSans-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/PTSans-Italic.ttf
+          weight: 400
+          style: italic
+        - asset: assets/fonts/PTSans-BoldItalic.ttf
+          weight: 700
+          style: italic
+    - family: Noto Sans
+      fonts:
+        - asset: assets/fonts/NotoSans-Variable.ttf
+        - asset: assets/fonts/NotoSans-Italic-Variable.ttf
+          style: italic
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Variable.ttf
+        - asset: assets/fonts/Roboto-Italic-Variable.ttf
+          style: italic
 
 # Flutter Launcher Icons configuration
 # Run: flutter pub run flutter_launcher_icons:main

@@ -111,6 +111,63 @@ RenderParagraph _paragraph(WidgetTester tester, String text) =>
       find.descendant(of: find.text(text), matching: find.byType(RichText)),
     );
 
+Iterable<RenderParagraph> _visibleParagraphs(
+  WidgetTester tester,
+  Rect viewport,
+) sync* {
+  for (final element in find.byType(RichText).evaluate()) {
+    final render = element.renderObject;
+    if (render is! RenderParagraph || !render.attached || !render.hasSize) {
+      continue;
+    }
+    final bounds = render.localToGlobal(Offset.zero) & render.size;
+    if (bounds.overlaps(viewport)) yield render;
+  }
+}
+
+void _expectFragmentVisible(
+  WidgetTester tester,
+  String fragment,
+  Rect viewport,
+) {
+  final boxes = <Rect>[];
+  for (final paragraph in _visibleParagraphs(tester, viewport)) {
+    final index = paragraph.text.toPlainText().indexOf(fragment);
+    if (index < 0) continue;
+    boxes.addAll(
+      paragraph
+          .getBoxesForSelection(
+            TextSelection(
+              baseOffset: index,
+              extentOffset: index + fragment.length,
+            ),
+          )
+          .map(
+            (box) => box.toRect().shift(paragraph.localToGlobal(Offset.zero)),
+          ),
+    );
+  }
+  expect(
+    boxes.any((box) => box.overlaps(viewport)),
+    isTrue,
+    reason: 'The saved text must be painted in every transitional frame',
+  );
+}
+
+Future<void> _pumpEveryFrame(WidgetTester tester, VoidCallback check) async {
+  var frames = 0;
+  do {
+    await tester.pump(const Duration(milliseconds: 16));
+    check();
+    frames++;
+    expect(
+      frames,
+      lessThan(30),
+      reason: 'Reflow must settle without a frame loop',
+    );
+  } while (tester.binding.hasScheduledFrame);
+}
+
 Future<void> _tapFirstGlyph(WidgetTester tester, String text) {
   final paragraph = _paragraph(tester, text);
   final box = paragraph
@@ -319,6 +376,286 @@ void main() {
       await tester.pumpAndSettle();
       expect(latest!.chapterIndex, 1);
       expect(_renderedText(tester), isNot(contains('THIRD CHAPTER')));
+    },
+  );
+
+  testWidgets(
+    'every reflow frame paints the saved text instead of chapter zero',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1400, 900);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final book = _book();
+      final blocks = XhtmlParser(
+        html: book.chapters[1].htmlContent,
+        images: const {},
+        baseStyle: const TextStyle(fontSize: 18),
+      ).parse().whereType<TextBlock>();
+      final offset = blocks
+          .firstWhere(
+            (block) =>
+                block.span.toPlainText().startsWith('SECOND paragraph 6.'),
+          )
+          .charStart;
+      final target = EpubLocation.fromPosition(
+        chapterIndex: 1,
+        charOffset: offset,
+        hasExactCharOffset: true,
+      );
+      final reports = <EpubLocation>[];
+      var settings = const ReaderSettings();
+      var size = const Size(1200, 500);
+      late StateSetter rebuild;
+      void checkFrame() {
+        final viewport = Rect.fromLTWH(0, 24, size.width, size.height - 48);
+        _expectFragmentVisible(tester, 'SECOND paragraph 6.', viewport);
+        for (final paragraph in _visibleParagraphs(tester, viewport)) {
+          expect(
+            paragraph.text.toPlainText(),
+            isNot(contains('FIRST CHAPTER')),
+          );
+        }
+        for (final report in reports) {
+          expect(report.hasExactCharOffset, isTrue);
+          expect(report.chapterIndex, target.chapterIndex);
+          expect(report.charOffset, target.charOffset);
+        }
+      }
+
+      await tester.pumpWidget(
+        StatefulBuilder(
+          builder: (context, setState) {
+            rebuild = setState;
+            return _frame(
+              EpubNativeView(
+                epub: book,
+                initialLocation: target,
+                settings: settings,
+                theme: ThemeData.dark(),
+                onLocationChanged: (location, _) => reports.add(location),
+              ),
+              size: size,
+            );
+          },
+        ),
+      );
+      checkFrame();
+      await _pumpEveryFrame(tester, checkFrame);
+      for (final mode in [
+        (ReadingMode.vertical, false),
+        (ReadingMode.horizontal, false),
+        (ReadingMode.horizontal, true),
+        (ReadingMode.vertical, false),
+      ]) {
+        rebuild(() {
+          settings = settings.copyWith(
+            readingMode: mode.$1,
+            enableDualPageSpread: mode.$2,
+          );
+        });
+        await _pumpEveryFrame(tester, checkFrame);
+        for (final update in [
+          settings.copyWith(fontSize: 25),
+          settings.copyWith(fontFamily: 'serif'),
+          settings.copyWith(lineHeight: 1.9),
+          settings.copyWith(horizontalPadding: 120),
+          settings.copyWith(horizontalPadding: 240),
+        ]) {
+          rebuild(() => settings = update);
+          await _pumpEveryFrame(tester, checkFrame);
+        }
+        for (final width in [440.0, 140.0, 1200.0]) {
+          rebuild(() => size = Size(width, 500));
+          await _pumpEveryFrame(tester, checkFrame);
+        }
+      }
+      expect(reports, isNotEmpty);
+      expect(settings.horizontalPadding, 240);
+    },
+  );
+
+  for (final mode in [
+    (ReadingMode.vertical, false, 'vertical'),
+    (ReadingMode.horizontal, false, 'single page'),
+    (ReadingMode.horizontal, true, 'spread'),
+  ]) {
+    testWidgets('reader typography controls actual ${mode.$3} line metrics', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1400, 900);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final book = _htmlBook(
+        '<style>body { line-height: 1.45; font-family: publisher; }'
+        'p { font-size: 16px !important; line-height: 12px !important; }</style>'
+        '<p>Metric probe. ${'readable metric content. ' * 180}</p>',
+      );
+      var settings = ReaderSettings(
+        readingMode: mode.$1,
+        enableDualPageSpread: mode.$2,
+        fontSize: 18,
+        lineHeight: 1.2,
+        horizontalPadding: 20,
+      );
+      var size = const Size(1200, 500);
+      late StateSetter rebuild;
+      await tester.pumpWidget(
+        StatefulBuilder(
+          builder: (context, setState) {
+            rebuild = setState;
+            return _frame(
+              EpubNativeView(
+                epub: book,
+                settings: settings,
+                theme: ThemeData.dark(),
+              ),
+              size: size,
+            );
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+      for (final typography in [
+        (18.0, 1.2, 20.0),
+        (24.0, 1.2, 20.0),
+        (24.0, 1.9, 20.0),
+        (24.0, 1.9, 120.0),
+        (24.0, 1.9, 240.0),
+      ]) {
+        rebuild(() {
+          settings = settings.copyWith(
+            fontSize: typography.$1,
+            lineHeight: typography.$2,
+            horizontalPadding: typography.$3,
+          );
+        });
+        await tester.pumpAndSettle();
+        final pageWidth = mode.$2 ? size.width * .48 : 800.0;
+        final effectivePadding = typography.$3.clamp(
+          0.0,
+          (pageWidth - 160) / 2,
+        );
+        final paragraphs =
+            _visibleParagraphs(
+                  tester,
+                  Rect.fromLTWH(0, 24, size.width, size.height - 48),
+                )
+                .where(
+                  (paragraph) =>
+                      paragraph.text.toPlainText().contains('metric content'),
+                )
+                .toList();
+        expect(paragraphs.length, mode.$2 ? 2 : 1);
+        for (var index = 0; index < paragraphs.length; index++) {
+          final paragraph = paragraphs[index];
+          expect(
+            paragraph.size.width,
+            closeTo(pageWidth - effectivePadding * 2, .01),
+          );
+          final pageLeft = mode.$2
+              ? index * (pageWidth + size.width * .04)
+              : (size.width - pageWidth) / 2;
+          expect(
+            paragraph.localToGlobal(Offset.zero).dx - pageLeft,
+            closeTo(effectivePadding, .01),
+          );
+          final painter = TextPainter(
+            text: paragraph.text,
+            textDirection: TextDirection.ltr,
+            textScaler: TextScaler.noScaling,
+            textHeightBehavior: const TextHeightBehavior(),
+          )..layout(maxWidth: paragraph.size.width);
+          final lines = painter.computeLineMetrics();
+          expect(lines.length, greaterThan(1));
+          expect(painter.height, closeTo(paragraph.size.height, .01));
+          expect(
+            lines[1].baseline - lines[0].baseline,
+            closeTo(typography.$1 * typography.$2, 1.01),
+          );
+          painter.dispose();
+        }
+      }
+      // A saved desktop margin survives narrowing, but the rendered page
+      // always retains 160px (or the full viewport when it is even narrower).
+      for (final width in [440.0, 140.0]) {
+        rebuild(() => size = Size(width, 500));
+        await tester.pumpAndSettle();
+        final paragraphs =
+            _visibleParagraphs(tester, Rect.fromLTWH(0, 24, width, 452))
+                .where(
+                  (paragraph) =>
+                      paragraph.text.toPlainText().contains('metric content'),
+                )
+                .toList();
+        expect(paragraphs, isNotEmpty);
+        expect(
+          paragraphs.first.size.width,
+          closeTo(width < 160 ? width : 160, .01),
+        );
+        expect(settings.horizontalPadding, 240);
+      }
+    });
+  }
+
+  testWidgets(
+    'spread margins constrain tables and images to the same page boxes',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1400, 900);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final book = _htmlBook(
+        '<table><tr><td>LEFT CELL</td><td>RIGHT CELL</td></tr></table>'
+        '<img src="../images/diagram.svg"/>',
+        images: {
+          'OEBPS/images/diagram.svg': Uint8List.fromList(
+            utf8.encode(
+              '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 80">'
+              '<rect width="160" height="80" fill="red"/></svg>',
+            ),
+          ),
+        },
+      );
+      var settings = const ReaderSettings(
+        readingMode: ReadingMode.horizontal,
+        enableDualPageSpread: true,
+      );
+      late StateSetter rebuild;
+      await tester.pumpWidget(
+        StatefulBuilder(
+          builder: (context, setState) {
+            rebuild = setState;
+            return _frame(
+              EpubNativeView(
+                epub: book,
+                settings: settings,
+                theme: ThemeData.dark(),
+              ),
+              size: const Size(1200, 500),
+            );
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+      for (final requested in [20.0, 120.0, 240.0]) {
+        rebuild(() {
+          settings = settings.copyWith(horizontalPadding: requested);
+        });
+        await tester.pumpAndSettle();
+        final padding = requested.clamp(0.0, (576 - 160) / 2);
+        final table = _cellRect(
+          tester,
+          'LEFT CELL',
+        ).expandToInclude(_cellRect(tester, 'RIGHT CELL'));
+        final image = tester.getRect(find.byType(SvgPicture));
+        expect(table.width, closeTo(576 - padding * 2, .01));
+        expect(image.width, closeTo(table.width, .01));
+        expect(table.left, closeTo(padding, .01));
+        expect(image.left, closeTo(624 + padding, .01));
+        expect(image.height, closeTo(image.width / 2, .01));
+      }
     },
   );
 
@@ -1309,30 +1646,31 @@ void main() {
         r'\[\d{4}\]',
       ).firstMatch(text.substring(saved.charOffset))!.group(0)!;
       expect(_topVisibleText(tester), contains(marker));
+      void checkSavedFrame() {
+        expect(_topVisibleText(tester), contains(marker));
+        expect(latest!.chapterIndex, saved.chapterIndex);
+        expect(latest!.charOffset, saved.charOffset);
+      }
+
       rebuild(() {
         initial = EpubLocation.fromJson(saved.toJson());
         readerId++;
       });
-      await tester.pumpAndSettle();
-      expect(_topVisibleText(tester), contains(marker));
+      await _pumpEveryFrame(tester, checkSavedFrame);
       rebuild(
         () => settings = settings.copyWith(fontSize: 23, lineHeight: 1.8),
       );
-      await tester.pumpAndSettle();
-      expect(_topVisibleText(tester), contains(marker));
+      await _pumpEveryFrame(tester, checkSavedFrame);
       rebuild(() => size = const Size(700, 400));
-      await tester.pumpAndSettle();
-      expect(_topVisibleText(tester), contains(marker));
+      await _pumpEveryFrame(tester, checkSavedFrame);
       rebuild(
         () => settings = settings.copyWith(readingMode: ReadingMode.vertical),
       );
-      await tester.pumpAndSettle();
-      expect(_topVisibleText(tester), contains(marker));
+      await _pumpEveryFrame(tester, checkSavedFrame);
       rebuild(
         () => settings = settings.copyWith(readingMode: ReadingMode.horizontal),
       );
-      await tester.pumpAndSettle();
-      expect(_topVisibleText(tester), contains(marker));
+      await _pumpEveryFrame(tester, checkSavedFrame);
     },
   );
 

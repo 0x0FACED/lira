@@ -65,9 +65,13 @@ Never wrap a live EPUB/PDF engine in a keyed `AnimatedSwitcher`: progress, selec
 - **Settings tab**: profile/account, source credentials, appearance/language, proxy and application version, grouped on common surfaces.
 - **Reader (`/reader`)**: themed chrome, TOC, selections/notes, an annotations sheet with separate Highlights/Bookmarks tabs, and settings. The top bar toggles a bookmark for the current reading position. Both bars animate in/out by their own height; note-editor keyboards do not resize the book behind the dialog. EPUB/PDF parsing, geometry and persistence remain the reader subsystem's responsibility; see [READER.md](READER.md).
 
+The bookmark button remains active within a small EPUB text neighborhood (±400 UTF-16 characters in one spine document) or the same PDF page; toggling it removes the matched saved bookmark without changing its navigation target. On Android, status and navigation bars are hidden with reader chrome and shown with it, on load errors, and after leaving the reader.
+
 Library and search cards have full-bleed artwork above an inset metadata/action body. Images use top-centered `BoxFit.cover`, preserve their aspect ratio and may crop to fill the cover area; the card surface clips the top corners. Book details use the same artwork treatment. Library and search grids increase tile height with text scaling; progress and cancellation remain inside the search-card body.
 
 A fresh reader settings profile starts on warm paper. Saved reader settings, including old dark/white backgrounds, remain unchanged; app theme changes do not overwrite them. Resetting reader settings returns to warm paper. Reading controls and background swatches have localized semantic labels/tooltips.
+
+Reader controls have visible localized names and numeric values. Page margins range from 8–64 logical pixels on phones and 8–240 on desktop/large tablets, with safe per-page clamping in the renderer. The font menu previews 11 bundled offline Latin/Cyrillic families: Inter, Lora, Literata, Source Serif 4, PT Serif, Noto Serif, Merriweather, Roboto Slab, PT Sans, Noto Sans and Roboto. Existing generic/system selections remain usable; UI theme fonts and default reader settings are unchanged.
 
 ## Verification checklist
 
@@ -79,5 +83,6 @@ Run the real application (`flutter run -d macos`, or a supported connected devic
 4. Open real EPUB/PDF, toggle chrome in both directions, use TOC/settings/highlights/bookmarks, then close and reopen without losing reading position. In both EPUB modes, open/save/cancel a note with the keyboard visible: the underlying book must not resize or jump.
 5. Change app theme with an explicitly chosen reading background and saved highlights; content preferences must remain intact.
 6. Enable reduced motion and check navigation, dialogs, sheets and reader controls. Check keyboard focus and disabled states.
+7. On Android, verify immersive reading, showing/hiding chrome, background/resume, note-keyboard dismissal and exit back to the library. System bars must follow reader chrome and must not remain hidden outside the reader.
 
 `dart analyze lib` checks the application sources. Reader regression commands and native PDFium prerequisites remain in [READER.md](READER.md).

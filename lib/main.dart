@@ -11,6 +11,7 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/app_tokens.dart';
 import 'core/providers/preferences_provider.dart';
 import 'core/network/proxy_http_overrides.dart';
+import 'features/settings/data/reader_font_catalog.dart';
 import 'features/settings/data/settings_provider.dart' show sharedPrefs;
 
 void main() async {
@@ -21,11 +22,11 @@ void main() async {
   // can read persisted state synchronously (no async race conditions).
   sharedPrefs = await SharedPreferences.getInstance();
 
-  for (final family in const ['Inter', 'Lora']) {
+  for (final font in bundledReaderFonts) {
     LicenseRegistry.addLicense(() async* {
       yield LicenseEntryWithLineBreaks([
-        family,
-      ], await rootBundle.loadString('assets/fonts/$family-OFL.txt'));
+        font.family,
+      ], await rootBundle.loadString(font.licenseAsset));
     });
   }
 

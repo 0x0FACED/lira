@@ -2,19 +2,13 @@ import 'package:epub_engine/epub_engine.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../l10n/app_localizations.dart';
+import '../data/reader_font_catalog.dart';
 import '../data/settings_provider.dart';
-
-const _readerFontOptions = [
-  _ReaderFontOption(label: 'Sans Serif', family: 'sans-serif'),
-  _ReaderFontOption(label: 'Serif', family: 'serif'),
-  _ReaderFontOption(label: 'Roboto', family: 'Roboto'),
-  _ReaderFontOption(label: 'Georgia', family: 'Georgia'),
-  _ReaderFontOption(label: 'Monospace', family: 'monospace'),
-];
 
 class SettingsPanel extends ConsumerStatefulWidget {
   const SettingsPanel({super.key});
@@ -43,6 +37,14 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
   Widget build(BuildContext context) {
     final settings = ref.watch(readerSettingsProvider);
     final notifier = ref.read(readerSettingsProvider.notifier);
+    ref.listen(readerSettingsProvider, (_, next) {
+      setState(() {
+        _fontSize = next.fontSize;
+        _lineHeight = next.lineHeight;
+        _horizontalPadding = next.horizontalPadding;
+        _brightness = next.brightness;
+      });
+    });
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
     final media = MediaQuery.of(context);
@@ -50,6 +52,23 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
         (defaultTargetPlatform == TargetPlatform.android ||
             defaultTargetPlatform == TargetPlatform.iOS) &&
         media.size.shortestSide < 600;
+    final maxPadding = isPhone ? 64.0 : 240.0;
+    final displayedPadding = _horizontalPadding
+        .clamp(8.0, maxPadding)
+        .toDouble();
+    final lineHeightFormat = NumberFormat('0.0', l10n.localeName);
+    final fontOptions = [
+      _ReaderFontOption(label: l10n.readerSansSerif, family: 'sans-serif'),
+      _ReaderFontOption(label: l10n.readerSerif, family: 'serif'),
+      for (final font in bundledReaderFonts)
+        _ReaderFontOption(label: font.family, family: font.family),
+      if (settings.fontFamily == 'Georgia' ||
+          defaultTargetPlatform == TargetPlatform.macOS ||
+          defaultTargetPlatform == TargetPlatform.iOS ||
+          defaultTargetPlatform == TargetPlatform.windows)
+        const _ReaderFontOption(label: 'Georgia', family: 'Georgia'),
+      _ReaderFontOption(label: l10n.readerMonospace, family: 'monospace'),
+    ];
 
     return SafeArea(
       top: false,
@@ -124,17 +143,12 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
                       size: 20,
                     ),
                   ),
-                  items: _readerFontOptions
+                  items: fontOptions
                       .map(
                         (option) => DropdownMenuItem<String>(
                           value: option.family,
                           child: Text(
-                            switch (option.family) {
-                              'sans-serif' => l10n.readerSansSerif,
-                              'serif' => l10n.readerSerif,
-                              'monospace' => l10n.readerMonospace,
-                              _ => option.label,
-                            },
+                            option.label,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               fontFamily: option.family,
@@ -154,7 +168,7 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
                 _sliderRow(
                   icon: Icons.text_fields,
                   semanticsLabel: l10n.readerFontSize,
-                  value: _fontSize,
+                  value: _fontSize.clamp(12.0, 32.0).toDouble(),
                   min: 12,
                   max: 32,
                   divisions: 10,
@@ -166,10 +180,10 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
                 _sliderRow(
                   icon: Icons.format_line_spacing,
                   semanticsLabel: l10n.readerLineHeight,
-                  value: _lineHeight,
+                  value: _lineHeight.clamp(1.0, 2.5).toDouble(),
                   min: 1.0,
                   max: 2.5,
-                  label: _lineHeight.toStringAsFixed(1),
+                  label: '${lineHeightFormat.format(_lineHeight)}×',
                   onChanged: (v) => setState(() => _lineHeight = v),
                   onChangeEnd: (v) =>
                       notifier.updateSettings(settings.copyWith(lineHeight: v)),
@@ -177,10 +191,10 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
                 _sliderRow(
                   icon: Icons.horizontal_distribute,
                   semanticsLabel: l10n.readerPageMargins,
-                  value: _horizontalPadding,
+                  value: displayedPadding,
                   min: 8,
-                  max: 64,
-                  label: '${_horizontalPadding.round()}',
+                  max: maxPadding,
+                  label: '${displayedPadding.round()}',
                   onChanged: (v) => setState(() => _horizontalPadding = v),
                   onChangeEnd: (v) => notifier.updateSettings(
                     settings.copyWith(horizontalPadding: v),
@@ -189,7 +203,7 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
                 _sliderRow(
                   icon: Icons.brightness_6_rounded,
                   semanticsLabel: l10n.readerBrightness,
-                  value: _brightness,
+                  value: _brightness.clamp(0.2, 1.0).toDouble(),
                   min: 0.2,
                   max: 1.0,
                   label: '${(_brightness * 100).round()}%',
@@ -275,41 +289,42 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
     ValueChanged<double>? onChangeEnd,
   }) {
     final theme = Theme.of(context);
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: AppLayout.minTouchTarget),
-      child: Row(
-        children: [
-          Tooltip(
-            message: semanticsLabel,
-            child: Icon(
-              icon,
-              size: 20,
-              color: theme.colorScheme.onSurfaceVariant,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 20, color: theme.colorScheme.onSurfaceVariant),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(semanticsLabel, style: theme.textTheme.labelLarge),
             ),
-          ),
-          Expanded(
-            child: Semantics(
-              label: semanticsLabel,
-              child: Slider(
-                value: value,
-                min: min,
-                max: max,
-                divisions: divisions,
-                label: label,
-                onChanged: onChanged,
-                onChangeEnd: onChangeEnd,
+            Text(
+              label,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
+          ],
+        ),
+        ConstrainedBox(
+          constraints: const BoxConstraints(
+            minHeight: AppLayout.minTouchTarget,
           ),
-          Text(
-            label,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+          child: Semantics(
+            label: semanticsLabel,
+            child: Slider(
+              value: value,
+              min: min,
+              max: max,
+              divisions: divisions,
+              label: label,
+              onChanged: onChanged,
+              onChangeEnd: onChangeEnd,
             ),
-            textAlign: TextAlign.right,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:epub_engine/epub_engine.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,6 +21,7 @@ import '../domain/engine/book_reader_engine.dart';
 import '../domain/engine/epub_book_reader_engine.dart';
 import '../domain/engine/pdf_book_reader_engine.dart';
 import '../domain/models/book_location.dart';
+import '../domain/models/bookmark_region.dart';
 import 'reader_annotations_panel.dart';
 
 const _highlightColors = [
@@ -43,6 +45,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     with WidgetsBindingObserver {
   late Future<BookReaderEngine> _engineFuture;
   BookReaderEngine? _engine;
+  static const _readerChromeChannel = MethodChannel(
+    'dev.u0xfaced.lira/reader_chrome',
+  );
   bool _showUi = false;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ValueNotifier<_ReaderProgressState> _progressNotifier = ValueNotifier(
@@ -76,6 +81,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       readingProgressControllerProvider(widget.book.id).notifier,
     );
     _engineFuture = _initEngine(++_loadGeneration);
+    _syncAndroidSystemBars();
   }
 
   @override
@@ -98,16 +104,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
   Future<BookReaderEngine> _initEngine(int generation) async {
     final book = widget.book;
-    final BookReaderEngine engine;
-    if (book.format == 'epub') {
-      engine = EpubBookReaderEngine();
-    } else if (book.format == 'pdf') {
-      engine = PdfBookReaderEngine();
-    } else {
-      throw UnsupportedError('Format ${book.format} is not supported');
-    }
-
+    BookReaderEngine? engine;
     try {
+      if (book.format == 'epub') {
+        engine = EpubBookReaderEngine();
+      } else if (book.format == 'pdf') {
+        engine = PdfBookReaderEngine();
+      } else {
+        throw UnsupportedError('Format ${book.format} is not supported');
+      }
       final bytes = await File(book.fileUrl!).readAsBytes();
       await engine.loadBook(bytes);
       if (!mounted || generation != _loadGeneration) {
@@ -117,14 +122,22 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       _engine = engine;
       return engine;
     } catch (_) {
-      engine.dispose();
+      engine?.dispose();
+      if (mounted && generation == _loadGeneration) {
+        _showUi = true;
+        _syncAndroidSystemBars();
+      }
       rethrow;
     }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.resumed) _flushProgressInBackground();
+    if (state == AppLifecycleState.resumed) {
+      _syncAndroidSystemBars();
+    } else {
+      _flushProgressInBackground();
+    }
   }
 
   void _flushProgressInBackground() {
@@ -174,6 +187,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   void dispose() {
     ++_loadGeneration;
     WidgetsBinding.instance.removeObserver(this);
+    _syncAndroidSystemBars(restore: true);
     _flushProgressInBackground();
     _engine?.dispose();
     _progressNotifier.dispose();
@@ -184,6 +198,28 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     setState(() {
       _showUi = !_showUi;
     });
+    _syncAndroidSystemBars();
+  }
+
+  void _syncAndroidSystemBars({bool restore = false}) {
+    if (defaultTargetPlatform != TargetPlatform.android) return;
+    unawaited(
+      _readerChromeChannel
+          .invokeMethod<void>(
+            restore ? 'restoreSystemBars' : 'setReaderChromeVisible',
+            restore ? null : _showUi,
+          )
+          .catchError((Object error, StackTrace stack) {
+            FlutterError.reportError(
+              FlutterErrorDetails(
+                exception: error,
+                stack: stack,
+                library: 'Lira reader',
+                context: ErrorDescription('while updating Android system bars'),
+              ),
+            );
+          }),
+    );
   }
 
   @override
@@ -588,13 +624,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       valueListenable: _progressNotifier,
       builder: (context, progress, _) {
         final location = progress.location;
-        BookmarkDto? current;
-        for (final bookmark in bookmarks.valueOrNull ?? const <BookmarkDto>[]) {
-          if (bookmark.location == location?.locator) {
-            current = bookmark;
-            break;
-          }
-        }
+        final current = bookmarkNearLocation(
+          bookmarks: bookmarks.valueOrNull ?? const <BookmarkDto>[],
+          format: widget.book.format,
+          locator: location?.locator ?? '',
+        );
         final l10n = AppLocalizations.of(context)!;
         return IconButton(
           tooltip: current == null ? l10n.addBookmark : l10n.removeBookmark,

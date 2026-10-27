@@ -287,6 +287,11 @@ void main() {
 
   tearDownAll(() => directory.deleteSync(recursive: true));
   setUp(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('dev.u0xfaced.lira/reader_chrome'),
+          (_) async => null,
+        );
     _chromeTapCount = 0;
     await sharedPrefs.clear();
     progress = _ProgressStore();
@@ -296,7 +301,14 @@ void main() {
     getIt.registerSingleton<HighlightsLocalRepository>(highlights);
     getIt.registerSingleton<BookmarksLocalRepository>(bookmarks);
   });
-  tearDown(() => getIt.reset());
+  tearDown(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('dev.u0xfaced.lira/reader_chrome'),
+          null,
+        );
+    await getIt.reset();
+  });
 
   for (final mode in ReadingMode.values) {
     testWidgets(
@@ -456,22 +468,31 @@ void main() {
     },
   );
 
-  testWidgets('the current bookmark can be removed from the reading toolbar', (
+  testWidgets('a nearby bookmark removes the original saved target', (
     tester,
   ) async {
     await _open(tester, readable);
     await _showControls(tester);
     await tester.tap(find.byTooltip('Add bookmark'));
     await tester.pumpAndSettle();
-    expect(
-      EpubLocation.fromJson(
-        bookmarks.values.values.single.location,
-      )!.charOffset,
-      0,
-    );
+    final saved = bookmarks.values.values.single;
+    final savedLocation = saved.location;
+    expect(EpubLocation.fromJson(savedLocation)!.charOffset, 0);
+
+    await tester.drag(find.byType(EpubNativeView), const Offset(0, -70));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    final nearby = EpubLocation.fromJson(progress.persisted!.location)!;
+    expect(nearby.charOffset, inInclusiveRange(1, 400));
+    expect(bookmarks.values.values.single.location, savedLocation);
+    expect(find.byTooltip('Remove bookmark'), findsOneWidget);
+    expect(find.byIcon(Icons.bookmark), findsOneWidget);
+
     await tester.tap(find.byTooltip('Remove bookmark'));
     await tester.pumpAndSettle();
     expect(bookmarks.values, isEmpty);
+    expect(find.byTooltip('Add bookmark'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 

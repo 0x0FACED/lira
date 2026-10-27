@@ -50,10 +50,208 @@ Future<int> _yellowPixelCount(WidgetTester tester, GlobalKey imageKey) async {
   return count;
 }
 
+Future<PdfViewerController> _openNativePdfReader(
+  WidgetTester tester, {
+  VoidCallback? onCenterTapped,
+}) async {
+  final engine = PdfBookReaderEngine();
+  await tester.runAsync(() => engine.loadBook(readerPdfFixtureBytes()));
+  addTearDown(() async {
+    await tester.pumpWidget(const SizedBox.shrink());
+    engine.dispose();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+  });
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: ThemeData(platform: TargetPlatform.macOS),
+      home: Builder(
+        builder: (context) => engine.buildReaderWidget(
+          context: context,
+          initialLocation: const BookLocation(locator: '1'),
+          settings: const ReaderSettings(),
+          theme: Theme.of(context),
+          onProgressChanged: (_, _) {},
+          onTextSelected: (_, _) {},
+          onCenterTapped: onCenterTapped,
+        ),
+      ),
+    ),
+  );
+  final controller = tester
+      .widget<PdfViewer>(find.byType(PdfViewer))
+      .controller!;
+  await _pumpNativeUntil(tester, () => controller.isReady);
+  await tester.pumpAndSettle();
+  return controller;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final modulePath = Platform.environment['PDFIUM_PATH'];
   final nativeRequirement = modulePath == null;
+
+  testWidgets(
+    'PDF reading width stays bounded on desktop while explicit zoom remains available',
+    (tester) async {
+      Pdfrx.pdfiumModulePath = modulePath;
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1600, 900);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final controller = await _openNativePdfReader(tester);
+      final readingWidth =
+          controller.layout.pageLayouts.first.width * controller.currentZoom;
+      expect(readingWidth, lessThanOrEqualTo(800));
+      expect(readingWidth, greaterThan(600));
+      final documentRef = controller.documentRef;
+      unawaited(controller.goToPage(pageNumber: 2, duration: Duration.zero));
+      await tester.pumpAndSettle();
+      tester.view.physicalSize = const Size(2100, 1000);
+      await tester.pump();
+      await tester.pumpAndSettle();
+      expect(controller.documentRef, same(documentRef));
+      expect(controller.pageNumber, 2);
+      expect(
+        controller.layout.pageLayouts[1].width * controller.currentZoom,
+        closeTo(readingWidth, 0.001),
+      );
+      final zoomBefore = controller.currentZoom;
+      controller.value = controller.calcMatrixFor(
+        controller.visibleRect.center,
+        zoom: zoomBefore * 1.5,
+      );
+      await tester.pump();
+      expect(controller.currentZoom, greaterThan(zoomBefore * 1.4));
+      expect(
+        controller.layout.pageLayouts[1].width * controller.currentZoom,
+        greaterThan(800),
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+    skip: nativeRequirement,
+  );
+
+  testWidgets(
+    'wheel and trackpad scroll over selectable PDF text without changing zoom or toggling chrome',
+    (tester) async {
+      Pdfrx.pdfiumModulePath = modulePath;
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1200, 800);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      var taps = 0;
+      final controller = await _openNativePdfReader(
+        tester,
+        onCenterTapped: () => taps++,
+      );
+      final overlay = find.byWidgetPredicate(
+        (widget) => widget is PdfPageTextOverlay && widget.page.pageNumber == 1,
+      );
+      await _pumpNativeUntil(
+        tester,
+        () =>
+            overlay.evaluate().isNotEmpty &&
+            tester
+                .widget<PdfPageTextOverlay>(overlay)
+                .selectables
+                .containsKey(1),
+      );
+      final pageText = tester
+          .widget<PdfPageTextOverlay>(overlay)
+          .selectables[1]!
+          .selectedRanges
+          .pageText;
+      final start = pageText.fullText.indexOf('alpha');
+      final word = PdfTextRangeWithFragments.fromTextRange(
+        pageText,
+        start,
+        start + 'alpha'.length,
+      )!;
+      final wordRect = controller.calcRectForRectInsidePage(
+        pageNumber: 1,
+        rect: word.bounds,
+      );
+      final point = controller.documentToGlobal(wordRect.center)!;
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: Offset.zero);
+      await mouse.moveTo(point);
+      await tester.pump();
+      final initialZoom = controller.currentZoom;
+      final initialTop = controller.visibleRect.top;
+      await tester.sendEventToBinding(
+        PointerScrollEvent(
+          position: point,
+          scrollDelta: const Offset(0, 100),
+          kind: PointerDeviceKind.mouse,
+        ),
+      );
+      await tester.pump();
+      expect(controller.visibleRect.top, greaterThan(initialTop));
+      expect(controller.currentZoom, closeTo(initialZoom, 0.000001));
+
+      final trackpadPoint = controller.documentToGlobal(wordRect.center)!;
+      await mouse.moveTo(trackpadPoint);
+      await tester.pump();
+      final beforePan = controller.visibleRect.top;
+      final trackpad = await tester.createGesture(
+        kind: PointerDeviceKind.trackpad,
+      );
+      await trackpad.panZoomStart(trackpadPoint);
+      for (var step = 1; step <= 10; step++) {
+        await trackpad.panZoomUpdate(
+          trackpadPoint,
+          pan: Offset(0, -20.0 * step),
+          timeStamp: Duration(milliseconds: step * 16),
+        );
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await trackpad.panZoomEnd(timeStamp: const Duration(milliseconds: 176));
+      await tester.pump();
+      expect(
+        controller.visibleRect.top,
+        greaterThan(beforePan + 50 / initialZoom),
+      );
+      expect(controller.currentZoom, closeTo(initialZoom, 0.000001));
+      unawaited(controller.goToPage(pageNumber: 1, duration: Duration.zero));
+      await tester.pumpAndSettle();
+      final pinchPoint = controller.documentToGlobal(wordRect.center)!;
+      await mouse.moveTo(pinchPoint);
+      await tester.pump();
+      final pinch = await tester.createGesture(
+        kind: PointerDeviceKind.trackpad,
+      );
+      await pinch.panZoomStart(pinchPoint);
+      for (var step = 1; step <= 5; step++) {
+        await pinch.panZoomUpdate(
+          pinchPoint,
+          scale: 1 + step * 0.1,
+          timeStamp: Duration(milliseconds: 200 + step * 16),
+        );
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await pinch.panZoomEnd(timeStamp: const Duration(milliseconds: 300));
+      await tester.pump();
+      expect(controller.currentZoom, greaterThan(initialZoom * 1.2));
+      final beforeMargin = controller.visibleRect.top;
+      final zoomBeforeMargin = controller.currentZoom;
+      await tester.sendEventToBinding(
+        const PointerScrollEvent(
+          position: Offset(20, 400),
+          scrollDelta: Offset(0, 100),
+          kind: PointerDeviceKind.mouse,
+        ),
+      );
+      await tester.pump();
+      expect(controller.visibleRect.top, greaterThan(beforeMargin));
+      expect(controller.currentZoom, closeTo(zoomBeforeMargin, 0.000001));
+      expect(taps, 0);
+      await mouse.removePointer();
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+    skip: nativeRequirement,
+  );
 
   testWidgets(
     'navigation still moves the mounted viewer after progress/settings/highlight rebuilds',

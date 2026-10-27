@@ -22,9 +22,11 @@ This is a native block renderer, not a complete browser HTML/CSS implementation.
 
 `ParsedEpub.images` and `stylesheets` are keyed by canonical archive paths. `XhtmlParser` needs the chapter's `documentPath` and the book's `stylesheets` when used directly. TOC `fileName` values are package-relative URI locators with escaped paths, whereas chapter `fileName` values are canonical archive paths.
 
-CSS supports tag/class/id/universal, descendant and child selectors, specificity, source order and `!important`. The reader keeps the user's font family; remote resources, web fonts, floats/grid layout, negative/percentage margins and conditional media queries are not supported. SVG image references are resolved locally against each SVG's own document; nested vectors are inlined rather than passed to an unsupported SVG data-image decoder.
+CSS supports tag/class/id/universal, descendant and child selectors, specificity, source order and `!important`. Reader font family and line spacing override author `font-family`/`line-height`; absolute author font sizes scale with the reader size from a 16px CSS reference, preserving relative heading/footnote sizing. Remote resources, web fonts, floats/grid layout, negative/percentage margins and conditional media queries are not supported. SVG image references are resolved locally against each SVG's own document; nested vectors are inlined rather than passed to an unsupported SVG data-image decoder.
 
 Tables use equal-width columns. Cells keep source-order text offsets for selection/highlights even with rowspans. Ordinary rows paginate together; a group taller than the viewport scrolls within its page. Image dimensions update table layout without losing the logical position.
+
+Page margins are applied independently to each page in a spread and shared by measurement and drawing. Oversized saved margins clamp to preserve at least 160 logical pixels of content, or the whole viewport when narrower, without rewriting the saved preference.
 
 Horizontal turns follow touch/stylus drags and settle or roll back on release. Edge taps, keyboard and trackpad navigation use the same animation; system reduced motion switches immediately. Progress is published only for completed turns, and navigation/reflow cancels an unfinished preview. Native long-press/mouse selection and vertical scrolling inside oversized pages remain available. Viewport snapshots are captured once per turn (an additional destination snapshot for spreads), capped at 2× pixel ratio; animation frames repaint cached images rather than rebuilding text.
 
@@ -35,7 +37,7 @@ Horizontal turns follow touch/stylus drags and settle or roll back on release. E
 
 `EpubLocation` serializes an application-specific JSON locator. Despite its historical `EpubCfi` class name, it is not a standard EPUB CFI string. New renderer positions include `v:2` and an exact parsed-content UTF-16 offset. Legacy JSON remains readable; `hasExactCharOffset` must be explicit when constructing an exact offset programmatically.
 
-The renderer captures the current logical text position before layout invalidation. A page number or previous pixel offset is not the primary reflow anchor. Selection ranges use start-inclusive/end-exclusive text offsets.
+The renderer captures the current logical text position before layout invalidation. Remounted lists/pages initialize at the measured target before their first paint, rather than showing chapter zero and scrolling afterwards; temporary layout positions are not published as reading progress. A page number or previous pixel offset is not the primary reflow anchor. Selection ranges use start-inclusive/end-exclusive text offsets.
 
 Restoring previously omitted images or correcting generated list markers changes offsets after those elements. Existing exact positions/highlights from the incomplete rendering may shift; their locator does not contain the old parsing revision or source quotation needed for unambiguous migration.
 

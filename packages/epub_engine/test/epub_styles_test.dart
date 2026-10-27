@@ -103,7 +103,7 @@ void main() {
     ''');
       final resolver = _resolver(document, baseStyle);
       final style = _styleFor(resolver, document.querySelector('#target')!);
-      expect(style.textStyle.fontSize, 31);
+      expect(style.textStyle.fontSize, 31 * 20 / 16);
       expect(style.textStyle.fontWeight, FontWeight.normal);
     },
   );
@@ -122,7 +122,7 @@ void main() {
         _resolver(document, baseStyle),
         document.querySelector('p')!,
       );
-      expect(style.textStyle.fontSize, 24);
+      expect(style.textStyle.fontSize, 24 * 20 / 16);
       expect(style.textStyle.fontWeight, FontWeight.normal);
     },
   );
@@ -146,10 +146,10 @@ void main() {
         },
       );
       final sheet = _styleFor(resolver, document.querySelector('#sheet')!);
-      expect(sheet.textStyle.fontSize, 27);
+      expect(sheet.textStyle.fontSize, 27 * 20 / 16);
       expect(sheet.textStyle.fontStyle, FontStyle.italic);
       final inline = _styleFor(resolver, document.querySelector('#inline')!);
-      expect(inline.textStyle.fontSize, 29);
+      expect(inline.textStyle.fontSize, 29 * 20 / 16);
       expect(inline.textStyle.fontStyle, FontStyle.normal);
     },
   );
@@ -178,7 +178,7 @@ void main() {
       },
     );
     final style = _styleFor(resolver, document.querySelector('p')!);
-    expect(style.textStyle.fontSize, 25);
+    expect(style.textStyle.fontSize, 25 * 20 / 16);
     expect(style.textStyle.fontWeight, FontWeight.bold);
     expect(style.textStyle.fontStyle, FontStyle.italic);
   });
@@ -203,7 +203,7 @@ void main() {
       );
       expect(
         _styleFor(resolver, document.querySelector('p')!).textStyle.fontSize,
-        28,
+        28 * 20 / 16,
       );
     },
   );
@@ -224,14 +224,14 @@ void main() {
         resolver,
         document.querySelector('#direct')!,
       ).textStyle.fontSize,
-      30,
+      30 * 20 / 16,
     );
     expect(
       _styleFor(
         resolver,
         document.querySelector('#nested')!,
       ).textStyle.fontSize,
-      22,
+      22 * 20 / 16,
     );
   });
 
@@ -319,10 +319,10 @@ void main() {
       expect(nested.textStyle.fontSize, 20);
       expect(nested.textStyle.color, const Color(0xFFFF0000));
       final author = _styleFor(resolver, document.querySelector('#author')!);
-      expect(author.textStyle.fontSize, 25);
+      expect(author.textStyle.fontSize, 25 * 20 / 16);
       expect(author.textStyle.color, const Color(0xFF0000FF));
       final inline = _styleFor(resolver, document.querySelector('#inline')!);
-      expect(inline.textStyle.fontSize, 18);
+      expect(inline.textStyle.fontSize, 18 * 20 / 16);
       expect(inline.textStyle.color, const Color(0xFF112233));
     },
   );
@@ -350,7 +350,7 @@ void main() {
   );
 
   test(
-    'relative sizes use parent and root sizes, and absolute line height inherits',
+    'relative sizes retain hierarchy while reader spacing overrides author height',
     () {
       final document = html_parser.parse('''
       <style>
@@ -366,11 +366,11 @@ void main() {
         resolver,
         document.querySelector('#paragraph')!,
       );
-      expect(paragraph.textStyle.fontSize, 25);
-      expect(paragraph.textStyle.height, 60 / 25);
+      expect(paragraph.textStyle.fontSize, 25 * 20 / 16);
+      expect(paragraph.textStyle.height, baseStyle.height);
       final small = _styleFor(resolver, document.querySelector('#small')!);
-      expect(small.textStyle.fontSize, 20);
-      expect(small.textStyle.height, 2);
+      expect(small.textStyle.fontSize, 20 * 20 / 16);
+      expect(small.textStyle.height, baseStyle.height);
     },
   );
 
@@ -399,7 +399,7 @@ void main() {
         },
       );
       final style = _styleFor(resolver, document.querySelector('p')!);
-      expect(style.textStyle.fontSize, 23);
+      expect(style.textStyle.fontSize, 23 * 20 / 16);
       expect(style.textStyle.fontStyle, FontStyle.italic);
     },
   );
@@ -418,7 +418,7 @@ void main() {
         _resolver(document, baseStyle),
         document.querySelector('p')!,
       );
-      expect(style.textStyle.fontSize, 24);
+      expect(style.textStyle.fontSize, 24 * 20 / 16);
       expect(style.textAlign, TextAlign.center);
       expect(
         style.textStyle.decoration,
@@ -469,6 +469,53 @@ void main() {
       FontWeight.w700,
     );
   });
+
+  test(
+    'reader typography scales absolute CSS and preserves relative hierarchy',
+    () {
+      final document = html_parser.parse('''
+      <style>
+        body { font-size: 12pt; font-family: publisher; line-height: 18px !important; }
+        h1 { font-size: 24pt; line-height: normal; }
+        p { font-size: 16px; line-height: .8 !important; }
+        .note { font-size: 75%; line-height: 200%; }
+        .root { font-size: .5rem; line-height: inherit; }
+      </style>
+      <h1 id="title">Heading</h1>
+      <p id="body">Text <em id="emphasis">emphasis</em>
+        <span id="note" class="note">note</span>
+        <span id="root" class="root">root</span>
+      </p>
+    ''');
+      for (final size in [16.0, 24.0, 32.0]) {
+        for (final height in [1.1, 1.9]) {
+          final resolver = _resolver(
+            document,
+            TextStyle(
+              fontSize: size,
+              height: height,
+              fontFamily: 'Reader choice',
+            ),
+          );
+          for (final entry in {
+            'title': 2.0,
+            'body': 1.0,
+            'emphasis': 1.0,
+            'note': .75,
+            'root': .5,
+          }.entries) {
+            final style = _styleFor(
+              resolver,
+              document.querySelector('#${entry.key}')!,
+            ).textStyle;
+            expect(style.fontSize, size * entry.value);
+            expect(style.height, height);
+            expect(style.fontFamily, 'Reader choice');
+          }
+        }
+      }
+    },
+  );
 }
 
 EpubStyleResolver _resolver(

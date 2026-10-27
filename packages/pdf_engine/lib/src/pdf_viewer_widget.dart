@@ -54,6 +54,8 @@ class _PdfViewerWidgetState extends State<PdfViewerWidget> {
   bool _multiTap = false;
   Timer? _pendingTap;
   int _tapGeneration = 0;
+  Offset? _trackpadDocumentFocalPoint;
+  double _trackpadStartZoom = 1;
 
   @override
   void initState() {
@@ -76,6 +78,7 @@ class _PdfViewerWidgetState extends State<PdfViewerWidget> {
     _cancelObservedTap();
     _selectionDelegate.resetEdges();
     _pressedPointers.clear();
+    _trackpadDocumentFocalPoint = null;
     _controller = widget.controller ?? PdfViewerController();
     _viewerIdentity = Object();
     _totalPages = 0;
@@ -281,6 +284,42 @@ class _PdfViewerWidgetState extends State<PdfViewerWidget> {
     _cancelObservedTap();
   }
 
+  void _onTrackpadStart(ScaleStartDetails details) {
+    _cancelObservedTap();
+    _trackpadDocumentFocalPoint = _controller.isReady
+        ? _controller.globalToDocument(details.focalPoint)
+        : null;
+    if (_trackpadDocumentFocalPoint != null) {
+      _trackpadStartZoom = _controller.currentZoom;
+    }
+  }
+
+  void _onTrackpadUpdate(ScaleUpdateDetails details) {
+    final reference = _trackpadDocumentFocalPoint;
+    if (reference == null || !_controller.isReady) return;
+    final focalPoint = _controller.globalToLocal(details.focalPoint);
+    if (focalPoint == null) return;
+    final zoom = (_trackpadStartZoom * details.scale).clamp(
+      _controller.minScale,
+      _controller.params.maxScale,
+    );
+    _controller.value = _controller.calcMatrixFor(
+      reference +
+          (_controller.viewSize.center(Offset.zero) - focalPoint) / zoom,
+      zoom: zoom,
+    );
+  }
+
+  void _onMarginPointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent || !_controller.isReady) return;
+    final point = _controller.globalToLocal(event.position);
+    if (point == null || (Offset.zero & _controller.viewSize).contains(point)) {
+      return;
+    }
+    _cancelObservedTap();
+    _controller.handlePointerSignalEvent(event);
+  }
+
   @override
   void dispose() {
     _cancelObservedTap();
@@ -306,6 +345,32 @@ class _PdfViewerWidgetState extends State<PdfViewerWidget> {
 
   @override
   Widget build(BuildContext context) {
+    // Selectable PDF text can hit-test above pdfrx's own scale recognizer.
+    // A trackpad-only recognizer covers that path without competing with
+    // mouse/touch text selection. Native pdfrx wins where it is hit directly.
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      supportedDevices: const {PointerDeviceKind.trackpad},
+      onScaleStart: _onTrackpadStart,
+      onScaleUpdate: _onTrackpadUpdate,
+      onScaleEnd: (_) => _trackpadDocumentFocalPoint = null,
+      child: Listener(
+        behavior: HitTestBehavior.opaque,
+        onPointerSignal: _onMarginPointerSignal,
+        child: ColoredBox(
+          color: widget.backgroundColor,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 800),
+              child: _buildPdfViewer(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPdfViewer() {
     return PdfViewer(
       _documentRef,
       // pdfrx itself retains the first controller. A different book/controller

@@ -4,6 +4,12 @@ Native `pdfrx` PDF viewer integration for Lira.
 
 `PdfViewerWidget` owns a stable document reference and keeps its controller attached across progress, settings and highlight rebuilds. A new document/controller gets a new viewer identity.
 
+## Layout and input
+
+The reading viewport is centered and capped at 800 logical pixels. Narrower windows use their available width; larger windows add background margins rather than enlarging the page automatically. Explicit zoom and panning remain available, and the same viewer/controller/document survive layout changes.
+
+A trackpad-only scale recognizer handles pan/pinch when selectable text intercepts the hit test above pdfrx's interactive viewer. Mouse/touch selection retains its native recognizers. Wheel events over the outer background margins are forwarded to the viewer; events inside its bounds remain on the native path to avoid duplicate scrolling.
+
 ## Selection and navigation
 
 - Native text selection emits the selected text and an encoded `PdfReaderLocation`.

@@ -317,10 +317,11 @@ class EpubParser {
       final navPath = navItem.archivePath;
       if (fileByPath.containsKey(navPath)) {
         try {
-          return _parseNavDocument(
+          final toc = _parseNavDocument(
             _decodeTextFile(fileByPath[navPath]!),
             navItem.resolvedPath,
           );
+          if (toc.any(_hasTocDestination)) return toc;
         } catch (_) {}
       }
     }
@@ -345,6 +346,9 @@ class EpubParser {
 
     return const [];
   }
+
+  static bool _hasTocDestination(TOCItem item) =>
+      item.fileName.isNotEmpty || item.subItems.any(_hasTocDestination);
 
   static List<TOCItem> _parseNavDocument(String document, String navPath) {
     final xml = XmlDocument.parse(document);
@@ -594,7 +598,9 @@ class EpubParser {
     if (resolvedPath == null) return '';
     if (fragment != null) {
       try {
-        fragment = Uri.decodeComponent(fragment);
+        // Normalize raw Unicode and mixed escaped/unescaped fragments before
+        // decoding: decodeComponent only accepts ASCII URI-encoded input.
+        fragment = Uri.decodeComponent(Uri.parse('#$fragment').fragment);
       } on FormatException {
         // Preserve a literal percent sign in legacy fragment identifiers.
       }
