@@ -931,6 +931,168 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'“{title}” added to your library'**
   String bookDownloaded(String title);
+
+  /// No description provided for @updateSection.
+  ///
+  /// In en, this message translates to:
+  /// **'App updates'**
+  String get updateSection;
+
+  /// No description provided for @updateSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Official releases on GitHub'**
+  String get updateSource;
+
+  /// No description provided for @updateCheckAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for updates'**
+  String get updateCheckAction;
+
+  /// No description provided for @updateCheckHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Check whether a newer version of Lira is available.'**
+  String get updateCheckHint;
+
+  /// No description provided for @updateChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking for updates…'**
+  String get updateChecking;
+
+  /// No description provided for @updateUpToDate.
+  ///
+  /// In en, this message translates to:
+  /// **'You have the latest version.'**
+  String get updateUpToDate;
+
+  /// No description provided for @updateAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} is available'**
+  String updateAvailable(String version);
+
+  /// No description provided for @updateDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading: {percent} · {received} / {total} MB'**
+  String updateDownloading(String percent, String received, String total);
+
+  /// No description provided for @updateReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} is ready to install'**
+  String updateReady(String version);
+
+  /// No description provided for @updateOpeningInstaller.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening the system installer…'**
+  String get updateOpeningInstaller;
+
+  /// No description provided for @updateDownloadAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Download APK · {size} MB'**
+  String updateDownloadAction(String size);
+
+  /// No description provided for @updateInstallAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Install update'**
+  String get updateInstallAction;
+
+  /// No description provided for @updateInstallHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Android will ask you to confirm installation. Your library and settings will be kept.'**
+  String get updateInstallHint;
+
+  /// No description provided for @updateReleaseAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Open release on GitHub'**
+  String get updateReleaseAction;
+
+  /// No description provided for @updateExternalHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Download and install the version for your device from the release page.'**
+  String get updateExternalHint;
+
+  /// No description provided for @updateNoApk.
+  ///
+  /// In en, this message translates to:
+  /// **'This release has no verified APK available. Open the release page for installation options.'**
+  String get updateNoApk;
+
+  /// No description provided for @updateUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No published release is available yet.'**
+  String get updateUnavailable;
+
+  /// No description provided for @updateNetworkError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not check for updates. Check your connection and try again.'**
+  String get updateNetworkError;
+
+  /// No description provided for @updateRateLimited.
+  ///
+  /// In en, this message translates to:
+  /// **'GitHub\'s request limit has been reached. Try again later.'**
+  String get updateRateLimited;
+
+  /// No description provided for @updateInvalidRelease.
+  ///
+  /// In en, this message translates to:
+  /// **'The release information could not be verified.'**
+  String get updateInvalidRelease;
+
+  /// No description provided for @updateDownloadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not download the update. Try downloading it again.'**
+  String get updateDownloadError;
+
+  /// No description provided for @updateChecksumError.
+  ///
+  /// In en, this message translates to:
+  /// **'The downloaded APK failed verification. Download it again.'**
+  String get updateChecksumError;
+
+  /// No description provided for @updatePermissionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow Lira to install unknown apps in Android settings, then tap “Install update” again.'**
+  String get updatePermissionHint;
+
+  /// No description provided for @updateSignatureError.
+  ///
+  /// In en, this message translates to:
+  /// **'This APK was signed with a different key and cannot update the installed app.'**
+  String get updateSignatureError;
+
+  /// No description provided for @updateInvalidApk.
+  ///
+  /// In en, this message translates to:
+  /// **'This APK is not a compatible update for the installed version of Lira.'**
+  String get updateInvalidApk;
+
+  /// No description provided for @updateInstallError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the Android installer. Try again or open the release page.'**
+  String get updateInstallError;
+
+  /// No description provided for @updateReleaseError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the release page in your browser.'**
+  String get updateReleaseError;
 }
 
 class _AppLocalizationsDelegate

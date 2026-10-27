@@ -2,7 +2,7 @@ name: lira
 description: "Lira is your free feature-rich library"
 publish_to: 'none'
 
-version: 0.6.4+8
+version: 0.6.5+9
 
 environment:
   sdk: ^3.9.4
@@ -48,6 +48,8 @@ dependencies:
   zlibrary_api:
     path: packages/zlibrary_api
   package_info_plus: ^9.0.0
+  url_launcher: ^6.3.2
+  crypto: ^3.0.6
   socks5_proxy: ^2.1.1
 
 dev_dependencies:

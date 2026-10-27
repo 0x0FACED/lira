@@ -12,6 +12,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private var readerChromeChannel: MethodChannel? = null
+    private var updatesChannel: MethodChannel? = null
     private var readerChromeVisible: Boolean? = null
     private var originalSystemUiVisibility = 0
     private var originalBarsBehavior = 0
@@ -34,6 +35,20 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        AppUpdateInstaller.start(applicationContext)
+        updatesChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "dev.u0xfaced.lira/updates",
+        ).apply {
+            setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "getUpdateDirectory" -> AppUpdateInstaller.getUpdateDirectory(applicationContext, result)
+                    "cleanupUpdates" -> AppUpdateInstaller.cleanupUpdates(applicationContext, result)
+                    "installUpdate" -> AppUpdateInstaller.installUpdate(this@MainActivity, call, result)
+                    else -> result.notImplemented()
+                }
+            }
+        }
         readerChromeChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             "dev.u0xfaced.lira/reader_chrome",
@@ -138,6 +153,8 @@ class MainActivity : FlutterActivity() {
         restoreSystemBars()
         readerChromeChannel?.setMethodCallHandler(null)
         readerChromeChannel = null
+        updatesChannel?.setMethodCallHandler(null)
+        updatesChannel = null
         super.cleanUpFlutterEngine(flutterEngine)
     }
 }

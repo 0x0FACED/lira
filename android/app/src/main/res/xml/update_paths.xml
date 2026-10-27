@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- FileProvider has no no-backup path type. Resolve only this sibling of filesDir;
+         its canonical root is noBackupFilesDir/updates, never the whole app directory. -->
+    <files-path name="updates" path="../no_backup/updates/" />
+</paths>

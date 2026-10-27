@@ -460,4 +460,107 @@ class AppLocalizationsEn extends AppLocalizations {
   String bookDownloaded(String title) {
     return '“$title” added to your library';
   }
+
+  @override
+  String get updateSection => 'App updates';
+
+  @override
+  String get updateSource => 'Official releases on GitHub';
+
+  @override
+  String get updateCheckAction => 'Check for updates';
+
+  @override
+  String get updateCheckHint =>
+      'Check whether a newer version of Lira is available.';
+
+  @override
+  String get updateChecking => 'Checking for updates…';
+
+  @override
+  String get updateUpToDate => 'You have the latest version.';
+
+  @override
+  String updateAvailable(String version) {
+    return 'Version $version is available';
+  }
+
+  @override
+  String updateDownloading(String percent, String received, String total) {
+    return 'Downloading: $percent · $received / $total MB';
+  }
+
+  @override
+  String updateReady(String version) {
+    return 'Version $version is ready to install';
+  }
+
+  @override
+  String get updateOpeningInstaller => 'Opening the system installer…';
+
+  @override
+  String updateDownloadAction(String size) {
+    return 'Download APK · $size MB';
+  }
+
+  @override
+  String get updateInstallAction => 'Install update';
+
+  @override
+  String get updateInstallHint =>
+      'Android will ask you to confirm installation. Your library and settings will be kept.';
+
+  @override
+  String get updateReleaseAction => 'Open release on GitHub';
+
+  @override
+  String get updateExternalHint =>
+      'Download and install the version for your device from the release page.';
+
+  @override
+  String get updateNoApk =>
+      'This release has no verified APK available. Open the release page for installation options.';
+
+  @override
+  String get updateUnavailable => 'No published release is available yet.';
+
+  @override
+  String get updateNetworkError =>
+      'Could not check for updates. Check your connection and try again.';
+
+  @override
+  String get updateRateLimited =>
+      'GitHub\'s request limit has been reached. Try again later.';
+
+  @override
+  String get updateInvalidRelease =>
+      'The release information could not be verified.';
+
+  @override
+  String get updateDownloadError =>
+      'Could not download the update. Try downloading it again.';
+
+  @override
+  String get updateChecksumError =>
+      'The downloaded APK failed verification. Download it again.';
+
+  @override
+  String get updatePermissionHint =>
+      'Allow Lira to install unknown apps in Android settings, then tap “Install update” again.';
+
+  @override
+  String get updateSignatureError =>
+      'This APK was signed with a different key and cannot update the installed app.';
+
+  @override
+  String get updateInvalidApk =>
+      'This APK is not a compatible update for the installed version of Lira.';
+
+  @override
+  String get updateInstallError =>
+      'Could not open the Android installer. Try again or open the release page.';
+
+  @override
+  String get updateReleaseError =>
+      'Could not open the release page in your browser.';
 }

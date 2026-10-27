@@ -213,5 +213,48 @@
     "placeholders": {
       "title": {"type": "String"}
     }
-  }
+  },
+  "updateSection": "App updates",
+  "updateSource": "Official releases on GitHub",
+  "updateCheckAction": "Check for updates",
+  "updateCheckHint": "Check whether a newer version of Lira is available.",
+  "updateChecking": "Checking for updates…",
+  "updateUpToDate": "You have the latest version.",
+  "updateAvailable": "Version {version} is available",
+  "@updateAvailable": {
+    "placeholders": {"version": {"type": "String"}}
+  },
+  "updateDownloading": "Downloading: {percent} · {received} / {total} MB",
+  "@updateDownloading": {
+    "placeholders": {
+      "percent": {"type": "String"},
+      "received": {"type": "String"},
+      "total": {"type": "String"}
+    }
+  },
+  "updateReady": "Version {version} is ready to install",
+  "@updateReady": {
+    "placeholders": {"version": {"type": "String"}}
+  },
+  "updateOpeningInstaller": "Opening the system installer…",
+  "updateDownloadAction": "Download APK · {size} MB",
+  "@updateDownloadAction": {
+    "placeholders": {"size": {"type": "String"}}
+  },
+  "updateInstallAction": "Install update",
+  "updateInstallHint": "Android will ask you to confirm installation. Your library and settings will be kept.",
+  "updateReleaseAction": "Open release on GitHub",
+  "updateExternalHint": "Download and install the version for your device from the release page.",
+  "updateNoApk": "This release has no verified APK available. Open the release page for installation options.",
+  "updateUnavailable": "No published release is available yet.",
+  "updateNetworkError": "Could not check for updates. Check your connection and try again.",
+  "updateRateLimited": "GitHub's request limit has been reached. Try again later.",
+  "updateInvalidRelease": "The release information could not be verified.",
+  "updateDownloadError": "Could not download the update. Try downloading it again.",
+  "updateChecksumError": "The downloaded APK failed verification. Download it again.",
+  "updatePermissionHint": "Allow Lira to install unknown apps in Android settings, then tap “Install update” again.",
+  "updateSignatureError": "This APK was signed with a different key and cannot update the installed app.",
+  "updateInvalidApk": "This APK is not a compatible update for the installed version of Lira.",
+  "updateInstallError": "Could not open the Android installer. Try again or open the release page.",
+  "updateReleaseError": "Could not open the release page in your browser."
 }

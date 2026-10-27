@@ -64,6 +64,13 @@ Warm light and dark themes, layouts for phones and desktops, and English and Rus
 2. **Add a book.** Import an EPUB or PDF, or use the Search tab to find a title through a supported source.
 3. **Settle in.** Open the book, adjust your EPUB reading settings, and start reading. Your place is saved as you go.
 
+### Updating Lira
+
+Open **Settings → App updates** to check the latest stable GitHub release. Lira checks when you first open Settings; **Check for updates** checks again.
+
+- **Android:** download the APK in the app, then tap **Install update**. The download continues when you switch tabs. Lira verifies its size and SHA-256, and checks the APK's package, version, and signing key before opening Android's installer. If Android requests permission to install unknown apps, allow it for Lira and tap **Install update** again. Updating keeps your library and settings; an APK signed with a different key cannot update your installation.
+- **iOS, macOS, Windows, Linux:** **Open release on GitHub** opens the release page in your browser. Download and install the appropriate file there; the platform-specific signing requirements above still apply.
+
 ## A few things worth knowing
 
 <details>

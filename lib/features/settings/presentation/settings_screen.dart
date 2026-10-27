@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,13 +10,36 @@ import '../../../core/providers/preferences_provider.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../app_update/presentation/app_update_controller.dart';
+import '../../app_update/presentation/app_update_settings_section.dart';
 import '../../auth/domain/providers/auth_provider.dart';
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // The settings tab is also built while hidden in MainShell's IndexedStack.
+    if (TickerMode.valuesOf(context).enabled) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !TickerMode.valuesOf(context).enabled) return;
+        final controller = ref.read(appUpdateControllerProvider);
+        if (controller.status == AppUpdateStatus.idle &&
+            controller.failure == null) {
+          unawaited(controller.check());
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
@@ -209,6 +234,7 @@ class SettingsScreen extends ConsumerWidget {
                         ],
                       ),
                       _buildProxySection(context, ref),
+                      const AppUpdateSettingsSection(),
                       AppSection(
                         title: l10n.about,
                         children: [

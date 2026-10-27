@@ -213,5 +213,48 @@
     "placeholders": {
       "title": {"type": "String"}
     }
-  }
+  },
+  "updateSection": "Обновление приложения",
+  "updateSource": "Официальные релизы на GitHub",
+  "updateCheckAction": "Проверить обновления",
+  "updateCheckHint": "Проверьте, доступна ли новая версия Lira.",
+  "updateChecking": "Проверяем обновления…",
+  "updateUpToDate": "У вас последняя версия.",
+  "updateAvailable": "Доступна версия {version}",
+  "@updateAvailable": {
+    "placeholders": {"version": {"type": "String"}}
+  },
+  "updateDownloading": "Скачивание: {percent} · {received} / {total} МБ",
+  "@updateDownloading": {
+    "placeholders": {
+      "percent": {"type": "String"},
+      "received": {"type": "String"},
+      "total": {"type": "String"}
+    }
+  },
+  "updateReady": "Версия {version} готова к установке",
+  "@updateReady": {
+    "placeholders": {"version": {"type": "String"}}
+  },
+  "updateOpeningInstaller": "Открываем системный установщик…",
+  "updateDownloadAction": "Скачать APK · {size} МБ",
+  "@updateDownloadAction": {
+    "placeholders": {"size": {"type": "String"}}
+  },
+  "updateInstallAction": "Установить обновление",
+  "updateInstallHint": "Android попросит подтвердить установку. Библиотека и настройки сохранятся.",
+  "updateReleaseAction": "Открыть релиз на GitHub",
+  "updateExternalHint": "Скачайте и установите версию для своего устройства со страницы релиза.",
+  "updateNoApk": "В этом релизе нет APK с проверяемой контрольной суммой. Варианты установки — на странице релиза.",
+  "updateUnavailable": "Опубликованных релизов пока нет.",
+  "updateNetworkError": "Не удалось проверить обновления. Проверьте подключение и попробуйте ещё раз.",
+  "updateRateLimited": "Достигнут лимит запросов GitHub. Попробуйте позже.",
+  "updateInvalidRelease": "Не удалось проверить данные релиза.",
+  "updateDownloadError": "Не удалось скачать обновление. Попробуйте скачать его ещё раз.",
+  "updateChecksumError": "Скачанный APK не прошёл проверку. Скачайте его ещё раз.",
+  "updatePermissionHint": "Разрешите Lira установку из неизвестных источников в настройках Android, затем снова нажмите «Установить обновление».",
+  "updateSignatureError": "APK подписан другим ключом и не может обновить установленное приложение.",
+  "updateInvalidApk": "Этот APK не подходит для обновления установленной версии Lira.",
+  "updateInstallError": "Не удалось открыть установщик Android. Попробуйте ещё раз или откройте страницу релиза.",
+  "updateReleaseError": "Не удалось открыть страницу релиза в браузере."
 }

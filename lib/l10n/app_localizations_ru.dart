@@ -464,4 +464,105 @@ class AppLocalizationsRu extends AppLocalizations {
   String bookDownloaded(String title) {
     return '«$title» добавлена в библиотеку';
   }
+
+  @override
+  String get updateSection => 'Обновление приложения';
+
+  @override
+  String get updateSource => 'Официальные релизы на GitHub';
+
+  @override
+  String get updateCheckAction => 'Проверить обновления';
+
+  @override
+  String get updateCheckHint => 'Проверьте, доступна ли новая версия Lira.';
+
+  @override
+  String get updateChecking => 'Проверяем обновления…';
+
+  @override
+  String get updateUpToDate => 'У вас последняя версия.';
+
+  @override
+  String updateAvailable(String version) {
+    return 'Доступна версия $version';
+  }
+
+  @override
+  String updateDownloading(String percent, String received, String total) {
+    return 'Скачивание: $percent · $received / $total МБ';
+  }
+
+  @override
+  String updateReady(String version) {
+    return 'Версия $version готова к установке';
+  }
+
+  @override
+  String get updateOpeningInstaller => 'Открываем системный установщик…';
+
+  @override
+  String updateDownloadAction(String size) {
+    return 'Скачать APK · $size МБ';
+  }
+
+  @override
+  String get updateInstallAction => 'Установить обновление';
+
+  @override
+  String get updateInstallHint =>
+      'Android попросит подтвердить установку. Библиотека и настройки сохранятся.';
+
+  @override
+  String get updateReleaseAction => 'Открыть релиз на GitHub';
+
+  @override
+  String get updateExternalHint =>
+      'Скачайте и установите версию для своего устройства со страницы релиза.';
+
+  @override
+  String get updateNoApk =>
+      'В этом релизе нет APK с проверяемой контрольной суммой. Варианты установки — на странице релиза.';
+
+  @override
+  String get updateUnavailable => 'Опубликованных релизов пока нет.';
+
+  @override
+  String get updateNetworkError =>
+      'Не удалось проверить обновления. Проверьте подключение и попробуйте ещё раз.';
+
+  @override
+  String get updateRateLimited =>
+      'Достигнут лимит запросов GitHub. Попробуйте позже.';
+
+  @override
+  String get updateInvalidRelease => 'Не удалось проверить данные релиза.';
+
+  @override
+  String get updateDownloadError =>
+      'Не удалось скачать обновление. Попробуйте скачать его ещё раз.';
+
+  @override
+  String get updateChecksumError =>
+      'Скачанный APK не прошёл проверку. Скачайте его ещё раз.';
+
+  @override
+  String get updatePermissionHint =>
+      'Разрешите Lira установку из неизвестных источников в настройках Android, затем снова нажмите «Установить обновление».';
+
+  @override
+  String get updateSignatureError =>
+      'APK подписан другим ключом и не может обновить установленное приложение.';
+
+  @override
+  String get updateInvalidApk =>
+      'Этот APK не подходит для обновления установленной версии Lira.';
+
+  @override
+  String get updateInstallError =>
+      'Не удалось открыть установщик Android. Попробуйте ещё раз или откройте страницу релиза.';
+
+  @override
+  String get updateReleaseError =>
+      'Не удалось открыть страницу релиза в браузере.';
 }
