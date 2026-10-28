@@ -1093,6 +1093,264 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not open the release page in your browser.'**
   String get updateReleaseError;
+
+  /// No description provided for @discover.
+  ///
+  /// In en, this message translates to:
+  /// **'Discover'**
+  String get discover;
+
+  /// No description provided for @discoverSources.
+  ///
+  /// In en, this message translates to:
+  /// **'Sources'**
+  String get discoverSources;
+
+  /// No description provided for @discoverSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search books, articles and RFCs'**
+  String get discoverSearchHint;
+
+  /// No description provided for @discoverSourceSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search this source'**
+  String get discoverSourceSearchHint;
+
+  /// No description provided for @discoverSourcesSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Find a source by name or description'**
+  String get discoverSourcesSearchHint;
+
+  /// No description provided for @discoverBooks.
+  ///
+  /// In en, this message translates to:
+  /// **'Books'**
+  String get discoverBooks;
+
+  /// No description provided for @discoverArticles.
+  ///
+  /// In en, this message translates to:
+  /// **'Articles'**
+  String get discoverArticles;
+
+  /// No description provided for @discoverDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'RFC'**
+  String get discoverDocuments;
+
+  /// No description provided for @discoverSelectedOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected only'**
+  String get discoverSelectedOnly;
+
+  /// No description provided for @discoverSelectedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one {{count} selected source} other {{count} selected sources}}'**
+  String discoverSelectedCount(int count);
+
+  /// No description provided for @discoverSourcePosition.
+  ///
+  /// In en, this message translates to:
+  /// **'Position {position}'**
+  String discoverSourcePosition(int position);
+
+  /// No description provided for @discoverMoveUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Move source up'**
+  String get discoverMoveUp;
+
+  /// No description provided for @discoverMoveDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Move source down'**
+  String get discoverMoveDown;
+
+  /// No description provided for @discoverSavingSources.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving selection…'**
+  String get discoverSavingSources;
+
+  /// No description provided for @discoverSourcesSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Selection saved on this device'**
+  String get discoverSourcesSaved;
+
+  /// No description provided for @discoverSourcesSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save your source selection'**
+  String get discoverSourcesSaveError;
+
+  /// No description provided for @discoverNoSources.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose your sources'**
+  String get discoverNoSources;
+
+  /// No description provided for @discoverNoSourcesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable sources to see their publications and include them in search.'**
+  String get discoverNoSourcesHint;
+
+  /// No description provided for @discoverNoMatchingSources.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching sources'**
+  String get discoverNoMatchingSources;
+
+  /// No description provided for @discoverSearchOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to search'**
+  String get discoverSearchOnly;
+
+  /// No description provided for @discoverSearchOnlyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Your selected book catalogs are search-only. Search above to find EPUB and PDF books.'**
+  String get discoverSearchOnlyHint;
+
+  /// No description provided for @discoverSearchSourceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search this catalog by title, author or ISBN.'**
+  String get discoverSearchSourceHint;
+
+  /// No description provided for @discoverSearchPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'What would you like to read?'**
+  String get discoverSearchPrompt;
+
+  /// No description provided for @discoverSearchPromptHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search only your selected sources. Switch categories to see separate results.'**
+  String get discoverSearchPromptHint;
+
+  /// No description provided for @discoverNoMaterials.
+  ///
+  /// In en, this message translates to:
+  /// **'No publications found'**
+  String get discoverNoMaterials;
+
+  /// No description provided for @discoverFeedError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load publications'**
+  String get discoverFeedError;
+
+  /// No description provided for @discoverSearchError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not search this source'**
+  String get discoverSearchError;
+
+  /// No description provided for @discoverRecentOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Searches recent publications only'**
+  String get discoverRecentOnly;
+
+  /// No description provided for @discoverWholeCatalog.
+  ///
+  /// In en, this message translates to:
+  /// **'Searches the full RFC catalog'**
+  String get discoverWholeCatalog;
+
+  /// No description provided for @discoverCachedFeed.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing saved publications. Refresh to try again.'**
+  String get discoverCachedFeed;
+
+  /// No description provided for @discoverUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated {date}'**
+  String discoverUpdated(String date);
+
+  /// No description provided for @discoverRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh publications'**
+  String get discoverRefresh;
+
+  /// No description provided for @discoverRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Read in Lira'**
+  String get discoverRead;
+
+  /// No description provided for @discoverSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save to library'**
+  String get discoverSave;
+
+  /// No description provided for @discoverSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved in library'**
+  String get discoverSaved;
+
+  /// No description provided for @discoverSavedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'“{title}” saved to your library'**
+  String discoverSavedMessage(String title);
+
+  /// No description provided for @discoverPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing for reading…'**
+  String get discoverPreparing;
+
+  /// No description provided for @discoverPrepareError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not prepare this publication. Try again.'**
+  String get discoverPrepareError;
+
+  /// No description provided for @discoverSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save this publication. Try again.'**
+  String get discoverSaveError;
+
+  /// No description provided for @discoverOpenOriginal.
+  ///
+  /// In en, this message translates to:
+  /// **'Open original'**
+  String get discoverOpenOriginal;
+
+  /// No description provided for @discoverOpenOriginalError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the original in your browser.'**
+  String get discoverOpenOriginalError;
+
+  /// No description provided for @discoverMaterialDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Publication'**
+  String get discoverMaterialDetails;
+
+  /// No description provided for @discoverClearAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear selection'**
+  String get discoverClearAll;
 }
 
 class _AppLocalizationsDelegate

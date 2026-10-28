@@ -5,14 +5,11 @@ import 'dart:convert';
 
 const _keyThemeMode = 'pref_theme_mode';
 const _keyLocale = 'pref_locale';
-const _keySearchSource = 'pref_search_source';
 const _keyZLibCookies = 'pref_zlib_cookies';
 const _keyZLibEmail = 'pref_zlib_email';
 const _keyProxyEnabled = 'pref_proxy_enabled';
 const _keyProxyHost = 'pref_proxy_host';
 const _keyProxyPort = 'pref_proxy_port';
-
-enum SearchSource { anna, zlibrary, both }
 
 /// Theme mode provider
 final themeModeProvider = NotifierProvider<ThemeModeNotifier, ThemeMode>(
@@ -66,38 +63,6 @@ class LocaleNotifier extends Notifier<Locale> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyLocale, languageCode);
     state = Locale(languageCode);
-  }
-}
-
-/// Search source provider
-final searchSourceProvider =
-    NotifierProvider<SearchSourceNotifier, SearchSource>(
-      () => SearchSourceNotifier(),
-    );
-
-class SearchSourceNotifier extends Notifier<SearchSource> {
-  @override
-  SearchSource build() {
-    _load();
-    return SearchSource.anna; // Default to anna since it doesn't require login
-  }
-
-  Future<void> _load() async {
-    final prefs = await SharedPreferences.getInstance();
-    final val = prefs.getString(_keySearchSource);
-    if (val == 'zlibrary') {
-      state = SearchSource.zlibrary;
-    } else if (val == 'both') {
-      state = SearchSource.both;
-    } else {
-      state = SearchSource.anna;
-    }
-  }
-
-  Future<void> setSource(SearchSource source) async {
-    state = source;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keySearchSource, source.name);
   }
 }
 

@@ -24,6 +24,20 @@ abstract final class AppLayout {
   static const double desktopBreakpoint = 900;
   static const double bottomNavHeight = 72;
   static const double minTouchTarget = 48;
+  static const double bookCardMinWidthDesktop = 180;
+  static const double bookCardMinWidth = 148;
+  static const double bookCardMaxWidth = 240;
+  static const double bookCardAspectRatio = 0.40;
+  static const double discoverCardWidth = 272;
+  static const double discoverImageAspectRatio = 16 / 9;
+  static const double discoverDetailImageHeight = 280;
+  static const double discoverProgressSize = 20;
+  static const double discoverProgressStroke = 2;
+  static const int discoverShelfItemLimit = 12;
+  static const int discoverTitleLines = 3;
+  static const int discoverSummaryLines = 4;
+  static const double discoverMaxCardTextScale = 1.5;
+  static const double discoverSearchControlsFraction = 0.5;
 }
 
 abstract final class AppMotion {
@@ -31,6 +45,7 @@ abstract final class AppMotion {
   static const Duration normal = Duration(milliseconds: 220);
   static const Duration slow = Duration(milliseconds: 320);
   static const Curve curve = Curves.easeOutCubic;
+  static const Duration searchDebounce = Duration(milliseconds: 350);
 
   static Duration duration(BuildContext context, [Duration value = normal]) {
     return MediaQuery.maybeOf(context)?.disableAnimations == true

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../books/presentation/library_screen.dart';
-import '../../search/presentation/search_screen.dart';
+import '../../discover/presentation/discover_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
 
 class MainShell extends StatefulWidget {
@@ -16,7 +16,7 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell>
     with SingleTickerProviderStateMixin {
   int _currentIndex = 0;
-  final _screens = const [LibraryScreen(), SearchScreen(), SettingsScreen()];
+  final _screens = const [LibraryScreen(), DiscoverScreen(), SettingsScreen()];
   late final AnimationController _transition;
   late final Animation<double> _opacity;
   late final Animation<Offset> _position;
@@ -133,11 +133,11 @@ class _MainShellState extends State<MainShell>
                                   label: Text(l10n.library),
                                 ),
                                 NavigationRailDestination(
-                                  icon: const Icon(Icons.search_outlined),
+                                  icon: const Icon(Icons.explore_outlined),
                                   selectedIcon: const Icon(
-                                    Icons.search_rounded,
+                                    Icons.explore_rounded,
                                   ),
-                                  label: Text(l10n.search),
+                                  label: Text(l10n.discover),
                                 ),
                                 NavigationRailDestination(
                                   icon: const Icon(Icons.tune_outlined),
@@ -197,9 +197,9 @@ class _MainShellState extends State<MainShell>
                           label: l10n.library,
                         ),
                         NavigationDestination(
-                          icon: const Icon(Icons.search_outlined),
-                          selectedIcon: const Icon(Icons.search_rounded),
-                          label: l10n.search,
+                          icon: const Icon(Icons.explore_outlined),
+                          selectedIcon: const Icon(Icons.explore_rounded),
+                          label: l10n.discover,
                         ),
                         NavigationDestination(
                           icon: const Icon(Icons.tune_outlined),

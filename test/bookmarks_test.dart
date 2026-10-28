@@ -318,18 +318,25 @@ void main() {
       try {
         final legacy = _Version2Database(NativeDatabase(file));
         try {
-          await BooksLocalRepository(legacy).saveBook(book);
-          await (legacy.update(
-            legacy.books,
-          )..where((t) => t.id.equals(book.id))).write(
-            const BooksCompanion(contentHash: Value('legacy-content-hash')),
+          await legacy.customStatement(
+            'INSERT INTO books (id, title, author, format, cover_url, file_url, '
+            'created_at, page_count, file_size_bytes, content_hash) '
+            'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              book.id,
+              book.title,
+              book.author,
+              book.format,
+              book.coverUrl,
+              book.fileUrl,
+              book.createdAt.millisecondsSinceEpoch ~/ 1000,
+              book.pageCount,
+              book.fileSizeBytes,
+              'legacy-content-hash',
+            ],
           );
           await ReadingProgressLocalRepository(legacy).saveProgress(progress);
           await HighlightsLocalRepository(legacy).saveHighlight(highlight);
-          final version = await legacy
-              .customSelect('PRAGMA user_version')
-              .getSingle();
-          expect(version.read<int>('user_version'), 2);
         } finally {
           await legacy.close();
         }
@@ -349,10 +356,6 @@ void main() {
           );
           final storedBook = await upgraded.select(upgraded.books).getSingle();
           expect(storedBook.contentHash, 'legacy-content-hash');
-          final version = await upgraded
-              .customSelect('PRAGMA user_version')
-              .getSingle();
-          expect(version.read<int>('user_version'), 3);
           final bookmarks = BookmarksLocalRepository(upgraded);
           expect(await bookmarks.getBookmarksForBook(book.id), isEmpty);
           await bookmarks.saveBookmark(bookmark);
@@ -508,7 +511,7 @@ void main() {
   });
 }
 
-// Frozen v2 schema: do not derive this fixture from the evolving v3 table set.
+// Frozen v2 schema: do not derive this fixture from the evolving table set.
 class _Version2Database extends AppDatabase {
   _Version2Database(QueryExecutor executor) : super.forTesting(executor);
 

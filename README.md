@@ -32,7 +32,7 @@ A good reader should make it easier to stay with a book. Lira keeps your library
 - **Keep more than your place.** Bookmark a reading position, highlight a passage, add a thought, and jump back when you need it. Highlights and bookmarks have separate tabs. Close the book and return to where you left off.
 - **Make the page yours.** For EPUBs, adjust the font, text size, line spacing, margins, and reading background. Scroll vertically, turn pages horizontally, or use a two-page spread when there is room.
 - **Read both formats their own way.** EPUB text adapts to your page; PDFs keep their original layout. Both share the same library and reading tools.
-- **Follow your curiosity.** Search Anna's Archive and Z-Library, filter results, and download books without leaving the app. Source availability and access requirements vary.
+- **Find your next read.** Discover recent articles from Cloudflare and GitHub Engineering, browse new RFCs, or search Anna's Archive and Z-Library for books. Choose which sources appear and participate in search. Source availability and access requirements vary.
 
 Warm light and dark themes, layouts for phones and desktops, and English and Russian interfaces make Lira feel at home wherever you like to read.
 
@@ -61,8 +61,18 @@ Warm light and dark themes, layouts for phones and desktops, and English and Rus
 ## Your first chapter
 
 1. **Open Lira and continue as a guest.** You do not need a Lira account to read your own files.
-2. **Add a book.** Import an EPUB or PDF, or use the Search tab to find a title through a supported source.
+2. **Add a book.** Import an EPUB or PDF, or open **Discover** to search for a title through a supported source.
 3. **Settle in.** Open the book, adjust your EPUB reading settings, and start reading. Your place is saved as you go.
+
+### Discover books, articles and RFCs
+
+Open **Discover → Sources** to enable sources and arrange their order. The same selection controls the overview and global search. Sources are searchable by name or description, grouped by category, and can be filtered to selected entries. Turning a source off never removes saved materials.
+
+The overview shows horizontal shelves for Cloudflare, GitHub Engineering and the official RFC catalog. Tap anywhere on a source heading to open its publications and search only that source. Desktop shelves also support arrow buttons and keyboard navigation. Book catalogs remain search-only rather than displaying invented recommendations.
+
+Global search separates **Books**, **Articles** and **RFC**. Blog search covers the recent publications returned by their feeds, not the complete website archive. RFC search uses the official full index, including document numbers, titles, abstracts and authors. Previously loaded publication lists remain available when a refresh fails.
+
+Open a publication to **Read in Lira**, **Save to library** or **Open original**. Articles and RFCs are converted from their full publisher documents to local EPUBs with images, section navigation and technical content. Reading alone does not add an item to your library; explicitly saving keeps the same local copy, progress and annotations. Saved text is not silently replaced when the publisher updates a page. Interactive media link to their originals rather than running inside the reader.
 
 ### Updating Lira
 
@@ -90,7 +100,7 @@ Not currently. Your books, reading progress, highlights, notes, and bookmarks ar
 <details>
 <summary><strong>How does built-in book search work?</strong></summary>
 
-Lira connects to Anna's Archive and Z-Library. These are third-party services; availability depends on the source, your network, and any required credentials. Source and proxy settings are available in the app.
+Lira connects to Anna's Archive and Z-Library for books, supported blog feeds for recent articles, and the official RFC index for specifications. Availability depends on the source, your network, and any required credentials. Choose discovery/search sources in **Discover → Sources**; Z-Library credentials and proxy settings remain in Settings.
 
 Use only books and services you have the right to access and download.
 

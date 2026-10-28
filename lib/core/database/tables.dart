@@ -13,6 +13,7 @@ class Books extends Table {
   IntColumn get pageCount => integer().withDefault(const Constant(0))();
   IntColumn get fileSizeBytes => integer().withDefault(const Constant(0))();
   TextColumn get contentHash => text().nullable()();
+  BoolColumn get isSaved => boolean().withDefault(const Constant(true))();
 
   @override
   Set<Column> get primaryKey => {id};

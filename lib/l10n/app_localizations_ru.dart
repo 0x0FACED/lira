@@ -565,4 +565,158 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get updateReleaseError =>
       'Не удалось открыть страницу релиза в браузере.';
+
+  @override
+  String get discover => 'Подборка';
+
+  @override
+  String get discoverSources => 'Источники';
+
+  @override
+  String get discoverSearchHint => 'Поиск книг, статей и RFC';
+
+  @override
+  String get discoverSourceSearchHint => 'Поиск в этом источнике';
+
+  @override
+  String get discoverSourcesSearchHint => 'Название или описание источника';
+
+  @override
+  String get discoverBooks => 'Книги';
+
+  @override
+  String get discoverArticles => 'Статьи';
+
+  @override
+  String get discoverDocuments => 'RFC';
+
+  @override
+  String get discoverSelectedOnly => 'Только выбранные';
+
+  @override
+  String discoverSelectedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Выбрано $count источника',
+      many: 'Выбрано $count источников',
+      few: 'Выбрано $count источника',
+      one: 'Выбран $count источник',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String discoverSourcePosition(int position) {
+    return 'Позиция $position';
+  }
+
+  @override
+  String get discoverMoveUp => 'Переместить источник выше';
+
+  @override
+  String get discoverMoveDown => 'Переместить источник ниже';
+
+  @override
+  String get discoverSavingSources => 'Сохраняем выбор…';
+
+  @override
+  String get discoverSourcesSaved => 'Выбор сохранён на устройстве';
+
+  @override
+  String get discoverSourcesSaveError =>
+      'Не удалось сохранить выбор источников';
+
+  @override
+  String get discoverNoSources => 'Выберите источники';
+
+  @override
+  String get discoverNoSourcesHint =>
+      'Включите источники, чтобы видеть их публикации и искать в них.';
+
+  @override
+  String get discoverNoMatchingSources => 'Источники не найдены';
+
+  @override
+  String get discoverSearchOnly => 'Всё готово к поиску';
+
+  @override
+  String get discoverSearchOnlyHint =>
+      'Выбранные книжные каталоги доступны через поиск. Найдите книгу в EPUB или PDF в строке выше.';
+
+  @override
+  String get discoverSearchSourceHint =>
+      'Ищите в этом каталоге по названию, автору или ISBN.';
+
+  @override
+  String get discoverSearchPrompt => 'Что хотите почитать?';
+
+  @override
+  String get discoverSearchPromptHint =>
+      'Поиск идёт только по выбранным источникам. Переключайте категории, чтобы увидеть отдельные результаты.';
+
+  @override
+  String get discoverNoMaterials => 'Публикации не найдены';
+
+  @override
+  String get discoverFeedError => 'Не удалось загрузить публикации';
+
+  @override
+  String get discoverSearchError => 'Не удалось выполнить поиск в источнике';
+
+  @override
+  String get discoverRecentOnly => 'Поиск только среди недавних публикаций';
+
+  @override
+  String get discoverWholeCatalog => 'Поиск по всему каталогу RFC';
+
+  @override
+  String get discoverCachedFeed =>
+      'Показаны сохранённые публикации. Обновите, чтобы повторить загрузку.';
+
+  @override
+  String discoverUpdated(String date) {
+    return 'Обновлено $date';
+  }
+
+  @override
+  String get discoverRefresh => 'Обновить публикации';
+
+  @override
+  String get discoverRead => 'Читать в Lira';
+
+  @override
+  String get discoverSave => 'Сохранить в библиотеку';
+
+  @override
+  String get discoverSaved => 'Сохранено в библиотеке';
+
+  @override
+  String discoverSavedMessage(String title) {
+    return '«$title» сохранено в библиотеку';
+  }
+
+  @override
+  String get discoverPreparing => 'Готовим к чтению…';
+
+  @override
+  String get discoverPrepareError =>
+      'Не удалось подготовить публикацию. Попробуйте ещё раз.';
+
+  @override
+  String get discoverSaveError =>
+      'Не удалось сохранить публикацию. Попробуйте ещё раз.';
+
+  @override
+  String get discoverOpenOriginal => 'Открыть оригинал';
+
+  @override
+  String get discoverOpenOriginalError =>
+      'Не удалось открыть оригинал в браузере.';
+
+  @override
+  String get discoverMaterialDetails => 'Публикация';
+
+  @override
+  String get discoverClearAll => 'Снять выбор';
 }

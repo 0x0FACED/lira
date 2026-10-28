@@ -563,4 +563,155 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get updateReleaseError =>
       'Could not open the release page in your browser.';
+
+  @override
+  String get discover => 'Discover';
+
+  @override
+  String get discoverSources => 'Sources';
+
+  @override
+  String get discoverSearchHint => 'Search books, articles and RFCs';
+
+  @override
+  String get discoverSourceSearchHint => 'Search this source';
+
+  @override
+  String get discoverSourcesSearchHint =>
+      'Find a source by name or description';
+
+  @override
+  String get discoverBooks => 'Books';
+
+  @override
+  String get discoverArticles => 'Articles';
+
+  @override
+  String get discoverDocuments => 'RFC';
+
+  @override
+  String get discoverSelectedOnly => 'Selected only';
+
+  @override
+  String discoverSelectedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count selected sources',
+      one: '$count selected source',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String discoverSourcePosition(int position) {
+    return 'Position $position';
+  }
+
+  @override
+  String get discoverMoveUp => 'Move source up';
+
+  @override
+  String get discoverMoveDown => 'Move source down';
+
+  @override
+  String get discoverSavingSources => 'Saving selection…';
+
+  @override
+  String get discoverSourcesSaved => 'Selection saved on this device';
+
+  @override
+  String get discoverSourcesSaveError => 'Could not save your source selection';
+
+  @override
+  String get discoverNoSources => 'Choose your sources';
+
+  @override
+  String get discoverNoSourcesHint =>
+      'Enable sources to see their publications and include them in search.';
+
+  @override
+  String get discoverNoMatchingSources => 'No matching sources';
+
+  @override
+  String get discoverSearchOnly => 'Ready to search';
+
+  @override
+  String get discoverSearchOnlyHint =>
+      'Your selected book catalogs are search-only. Search above to find EPUB and PDF books.';
+
+  @override
+  String get discoverSearchSourceHint =>
+      'Search this catalog by title, author or ISBN.';
+
+  @override
+  String get discoverSearchPrompt => 'What would you like to read?';
+
+  @override
+  String get discoverSearchPromptHint =>
+      'Search only your selected sources. Switch categories to see separate results.';
+
+  @override
+  String get discoverNoMaterials => 'No publications found';
+
+  @override
+  String get discoverFeedError => 'Could not load publications';
+
+  @override
+  String get discoverSearchError => 'Could not search this source';
+
+  @override
+  String get discoverRecentOnly => 'Searches recent publications only';
+
+  @override
+  String get discoverWholeCatalog => 'Searches the full RFC catalog';
+
+  @override
+  String get discoverCachedFeed =>
+      'Showing saved publications. Refresh to try again.';
+
+  @override
+  String discoverUpdated(String date) {
+    return 'Updated $date';
+  }
+
+  @override
+  String get discoverRefresh => 'Refresh publications';
+
+  @override
+  String get discoverRead => 'Read in Lira';
+
+  @override
+  String get discoverSave => 'Save to library';
+
+  @override
+  String get discoverSaved => 'Saved in library';
+
+  @override
+  String discoverSavedMessage(String title) {
+    return '“$title” saved to your library';
+  }
+
+  @override
+  String get discoverPreparing => 'Preparing for reading…';
+
+  @override
+  String get discoverPrepareError =>
+      'Could not prepare this publication. Try again.';
+
+  @override
+  String get discoverSaveError => 'Could not save this publication. Try again.';
+
+  @override
+  String get discoverOpenOriginal => 'Open original';
+
+  @override
+  String get discoverOpenOriginalError =>
+      'Could not open the original in your browser.';
+
+  @override
+  String get discoverMaterialDetails => 'Publication';
+
+  @override
+  String get discoverClearAll => 'Clear selection';
 }

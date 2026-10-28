@@ -256,5 +256,60 @@
   "updateSignatureError": "APK подписан другим ключом и не может обновить установленное приложение.",
   "updateInvalidApk": "Этот APK не подходит для обновления установленной версии Lira.",
   "updateInstallError": "Не удалось открыть установщик Android. Попробуйте ещё раз или откройте страницу релиза.",
-  "updateReleaseError": "Не удалось открыть страницу релиза в браузере."
+  "updateReleaseError": "Не удалось открыть страницу релиза в браузере.",
+  "discover": "Подборка",
+  "discoverSources": "Источники",
+  "discoverSearchHint": "Поиск книг, статей и RFC",
+  "discoverSourceSearchHint": "Поиск в этом источнике",
+  "discoverSourcesSearchHint": "Название или описание источника",
+  "discoverBooks": "Книги",
+  "discoverArticles": "Статьи",
+  "discoverDocuments": "RFC",
+  "discoverSelectedOnly": "Только выбранные",
+  "discoverSelectedCount": "{count, plural, one {Выбран {count} источник} few {Выбрано {count} источника} many {Выбрано {count} источников} other {Выбрано {count} источника}}",
+  "@discoverSelectedCount": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "discoverSourcePosition": "Позиция {position}",
+  "@discoverSourcePosition": {
+    "placeholders": {"position": {"type": "int"}}
+  },
+  "discoverMoveUp": "Переместить источник выше",
+  "discoverMoveDown": "Переместить источник ниже",
+  "discoverSavingSources": "Сохраняем выбор…",
+  "discoverSourcesSaved": "Выбор сохранён на устройстве",
+  "discoverSourcesSaveError": "Не удалось сохранить выбор источников",
+  "discoverNoSources": "Выберите источники",
+  "discoverNoSourcesHint": "Включите источники, чтобы видеть их публикации и искать в них.",
+  "discoverNoMatchingSources": "Источники не найдены",
+  "discoverSearchOnly": "Всё готово к поиску",
+  "discoverSearchOnlyHint": "Выбранные книжные каталоги доступны через поиск. Найдите книгу в EPUB или PDF в строке выше.",
+  "discoverSearchSourceHint": "Ищите в этом каталоге по названию, автору или ISBN.",
+  "discoverSearchPrompt": "Что хотите почитать?",
+  "discoverSearchPromptHint": "Поиск идёт только по выбранным источникам. Переключайте категории, чтобы увидеть отдельные результаты.",
+  "discoverNoMaterials": "Публикации не найдены",
+  "discoverFeedError": "Не удалось загрузить публикации",
+  "discoverSearchError": "Не удалось выполнить поиск в источнике",
+  "discoverRecentOnly": "Поиск только среди недавних публикаций",
+  "discoverWholeCatalog": "Поиск по всему каталогу RFC",
+  "discoverCachedFeed": "Показаны сохранённые публикации. Обновите, чтобы повторить загрузку.",
+  "discoverUpdated": "Обновлено {date}",
+  "@discoverUpdated": {
+    "placeholders": {"date": {"type": "String"}}
+  },
+  "discoverRefresh": "Обновить публикации",
+  "discoverRead": "Читать в Lira",
+  "discoverSave": "Сохранить в библиотеку",
+  "discoverSaved": "Сохранено в библиотеке",
+  "discoverSavedMessage": "«{title}» сохранено в библиотеку",
+  "@discoverSavedMessage": {
+    "placeholders": {"title": {"type": "String"}}
+  },
+  "discoverPreparing": "Готовим к чтению…",
+  "discoverPrepareError": "Не удалось подготовить публикацию. Попробуйте ещё раз.",
+  "discoverSaveError": "Не удалось сохранить публикацию. Попробуйте ещё раз.",
+  "discoverOpenOriginal": "Открыть оригинал",
+  "discoverOpenOriginalError": "Не удалось открыть оригинал в браузере.",
+  "discoverMaterialDetails": "Публикация",
+  "discoverClearAll": "Снять выбор"
 }

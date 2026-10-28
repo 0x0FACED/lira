@@ -256,5 +256,60 @@
   "updateSignatureError": "This APK was signed with a different key and cannot update the installed app.",
   "updateInvalidApk": "This APK is not a compatible update for the installed version of Lira.",
   "updateInstallError": "Could not open the Android installer. Try again or open the release page.",
-  "updateReleaseError": "Could not open the release page in your browser."
+  "updateReleaseError": "Could not open the release page in your browser.",
+  "discover": "Discover",
+  "discoverSources": "Sources",
+  "discoverSearchHint": "Search books, articles and RFCs",
+  "discoverSourceSearchHint": "Search this source",
+  "discoverSourcesSearchHint": "Find a source by name or description",
+  "discoverBooks": "Books",
+  "discoverArticles": "Articles",
+  "discoverDocuments": "RFC",
+  "discoverSelectedOnly": "Selected only",
+  "discoverSelectedCount": "{count, plural, one {{count} selected source} other {{count} selected sources}}",
+  "@discoverSelectedCount": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "discoverSourcePosition": "Position {position}",
+  "@discoverSourcePosition": {
+    "placeholders": {"position": {"type": "int"}}
+  },
+  "discoverMoveUp": "Move source up",
+  "discoverMoveDown": "Move source down",
+  "discoverSavingSources": "Saving selection…",
+  "discoverSourcesSaved": "Selection saved on this device",
+  "discoverSourcesSaveError": "Could not save your source selection",
+  "discoverNoSources": "Choose your sources",
+  "discoverNoSourcesHint": "Enable sources to see their publications and include them in search.",
+  "discoverNoMatchingSources": "No matching sources",
+  "discoverSearchOnly": "Ready to search",
+  "discoverSearchOnlyHint": "Your selected book catalogs are search-only. Search above to find EPUB and PDF books.",
+  "discoverSearchSourceHint": "Search this catalog by title, author or ISBN.",
+  "discoverSearchPrompt": "What would you like to read?",
+  "discoverSearchPromptHint": "Search only your selected sources. Switch categories to see separate results.",
+  "discoverNoMaterials": "No publications found",
+  "discoverFeedError": "Could not load publications",
+  "discoverSearchError": "Could not search this source",
+  "discoverRecentOnly": "Searches recent publications only",
+  "discoverWholeCatalog": "Searches the full RFC catalog",
+  "discoverCachedFeed": "Showing saved publications. Refresh to try again.",
+  "discoverUpdated": "Updated {date}",
+  "@discoverUpdated": {
+    "placeholders": {"date": {"type": "String"}}
+  },
+  "discoverRefresh": "Refresh publications",
+  "discoverRead": "Read in Lira",
+  "discoverSave": "Save to library",
+  "discoverSaved": "Saved in library",
+  "discoverSavedMessage": "“{title}” saved to your library",
+  "@discoverSavedMessage": {
+    "placeholders": {"title": {"type": "String"}}
+  },
+  "discoverPreparing": "Preparing for reading…",
+  "discoverPrepareError": "Could not prepare this publication. Try again.",
+  "discoverSaveError": "Could not save this publication. Try again.",
+  "discoverOpenOriginal": "Open original",
+  "discoverOpenOriginalError": "Could not open the original in your browser.",
+  "discoverMaterialDetails": "Publication",
+  "discoverClearAll": "Clear selection"
 }

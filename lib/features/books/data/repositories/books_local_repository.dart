@@ -9,7 +9,7 @@ class BooksLocalRepository {
 
   BooksLocalRepository(this._db);
 
-  Future<void> saveBook(BookDto book) async {
+  Future<void> saveBook(BookDto book, {bool isSaved = true}) async {
     await _db
         .into(_db.books)
         .insert(
@@ -23,6 +23,7 @@ class BooksLocalRepository {
             createdAt: book.createdAt,
             pageCount: Value(book.pageCount),
             fileSizeBytes: Value(book.fileSizeBytes),
+            isSaved: Value(isSaved),
           ),
           mode: InsertMode.replace,
         );
@@ -35,7 +36,9 @@ class BooksLocalRepository {
   }
 
   Future<List<BookDto>> getAllBooks() async {
-    final entries = await _db.select(_db.books).get();
+    final entries = await (_db.select(
+      _db.books,
+    )..where((book) => book.isSaved.equals(true))).get();
     return entries
         .map(
           (e) => BookDto(
@@ -69,6 +72,19 @@ class BooksLocalRepository {
       pageCount: entry.pageCount,
       fileSizeBytes: entry.fileSizeBytes,
     );
+  }
+
+  Future<void> markSaved(String id) async {
+    await (_db.update(_db.books)..where((book) => book.id.equals(id))).write(
+      const BooksCompanion(isSaved: Value(true)),
+    );
+  }
+
+  Future<bool> isSaved(String id) async {
+    final entry = await (_db.select(
+      _db.books,
+    )..where((book) => book.id.equals(id))).getSingleOrNull();
+    return entry?.isSaved ?? false;
   }
 
   Future<void> deleteBook(String id) async {
