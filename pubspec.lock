@@ -17,14 +17,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "10.0.1"
-  annas_archive_api:
-    dependency: "direct main"
-    description:
-      name: annas_archive_api
-      sha256: "04aec5a4e060c33dbb9ec973c4cfd127dd0c312f0cda8f240d598a0b70bbf3ca"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.1.0"
   ansicolor:
     dependency: transitive
     description:
@@ -57,22 +49,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.13.0"
-  beautiful_soup_dart:
-    dependency: transitive
-    description:
-      name: beautiful_soup_dart
-      sha256: "57e23946c85776dd9515a4e9a14263fff37dbedbd559bc4412bf565886e12b10"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.3.0"
-  book_scraper:
-    dependency: transitive
-    description:
-      name: book_scraper
-      sha256: ec9d4c8f06627487ab0e5cf1497750bb4d792fae7053e4742ee36d3687488806
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.0.8"
   boolean_selector:
     dependency: transitive
     description:
@@ -185,14 +161,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.19.1"
-  compute:
-    dependency: transitive
-    description:
-      name: compute
-      sha256: b70190d59352a267a9765a77b97d0f619874c84d30c5193ae71050ee22ab2ef7
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.0.2"
   convert:
     dependency: transitive
     description:
@@ -501,7 +469,7 @@ packages:
     source: hosted
     version: "0.15.6"
   http:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: http
       sha256: "87721a4a50b19c7f1d49001e51409bddc46303966ce89a65af4f4e6004896412"

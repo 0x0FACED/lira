@@ -1351,6 +1351,210 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Clear selection'**
   String get discoverClearAll;
+
+  /// No description provided for @zLibraryMirrors.
+  ///
+  /// In en, this message translates to:
+  /// **'Z-Library mirrors'**
+  String get zLibraryMirrors;
+
+  /// No description provided for @zLibraryMirrorsSettingsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Used for search, sign-in and downloads'**
+  String get zLibraryMirrorsSettingsHint;
+
+  /// No description provided for @zLibraryMirrorsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Mirrors are alternate addresses of the same catalog. Lira tries them in order when an address is unavailable; it does not send the same search to every mirror.'**
+  String get zLibraryMirrorsHint;
+
+  /// No description provided for @zLibraryMirrorsTrustWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Only add addresses you trust. Configured mirrors may receive your Z-Library session or sign-in credentials. Suggestions are never enabled without your review and Save.'**
+  String get zLibraryMirrorsTrustWarning;
+
+  /// No description provided for @zLibraryMirrorsField.
+  ///
+  /// In en, this message translates to:
+  /// **'Mirror addresses'**
+  String get zLibraryMirrorsField;
+
+  /// No description provided for @zLibraryMirrorsFieldHint.
+  ///
+  /// In en, this message translates to:
+  /// **'One HTTPS origin per line, in priority order. You can also paste a hostname without https://.'**
+  String get zLibraryMirrorsFieldHint;
+
+  /// No description provided for @zLibraryMirrorInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter at least one valid HTTPS origin. Paths, query parameters and embedded credentials are not allowed.'**
+  String get zLibraryMirrorInvalid;
+
+  /// No description provided for @zLibraryMirrorsSaving.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving…'**
+  String get zLibraryMirrorsSaving;
+
+  /// No description provided for @zLibraryMirrorsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Mirror list saved'**
+  String get zLibraryMirrorsSaved;
+
+  /// No description provided for @zLibraryMirrorsSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the mirror list. Your previous list is still active.'**
+  String get zLibraryMirrorsSaveError;
+
+  /// No description provided for @zLibraryMirrorsFind.
+  ///
+  /// In en, this message translates to:
+  /// **'Find mirrors'**
+  String get zLibraryMirrorsFind;
+
+  /// No description provided for @zLibraryMirrorsFinding.
+  ///
+  /// In en, this message translates to:
+  /// **'Finding mirrors…'**
+  String get zLibraryMirrorsFinding;
+
+  /// No description provided for @zLibraryMirrorsRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore known addresses'**
+  String get zLibraryMirrorsRestore;
+
+  /// No description provided for @zLibraryMirrorsFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Review mirror suggestions'**
+  String get zLibraryMirrorsFound;
+
+  /// No description provided for @zLibraryMirrorsReviewHint.
+  ///
+  /// In en, this message translates to:
+  /// **'These addresses came from Z-Library\'s access information. Review them before adding. Availability can differ across networks.'**
+  String get zLibraryMirrorsReviewHint;
+
+  /// No description provided for @zLibraryMirrorsAddSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Add selected'**
+  String get zLibraryMirrorsAddSelected;
+
+  /// No description provided for @zLibraryMirrorsReviewSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Addresses added to the editor. Press Save to use the new list.'**
+  String get zLibraryMirrorsReviewSave;
+
+  /// No description provided for @zLibraryMirrorDirectoryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggestions come from Z-Library\'s public access-information file, not an unverified third-party mirror directory.'**
+  String get zLibraryMirrorDirectoryHint;
+
+  /// No description provided for @zLibraryMirrorDirectoryOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open official access information'**
+  String get zLibraryMirrorDirectoryOpen;
+
+  /// No description provided for @zLibraryMirrorDirectoryError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not retrieve the official mirror list. The source may be unavailable or require browser verification. Open its access information or edit known addresses manually.'**
+  String get zLibraryMirrorDirectoryError;
+
+  /// No description provided for @zLibraryMirrorDirectoryOpenError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the access-information page.'**
+  String get zLibraryMirrorDirectoryOpenError;
+
+  /// No description provided for @annaSessionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Anna’s Archive access'**
+  String get annaSessionTitle;
+
+  /// No description provided for @annaSessionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Anna’s Archive may require browser verification before showing search results. After passing it legitimately, you can use that browser session here. A session is sent only to its selected official domain.'**
+  String get annaSessionHint;
+
+  /// No description provided for @annaSessionDomain.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified browser domain'**
+  String get annaSessionDomain;
+
+  /// No description provided for @annaSessionOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open search in browser'**
+  String get annaSessionOpen;
+
+  /// No description provided for @annaSessionConnectionWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'The browser and Lira must use the same connection or proxy exit IP and User-Agent. A session cleared without a proxy will not clear a blocked proxy. Expired verification must be completed again.'**
+  String get annaSessionConnectionWarning;
+
+  /// No description provided for @annaSessionInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'After verification, open browser developer tools → Network → a successful /search request → Request Headers. Copy its Cookie and User-Agent values below. Do not share these values with anyone. They are stored only on this device.'**
+  String get annaSessionInstructions;
+
+  /// No description provided for @annaSessionToggleCookies.
+  ///
+  /// In en, this message translates to:
+  /// **'Show or hide browser cookies'**
+  String get annaSessionToggleCookies;
+
+  /// No description provided for @annaSessionClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove session'**
+  String get annaSessionClear;
+
+  /// No description provided for @annaSessionSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Browser session saved'**
+  String get annaSessionSaved;
+
+  /// No description provided for @annaSessionCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Browser session removed'**
+  String get annaSessionCleared;
+
+  /// No description provided for @annaSessionInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an official domain and enter a valid Cookie header and matching User-Agent.'**
+  String get annaSessionInvalid;
+
+  /// No description provided for @annaSessionSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the browser session.'**
+  String get annaSessionSaveError;
+
+  /// No description provided for @annaSessionOpenError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open Anna’s Archive in the browser.'**
+  String get annaSessionOpenError;
 }
 
 class _AppLocalizationsDelegate

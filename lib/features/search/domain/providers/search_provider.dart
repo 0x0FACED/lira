@@ -1,11 +1,9 @@
-import 'package:annas_archive_api/annas_archive_api.dart' as anna;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:zlibrary_api/zlibrary_api.dart';
 
-import '../../../../core/providers/preferences_provider.dart';
 import '../../../discover/domain/discover_source.dart';
 import '../../../discover/domain/discover_sources_provider.dart';
 import '../models/search_result_item.dart';
+import 'book_source_clients.dart';
 
 typedef BookSearchQuery = ({String query, String? sourceId});
 
@@ -31,7 +29,6 @@ final bookSearchProvider = FutureProvider.autoDispose
                       source.id == request.sourceId && source.isBookSource,
                 )
                 .toList();
-      final credentials = ref.watch(zLibraryCredentialsProvider);
 
       final results = await Future.wait(
         sources.map((source) async {
@@ -39,19 +36,13 @@ final bookSearchProvider = FutureProvider.autoDispose
             final List<SearchResultItem> books;
             switch (source.kind) {
               case DiscoverSourceKind.anna:
-                final response = await anna.AnnaApi().find(
-                  anna.SearchRequest(
-                    query: query,
-                    formats: [anna.Format.epub, anna.Format.pdf],
-                  ),
-                );
-                books = response.books
-                    .map(SearchResultItem.fromAnnaBook)
-                    .toList();
+                books = await ref
+                    .watch(annaArchiveClientProvider)
+                    .search(query);
               case DiscoverSourceKind.zlibrary:
-                final response = await ZLibraryApi(
-                  cookies: credentials?.cookies,
-                ).search(query: query, extensions: ['epub', 'pdf']);
+                final response = await ref
+                    .watch(zLibraryApiProvider)
+                    .search(query: query, extensions: ['epub', 'pdf']);
                 books = response
                     .map(SearchResultItem.fromZLibraryBook)
                     .toList();

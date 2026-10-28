@@ -52,7 +52,7 @@ Warm light and dark themes, layouts for phones and desktops, and English and Rus
 | --- | --- | --- |
 | **Android** | [APK](https://github.com/0x0FACED/lira/releases/latest/download/app-release.apk) | Install the APK directly on your device. You may need to allow installation from your browser or file manager. |
 | **Windows** | [Windows ZIP](https://github.com/0x0FACED/lira/releases/latest/download/lira-windows.zip) | Extract the archive and launch the app. |
-| **macOS** | [macOS DMG](https://github.com/0x0FACED/lira/releases/latest/download/Lira.dmg) | The app is not Developer ID-signed or notarized. Gatekeeper may require you to allow it in Privacy & Security. |
+| **macOS** | [macOS DMG](https://github.com/0x0FACED/lira/releases/latest/download/Lira.dmg) | Requires macOS 11 or later. The app is not Developer ID-signed or notarized; Gatekeeper may require you to allow it in Privacy & Security. |
 | **Linux** | [Linux ZIP](https://github.com/0x0FACED/lira/releases/latest/download/lira-linux.zip) | Extract the archive and run `lira` on a GTK 3 desktop. |
 | **iOS** | [Unsigned IPA](https://github.com/0x0FACED/lira/releases/latest/download/lira-ios-unsigned.ipa) | Sign the IPA with AltStore, Sideloadly, or another signing tool before installation. It is not a TestFlight or App Store download. |
 
@@ -73,6 +73,18 @@ The overview shows horizontal shelves for Cloudflare, GitHub Engineering and the
 Global search separates **Books**, **Articles** and **RFC**. Blog search covers the recent publications returned by their feeds, not the complete website archive. RFC search uses the official full index, including document numbers, titles, abstracts and authors. Previously loaded publication lists remain available when a refresh fails.
 
 Open a publication to **Read in Lira**, **Save to library** or **Open original**. Articles and RFCs are converted from their full publisher documents to local EPUBs with images, section navigation and technical content. Reading alone does not add an item to your library; explicitly saving keeps the same local copy, progress and annotations. Saved text is not silently replaced when the publisher updates a page. Interactive media link to their originals rather than running inside the reader.
+
+### Book-source access and mirrors
+
+**Z-Library:** open **Settings → Z-Library → Z-Library mirrors**, or the mirror action on its source page. Edit one HTTPS origin per line, in priority order, then Save. Search, sign-in and downloads use that same approved list. Mirrors are alternate addresses of one catalog: Lira fails over to another address rather than merging duplicate searches from every mirror.
+
+**Find mirrors** reads [Z-Library's official access-information file](https://z-library.biz/access-info). Review the suggestions, add the addresses you trust, and Save before they become active. Remote suggestions never silently expand the domains allowed to receive your session. Availability and browser verification can differ between mirrors and networks.
+
+**Anna’s Archive:** the native client reads the current EPUB/PDF catalog and distinguishes a genuine empty result from a failed or challenged request. If the website requires verification, open **Settings → Anna’s Archive → Anna’s Archive access** or the access action on its source/error page. Complete the site's normal verification in a browser, then copy the Cookie and User-Agent values from a successful `/search` request into the local session editor.
+
+Browser clearance can be bound to the domain, exit IP and User-Agent. Use the same connection or proxy in the browser and Lira; a direct browser session does not clear a blocked SOCKS exit. Sessions stay scoped to their selected official origin and are not sent to other mirrors or download hosts. Lira never silently disables your proxy to make a session work. A source refusing the connection even in a browser still requires legitimate access from that connection.
+
+SOCKS5 settings in Lira are the explicit application-level routing policy; inherited `HTTP_PROXY`/`HTTPS_PROXY` variables are not layered inside that connection. Normal TLS certificate verification remains enabled.
 
 ### Updating Lira
 
@@ -132,8 +144,8 @@ flutter run
 
 Explore the implementation:
 
-- [Reader architecture and regression checks](READER.md)
-- [UI and design system](UI.md)
+- [Reader module architecture](lib/features/reader/README.md)
+- [UI theme](lib/core/theme/) and [shared components](lib/core/widgets/app_components.dart)
 - [Release and signing guide](RELEASE.md)
 - [Changelog](CHANGELOG.md)
 

@@ -719,4 +719,122 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get discoverClearAll => 'Снять выбор';
+
+  @override
+  String get zLibraryMirrors => 'Зеркала Z-Library';
+
+  @override
+  String get zLibraryMirrorsSettingsHint => 'Для поиска, входа и скачивания';
+
+  @override
+  String get zLibraryMirrorsHint =>
+      'Зеркала — запасные адреса одного каталога. Если адрес недоступен, Lira пробует следующий по списку, а не отправляет одинаковый поиск во все зеркала.';
+
+  @override
+  String get zLibraryMirrorsTrustWarning =>
+      'Добавляйте только доверенные адреса. Настроенные зеркала могут получать вашу сессию Z-Library или данные для входа. Найденные адреса не включаются без просмотра и сохранения.';
+
+  @override
+  String get zLibraryMirrorsField => 'Адреса зеркал';
+
+  @override
+  String get zLibraryMirrorsFieldHint =>
+      'По одному HTTPS-адресу в строке, в порядке приоритета. Можно вставить домен без https://.';
+
+  @override
+  String get zLibraryMirrorInvalid =>
+      'Нужен хотя бы один HTTPS-адрес без пути, параметров запроса и встроенных данных для входа.';
+
+  @override
+  String get zLibraryMirrorsSaving => 'Сохраняем…';
+
+  @override
+  String get zLibraryMirrorsSaved => 'Список зеркал сохранён';
+
+  @override
+  String get zLibraryMirrorsSaveError =>
+      'Не удалось сохранить зеркала. Продолжает действовать прежний список.';
+
+  @override
+  String get zLibraryMirrorsFind => 'Найти зеркала';
+
+  @override
+  String get zLibraryMirrorsFinding => 'Ищем зеркала…';
+
+  @override
+  String get zLibraryMirrorsRestore => 'Вернуть известные адреса';
+
+  @override
+  String get zLibraryMirrorsFound => 'Проверка найденных зеркал';
+
+  @override
+  String get zLibraryMirrorsReviewHint =>
+      'Адреса получены из справки о доступе Z-Library. Проверьте их перед добавлением: доступность зависит от сети.';
+
+  @override
+  String get zLibraryMirrorsAddSelected => 'Добавить выбранные';
+
+  @override
+  String get zLibraryMirrorsReviewSave =>
+      'Адреса добавлены в редактор. Нажмите «Сохранить», чтобы использовать новый список.';
+
+  @override
+  String get zLibraryMirrorDirectoryHint =>
+      'Список берётся из публичного файла Z-Library о доступе, а не из непроверенного стороннего каталога зеркал.';
+
+  @override
+  String get zLibraryMirrorDirectoryOpen =>
+      'Открыть официальную справку о доступе';
+
+  @override
+  String get zLibraryMirrorDirectoryError =>
+      'Не удалось получить официальный список. Источник может быть недоступен или требовать проверку в браузере. Откройте справку о доступе или отредактируйте известные адреса вручную.';
+
+  @override
+  String get zLibraryMirrorDirectoryOpenError =>
+      'Не удалось открыть справку о доступе.';
+
+  @override
+  String get annaSessionTitle => 'Доступ Anna’s Archive';
+
+  @override
+  String get annaSessionHint =>
+      'Anna’s Archive может требовать проверку браузера перед поиском. После обычного прохождения проверки можно использовать сессию браузера здесь. Она отправляется только на выбранный официальный домен.';
+
+  @override
+  String get annaSessionDomain => 'Домен проверенного браузера';
+
+  @override
+  String get annaSessionOpen => 'Открыть поиск в браузере';
+
+  @override
+  String get annaSessionConnectionWarning =>
+      'Браузер и Lira должны использовать одно соединение или выходной IP прокси и одинаковый User-Agent. Сессия без прокси не снимает блокировку прокси. Истёкшую проверку нужно пройти заново.';
+
+  @override
+  String get annaSessionInstructions =>
+      'После проверки откройте инструменты разработчика браузера → Network → успешный запрос /search → Request Headers. Скопируйте сюда значения Cookie и User-Agent. Не передавайте их другим людям. Они сохраняются только на этом устройстве.';
+
+  @override
+  String get annaSessionToggleCookies => 'Показать или скрыть Cookie браузера';
+
+  @override
+  String get annaSessionClear => 'Удалить сессию';
+
+  @override
+  String get annaSessionSaved => 'Сессия браузера сохранена';
+
+  @override
+  String get annaSessionCleared => 'Сессия браузера удалена';
+
+  @override
+  String get annaSessionInvalid =>
+      'Выберите официальный домен, укажите корректный заголовок Cookie и соответствующий User-Agent.';
+
+  @override
+  String get annaSessionSaveError => 'Не удалось сохранить сессию браузера.';
+
+  @override
+  String get annaSessionOpenError =>
+      'Не удалось открыть Anna’s Archive в браузере.';
 }

@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../search/presentation/zlibrary_mirrors_screen.dart';
+import '../../search/presentation/anna_access_screen.dart';
 import '../domain/discover_content_providers.dart';
 import '../domain/discover_source.dart';
 import 'discover_search_screen.dart';
@@ -75,6 +77,24 @@ class _DiscoverSourceScreenState extends ConsumerState<DiscoverSourceScreen> {
             ),
             leading: const BackButton(),
             actions: [
+              if (source.kind == DiscoverSourceKind.anna)
+                IconButton(
+                  tooltip: l10n.annaSessionTitle,
+                  onPressed: () => Navigator.of(context).push<void>(
+                    MaterialPageRoute(builder: (_) => const AnnaAccessScreen()),
+                  ),
+                  icon: const Icon(Icons.key_outlined),
+                ),
+              if (source.kind == DiscoverSourceKind.zlibrary)
+                IconButton(
+                  tooltip: l10n.zLibraryMirrors,
+                  onPressed: () => Navigator.of(context).push<void>(
+                    MaterialPageRoute(
+                      builder: (_) => const ZLibraryMirrorsScreen(),
+                    ),
+                  ),
+                  icon: const Icon(Icons.dns_outlined),
+                ),
               if (source.hasFeed)
                 IconButton(
                   tooltip: l10n.discoverRefresh,

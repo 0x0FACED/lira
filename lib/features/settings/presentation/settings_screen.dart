@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:zlibrary_api/zlibrary_api.dart';
 
 import '../../../core/providers/preferences_provider.dart';
 import '../../../core/theme/app_tokens.dart';
@@ -13,6 +12,9 @@ import '../../../l10n/app_localizations.dart';
 import '../../app_update/presentation/app_update_controller.dart';
 import '../../app_update/presentation/app_update_settings_section.dart';
 import '../../auth/domain/providers/auth_provider.dart';
+import '../../search/domain/providers/book_source_clients.dart';
+import '../../search/presentation/zlibrary_mirrors_screen.dart';
+import '../../search/presentation/anna_access_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -121,8 +123,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ],
                       ),
                       AppSection(
+                        title: 'Anna’s Archive',
+                        children: [
+                          ListTile(
+                            leading: const Icon(Icons.key_outlined),
+                            title: Text(l10n.annaSessionTitle),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => Navigator.of(context).push<void>(
+                              MaterialPageRoute(
+                                builder: (_) => const AnnaAccessScreen(),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      AppSection(
                         title: l10n.zLibrary,
                         children: [
+                          ListTile(
+                            leading: const Icon(Icons.dns_outlined),
+                            title: Text(l10n.zLibraryMirrors),
+                            subtitle: Text(l10n.zLibraryMirrorsSettingsHint),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => Navigator.of(context).push<void>(
+                              MaterialPageRoute(
+                                builder: (_) => const ZLibraryMirrorsScreen(),
+                              ),
+                            ),
+                          ),
                           ListTile(
                             leading: Icon(
                               Icons.library_books_outlined,
@@ -371,7 +399,7 @@ class _ZLibraryLoginDialogState extends ConsumerState<_ZLibraryLoginDialog> {
     });
 
     try {
-      final api = ZLibraryApi();
+      final api = ref.read(zLibraryApiProvider);
       await api.login(email, password);
       await credentials.saveCredentials(email, api.cookies);
       if (mounted) Navigator.pop(context);

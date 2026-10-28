@@ -1,10 +1,6 @@
-import 'package:annas_archive_api/annas_archive_api.dart' as anna;
 import 'package:zlibrary_api/zlibrary_api.dart';
 
-enum SearchResultSource {
-  anna,
-  zlibrary,
-}
+enum SearchResultSource { anna, zlibrary }
 
 class SearchResultItem {
   final String id;
@@ -26,19 +22,6 @@ class SearchResultItem {
     required this.source,
     required this.originalObject,
   });
-
-  factory SearchResultItem.fromAnnaBook(anna.Book book) {
-    return SearchResultItem(
-      id: book.md5,
-      title: book.title,
-      author: book.author,
-      format: book.format.extension,
-      size: book.size,
-      imgUrl: book.imgUrl,
-      source: SearchResultSource.anna,
-      originalObject: book,
-    );
-  }
 
   factory SearchResultItem.fromZLibraryBook(ZLibraryBook book) {
     return SearchResultItem(

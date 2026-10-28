@@ -5,8 +5,11 @@ import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../books/presentation/widgets/responsive_grid_delegate.dart';
+import '../../discover/domain/discover_source.dart';
 import '../domain/models/search_result_item.dart';
 import '../domain/providers/search_provider.dart';
+import 'anna_access_screen.dart';
+import 'zlibrary_mirrors_screen.dart';
 import 'widgets/search_book_card.dart';
 
 enum _FormatFilter { all, epub, pdf }
@@ -235,14 +238,46 @@ class _BookSearchResultsState extends ConsumerState<BookSearchResults> {
     AppLocalizations l10n,
     String message,
     BookSearchQuery request,
-  ) => AppEmptyState(
-    icon: Icons.cloud_off_outlined,
-    title: l10n.searchFailed,
-    description: message,
-    action: FilledButton.icon(
-      onPressed: () => ref.invalidate(bookSearchProvider(request)),
-      icon: const Icon(Icons.refresh_rounded),
-      label: Text(l10n.searchRetry),
+  ) => LayoutBuilder(
+    builder: (context, constraints) => SingleChildScrollView(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: constraints.maxHeight),
+        child: AppEmptyState(
+          icon: Icons.cloud_off_outlined,
+          title: l10n.searchFailed,
+          description: message,
+          action: Wrap(
+            alignment: WrapAlignment.center,
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              FilledButton.icon(
+                onPressed: () => ref.invalidate(bookSearchProvider(request)),
+                icon: const Icon(Icons.refresh_rounded),
+                label: Text(l10n.searchRetry),
+              ),
+              if (widget.sourceId == null ||
+                  widget.sourceId == DiscoverSourceIds.anna)
+                TextButton(
+                  onPressed: () => Navigator.of(context).push<void>(
+                    MaterialPageRoute(builder: (_) => const AnnaAccessScreen()),
+                  ),
+                  child: Text(l10n.annaSessionTitle),
+                ),
+              if (widget.sourceId == null ||
+                  widget.sourceId == DiscoverSourceIds.zlibrary)
+                TextButton(
+                  onPressed: () => Navigator.of(context).push<void>(
+                    MaterialPageRoute(
+                      builder: (_) => const ZLibraryMirrorsScreen(),
+                    ),
+                  ),
+                  child: Text(l10n.zLibraryMirrors),
+                ),
+            ],
+          ),
+        ),
+      ),
     ),
   );
 }

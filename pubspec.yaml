@@ -2,7 +2,7 @@ name: lira
 description: "Lira is your free feature-rich library"
 publish_to: 'none'
 
-version: 0.6.5+9
+version: 0.6.6+10
 
 environment:
   sdk: ^3.9.4
@@ -43,7 +43,7 @@ dependencies:
   file_selector_macos: ^0.9.5
   file_selector_windows: ^0.9.3+5
   shared_preferences: ^2.3.4
-  annas_archive_api: ^1.1.0
+  http: ^1.2.0
   scrollable_positioned_list: ^0.3.8
   zlibrary_api:
     path: packages/zlibrary_api

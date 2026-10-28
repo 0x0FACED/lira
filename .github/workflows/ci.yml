@@ -35,6 +35,14 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Get Z-Library test dependencies
+        working-directory: packages/zlibrary_api
+        run: dart pub get
+
+      - name: Run Z-Library protocol regression tests
+        working-directory: packages/zlibrary_api
+        run: dart test
+
       - name: Build native PDFium framework
         run: flutter build macos --debug --no-pub
 

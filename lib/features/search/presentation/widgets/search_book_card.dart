@@ -160,6 +160,7 @@ class SearchBookCard extends ConsumerWidget {
 
   Future<void> _handleDownload(BuildContext context, WidgetRef ref) async {
     final l10n = AppLocalizations.of(context)!;
+    final downloads = ref.read(downloadNotifierProvider.notifier);
     try {
       await ref
           .read(booksControllerProvider.notifier)
@@ -184,6 +185,8 @@ class SearchBookCard extends ConsumerWidget {
           backgroundColor: colors.error,
         ),
       );
+    } finally {
+      downloads.finish(book.id);
     }
   }
 }

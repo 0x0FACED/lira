@@ -17,23 +17,21 @@ void updateGlobalProxyConfig(Socks5Config config) {
 
 /// HttpOverrides that routes all traffic through SOCKS5 when enabled.
 class ProxyHttpOverrides extends HttpOverrides {
+  ProxyHttpOverrides({Socks5Config? config}) : _config = config;
+
+  final Socks5Config? _config;
+
   @override
   HttpClient createHttpClient(SecurityContext? context) {
     final client = super.createHttpClient(context);
-    // Accept self-signed certs (existing behaviour)
-    client.badCertificateCallback =
-        (X509Certificate cert, String host, int port) => true;
-
-    if (_currentConfig.enabled && _currentConfig.host.isNotEmpty) {
-      socks.SocksTCPClient.assignToHttpClientWithSecureOptions(
-        client,
-        [
-          socks.ProxySettings(
-            InternetAddress(_currentConfig.host),
-            _currentConfig.port,
-          ),
-        ],
-      );
+    // The app's explicit configuration is the only application-level proxy.
+    // An ambient HTTP proxy would add CONNECT inside the SOCKS connection.
+    client.findProxy = (_) => 'DIRECT';
+    final config = _config ?? _currentConfig;
+    if (config.enabled && config.host.isNotEmpty) {
+      socks.SocksTCPClient.assignToHttpClientWithSecureOptions(client, [
+        socks.ProxySettings(InternetAddress(config.host), config.port),
+      ]);
     }
 
     return client;
@@ -42,6 +40,6 @@ class ProxyHttpOverrides extends HttpOverrides {
 
 /// Creates a one-off HttpClient with current SOCKS5 settings applied.
 /// Use this when you need a fresh HttpClient (e.g. for Dio downloads).
-HttpClient createProxiedHttpClient() {
-  return ProxyHttpOverrides().createHttpClient(null);
+HttpClient createProxiedHttpClient({Socks5Config? config}) {
+  return ProxyHttpOverrides(config: config).createHttpClient(null);
 }

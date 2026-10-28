@@ -714,4 +714,122 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get discoverClearAll => 'Clear selection';
+
+  @override
+  String get zLibraryMirrors => 'Z-Library mirrors';
+
+  @override
+  String get zLibraryMirrorsSettingsHint =>
+      'Used for search, sign-in and downloads';
+
+  @override
+  String get zLibraryMirrorsHint =>
+      'Mirrors are alternate addresses of the same catalog. Lira tries them in order when an address is unavailable; it does not send the same search to every mirror.';
+
+  @override
+  String get zLibraryMirrorsTrustWarning =>
+      'Only add addresses you trust. Configured mirrors may receive your Z-Library session or sign-in credentials. Suggestions are never enabled without your review and Save.';
+
+  @override
+  String get zLibraryMirrorsField => 'Mirror addresses';
+
+  @override
+  String get zLibraryMirrorsFieldHint =>
+      'One HTTPS origin per line, in priority order. You can also paste a hostname without https://.';
+
+  @override
+  String get zLibraryMirrorInvalid =>
+      'Enter at least one valid HTTPS origin. Paths, query parameters and embedded credentials are not allowed.';
+
+  @override
+  String get zLibraryMirrorsSaving => 'Saving…';
+
+  @override
+  String get zLibraryMirrorsSaved => 'Mirror list saved';
+
+  @override
+  String get zLibraryMirrorsSaveError =>
+      'Could not save the mirror list. Your previous list is still active.';
+
+  @override
+  String get zLibraryMirrorsFind => 'Find mirrors';
+
+  @override
+  String get zLibraryMirrorsFinding => 'Finding mirrors…';
+
+  @override
+  String get zLibraryMirrorsRestore => 'Restore known addresses';
+
+  @override
+  String get zLibraryMirrorsFound => 'Review mirror suggestions';
+
+  @override
+  String get zLibraryMirrorsReviewHint =>
+      'These addresses came from Z-Library\'s access information. Review them before adding. Availability can differ across networks.';
+
+  @override
+  String get zLibraryMirrorsAddSelected => 'Add selected';
+
+  @override
+  String get zLibraryMirrorsReviewSave =>
+      'Addresses added to the editor. Press Save to use the new list.';
+
+  @override
+  String get zLibraryMirrorDirectoryHint =>
+      'Suggestions come from Z-Library\'s public access-information file, not an unverified third-party mirror directory.';
+
+  @override
+  String get zLibraryMirrorDirectoryOpen => 'Open official access information';
+
+  @override
+  String get zLibraryMirrorDirectoryError =>
+      'Could not retrieve the official mirror list. The source may be unavailable or require browser verification. Open its access information or edit known addresses manually.';
+
+  @override
+  String get zLibraryMirrorDirectoryOpenError =>
+      'Could not open the access-information page.';
+
+  @override
+  String get annaSessionTitle => 'Anna’s Archive access';
+
+  @override
+  String get annaSessionHint =>
+      'Anna’s Archive may require browser verification before showing search results. After passing it legitimately, you can use that browser session here. A session is sent only to its selected official domain.';
+
+  @override
+  String get annaSessionDomain => 'Verified browser domain';
+
+  @override
+  String get annaSessionOpen => 'Open search in browser';
+
+  @override
+  String get annaSessionConnectionWarning =>
+      'The browser and Lira must use the same connection or proxy exit IP and User-Agent. A session cleared without a proxy will not clear a blocked proxy. Expired verification must be completed again.';
+
+  @override
+  String get annaSessionInstructions =>
+      'After verification, open browser developer tools → Network → a successful /search request → Request Headers. Copy its Cookie and User-Agent values below. Do not share these values with anyone. They are stored only on this device.';
+
+  @override
+  String get annaSessionToggleCookies => 'Show or hide browser cookies';
+
+  @override
+  String get annaSessionClear => 'Remove session';
+
+  @override
+  String get annaSessionSaved => 'Browser session saved';
+
+  @override
+  String get annaSessionCleared => 'Browser session removed';
+
+  @override
+  String get annaSessionInvalid =>
+      'Choose an official domain and enter a valid Cookie header and matching User-Agent.';
+
+  @override
+  String get annaSessionSaveError => 'Could not save the browser session.';
+
+  @override
+  String get annaSessionOpenError =>
+      'Could not open Anna’s Archive in the browser.';
 }

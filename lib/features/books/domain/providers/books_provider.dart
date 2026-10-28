@@ -11,11 +11,13 @@ import 'package:uuid/uuid.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
-import 'package:annas_archive_api/annas_archive_api.dart' as anna;
+import 'package:dio/io.dart';
 import 'package:zlibrary_api/zlibrary_api.dart';
 
 import '../../../../core/di/injection.dart';
 import '../../../../core/providers/preferences_provider.dart';
+import '../../../../core/network/proxy_http_overrides.dart';
+import '../../../search/domain/providers/book_source_clients.dart';
 import '../../../search/domain/models/search_result_item.dart';
 import '../models/book_dto.dart';
 import '../../data/repositories/books_local_repository.dart';
@@ -31,11 +33,10 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
       'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 '
       '(KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36';
 
-  late final BooksLocalRepository _repository;
+  late final BooksLocalRepository _repository = getIt<BooksLocalRepository>();
 
   @override
   FutureOr<List<BookDto>> build() async {
-    _repository = getIt<BooksLocalRepository>();
     return _repository.getAllBooks();
   }
 
@@ -183,16 +184,15 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
 
     List<String> downloadLinks = [];
     ZLibraryApi? zLibApi;
-    String? zLibEmail;
     String? zLibReferer;
 
     if (book.source == SearchResultSource.anna) {
-      final annaApi = anna.AnnaApi();
-      downloadLinks = await annaApi.getDownloadLinks(book.id);
+      downloadLinks = await ref
+          .read(annaArchiveClientProvider)
+          .getDownloadLinks(book.id);
     } else if (book.source == SearchResultSource.zlibrary) {
-      final zLibCreds = ref.read(zLibraryCredentialsProvider);
-      zLibApi = ZLibraryApi(cookies: zLibCreds?.cookies);
-      zLibEmail = zLibCreds?.email;
+      final api = ref.read(zLibraryApiProvider);
+      zLibApi = api;
       final zBook = book.originalObject as ZLibraryBook;
       final candidateLinks = LinkedHashSet<String>();
 
@@ -201,7 +201,7 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
       }
 
       try {
-        final bookDetails = await zLibApi.fetchBookDetails(zBook);
+        final bookDetails = await api.fetchBookDetails(zBook);
         if (bookDetails.downloadUrl != null &&
             bookDetails.downloadUrl!.isNotEmpty) {
           candidateLinks.add(bookDetails.downloadUrl!);
@@ -246,55 +246,68 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
         headers: {'User-Agent': _desktopUserAgent},
       ),
     );
+    dio.httpClientAdapter = IOHttpClientAdapter(
+      createHttpClient: () =>
+          createProxiedHttpClient(config: ref.read(socks5ConfigProvider)),
+    );
 
     // Try links until one works
     bool success = false;
     for (final link in downloadLinks) {
       try {
-        String? zLibCookieHeader;
-        if (book.source == SearchResultSource.zlibrary && zLibApi != null) {
-          final resolvedCookies = await zLibApi.resolveDownloadCookies(link);
-          zLibCookieHeader = resolvedCookies.entries
-              .map((e) => '${e.key}=${e.value}')
-              .join('; ');
-
-          if (zLibEmail != null) {
-            unawaited(
-              ref
-                  .read(zLibraryCredentialsProvider.notifier)
-                  .saveCredentials(zLibEmail, resolvedCookies),
-            );
+        var target = Uri.parse(link);
+        final visited = <Uri>{};
+        for (var redirect = 0; redirect < 6; redirect++) {
+          if (!{'http', 'https'}.contains(target.scheme) ||
+              target.host.isEmpty ||
+              target.userInfo.isNotEmpty ||
+              !visited.add(target)) {
+            throw StateError('Invalid or looping book download redirect');
           }
+          final cookies = zLibApi == null
+              ? const <String, String>{}
+              : await zLibApi.resolveDownloadCookies(target.toString());
+          final cookieHeader = cookies.entries
+              .map((entry) => '${entry.key}=${entry.value}')
+              .join('; ');
+          final response = await dio.download(
+            target.toString(),
+            newFilePath,
+            options: Options(
+              headers: cookieHeader.isEmpty
+                  ? null
+                  : {
+                      'Cookie': cookieHeader,
+                      if (zLibReferer != null && zLibReferer.isNotEmpty)
+                        'Referer': zLibReferer,
+                    },
+              // Rebuild credentials for every destination instead of allowing
+              // Dio to forward a source session to an unrelated CDN.
+              followRedirects: false,
+              receiveDataWhenStatusError: false,
+              validateStatus: (status) =>
+                  status != null && status >= 200 && status < 400,
+            ),
+            cancelToken: cancelToken,
+            onReceiveProgress: (count, total) {
+              if (total > 0) {
+                ref
+                    .read(downloadNotifierProvider.notifier)
+                    .setProgress(book.id, count / total);
+              }
+            },
+          );
+          if (response.statusCode! >= 300) {
+            final location = response.headers.value('location');
+            if (location == null)
+              throw StateError('Book download redirect has no destination');
+            target = target.resolve(location);
+            continue;
+          }
+          success = true;
+          break;
         }
-
-        final options = Options(
-          headers: zLibCookieHeader != null && zLibCookieHeader.isNotEmpty
-              ? {
-                  'Cookie': zLibCookieHeader,
-                  if (zLibReferer != null && zLibReferer.isNotEmpty)
-                    'Referer': zLibReferer,
-                }
-              : null,
-          followRedirects: true,
-          receiveDataWhenStatusError: false,
-          validateStatus: (status) =>
-              status != null && status >= 200 && status < 400,
-        );
-        await dio.download(
-          link,
-          newFilePath,
-          options: options,
-          cancelToken: cancelToken,
-          onReceiveProgress: (count, total) {
-            if (total != -1) {
-              final progress = count / total;
-              ref
-                  .read(downloadNotifierProvider.notifier)
-                  .setProgress(book.id, progress);
-            }
-          },
-        );
-        success = true;
+        if (!success) throw StateError('Too many book download redirects');
         break; // Successfully downloaded
       } on DioException catch (e) {
         if (e.type == DioExceptionType.cancel) {
@@ -303,6 +316,7 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
           if (await partialFile.exists()) {
             await partialFile.delete();
           }
+          dio.close(force: true);
           throw Exception('download_cancelled');
         }
         // ignore: avoid_print
@@ -314,6 +328,7 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
         continue;
       }
     }
+    dio.close(force: true);
 
     ref.read(downloadNotifierProvider.notifier).finish(book.id);
 
