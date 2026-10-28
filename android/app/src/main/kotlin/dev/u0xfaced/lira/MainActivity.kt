@@ -7,12 +7,14 @@ import android.view.ViewTreeObserver
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterSurfaceView
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private var readerChromeChannel: MethodChannel? = null
     private var updatesChannel: MethodChannel? = null
+    private var flutterRefreshRate: FlutterRefreshRate? = null
     private var readerChromeVisible: Boolean? = null
     private var originalSystemUiVisibility = 0
     private var originalBarsBehavior = 0
@@ -31,6 +33,12 @@ class MainActivity : FlutterActivity() {
                 window.decorView.postDelayed(reapplyAfterKeyboard, 1100)
             }
         }
+    }
+
+    override fun onFlutterSurfaceViewCreated(flutterSurfaceView: FlutterSurfaceView) {
+        super.onFlutterSurfaceViewCreated(flutterSurfaceView)
+        flutterRefreshRate?.dispose()
+        flutterRefreshRate = FlutterRefreshRate(window, flutterSurfaceView)
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -141,15 +149,24 @@ class MainActivity : FlutterActivity() {
 
     override fun onPostResume() {
         super.onPostResume()
+        flutterRefreshRate?.setResumed(true)
         applyReaderSystemBars()
+    }
+
+    override fun onPause() {
+        flutterRefreshRate?.setResumed(false)
+        super.onPause()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
+        flutterRefreshRate?.setFocused(hasFocus)
         if (hasFocus) applyReaderSystemBars()
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        flutterRefreshRate?.dispose()
+        flutterRefreshRate = null
         restoreSystemBars()
         readerChromeChannel?.setMethodCallHandler(null)
         readerChromeChannel = null
