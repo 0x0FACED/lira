@@ -66,19 +66,32 @@ Warm light and dark themes, layouts for phones and desktops, and English and Rus
 
 ### Discover books, articles and RFCs
 
-Open **Discover → Sources** to enable sources and arrange their order. The same selection controls the overview and global search. Sources are searchable by name or description, grouped by category, and can be filtered to selected entries. Turning a source off never removes saved materials.
+Open **Discover → Sources** to enable sources and arrange their order. The same selection controls the overview and global search. Sources are searchable by name or description and can be filtered by **topic**, **content language** and **selected only**. These filters combine without changing your saved selection or order. New sources are opt-in: updating preserves existing choices, including an intentionally empty selection. Turning a source off never removes saved materials.
 
-The overview shows horizontal shelves for Cloudflare, GitHub Engineering and the official RFC catalog. Tap anywhere on a source heading to open its publications and search only that source. Desktop shelves also support arrow buttons and keyboard navigation. Book catalogs remain search-only rather than displaying invented recommendations.
+Alongside Cloudflare, GitHub Engineering and the official RFC catalog, Discover includes:
 
-Global search separates **Books**, **Articles** and **RFC**. Blog search covers the recent publications returned by their feeds, not the complete website archive. RFC search uses the official full index, including document numbers, titles, abstracts and authors. Previously loaded publication lists remain available when a refresh fails.
+| Source | Content language | Topics |
+| --- | --- | --- |
+| [Батрахоспермум](https://batrachospermum.ru/) | Russian | Biology, wildlife and unusual discoveries |
+| [Элементы](https://elementy.ru/) | Russian | Science, evolution, nature and space |
+| [Our World in Data](https://ourworldindata.org/) | English | Economics, health, population and the environment |
+| [JSTOR Daily](https://daily.jstor.org/) | English | History, culture and research |
+| [Aeon](https://aeon.co/) | English | Philosophy, psychology, science and culture |
+| [Mongabay](https://news.mongabay.com/) | English | Wildlife, biodiversity and conservation |
 
-Open a publication to **Read in Lira**, **Save to library** or **Open original**. Articles and RFCs are converted from their full publisher documents to local EPUBs with images, section navigation and technical content. Reading alone does not add an item to your library; explicitly saving keeps the same local copy, progress and annotations. Saved text is not silently replaced when the publisher updates a page. Interactive media link to their originals rather than running inside the reader.
+Enabled publication sources appear as horizontal shelves. Tap anywhere on a source heading to open its publications and search only that source. Desktop shelves also support arrow buttons and keyboard navigation. Book catalogs remain search-only rather than displaying invented recommendations.
+
+Global search separates **Books**, **Articles** and **RFC**. Article search covers the recent publications returned by each feed, not the complete website archive. RFC search uses the official full index, including document numbers, titles, abstracts and authors. Previously loaded publication lists remain available when a refresh fails.
+
+Open a publication to **Read in Lira**, **Save to library** or **Open original**. Articles and RFCs are converted from their full publisher documents to local EPUBs with images, captions, section navigation and source links; feed summaries are not substituted for the full text. Our World in Data charts use the publisher's static images, retaining chart selections and links to the interactive originals. Other interactive, audio and video embeds link to their originals rather than running inside the reader. Reading alone does not add an item to your library; explicitly saving keeps the same local copy, progress and annotations. Saved text is not silently replaced when the publisher updates a page.
 
 ### Book-source access and mirrors
 
 **Z-Library:** open **Settings → Z-Library → Z-Library mirrors**, or the mirror action on its source page. Edit one HTTPS origin per line, in priority order, then Save. Search, sign-in and downloads use that same approved list. Mirrors are alternate addresses of one catalog: Lira fails over to another address rather than merging duplicate searches from every mirror.
 
 **Find mirrors** reads [Z-Library's official access-information file](https://z-library.biz/access-info). Review the suggestions, add the addresses you trust, and Save before they become active. Remote suggestions never silently expand the domains allowed to receive your session. Availability and browser verification can differ between mirrors and networks.
+
+Z-Library downloads use the file-download action, not **Read Online**, and keep the same User-Agent as the catalog's browser-verified session. Lira opens the downloaded EPUB/PDF before adding it to the library; HTML pages and unreadable files are rejected, and another available download link is tried. EPUB covers come from the book's embedded image at its original resolution, while PDF covers are rendered from the first page. The catalog thumbnail is only a fallback when no local cover is available. Previously saved invalid downloads must be removed and downloaded again after updating.
 
 **Anna’s Archive:** the native client reads the current EPUB/PDF catalog and distinguishes a genuine empty result from a failed or challenged request. If the website requires verification, open **Settings → Anna’s Archive → Anna’s Archive access** or the access action on its source/error page. Complete the site's normal verification in a browser, then copy the Cookie and User-Agent values from a successful `/search` request into the local session editor.
 

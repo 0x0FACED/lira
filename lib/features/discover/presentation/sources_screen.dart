@@ -20,6 +20,8 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen> {
   final _searchController = TextEditingController();
   String _query = '';
   bool _selectedOnly = false;
+  DiscoverTopic? _topic;
+  DiscoverSourceLanguage? _language;
   bool _saving = false;
   bool _failed = false;
 
@@ -67,6 +69,8 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen> {
         .where(
           (source) =>
               (!_selectedOnly || selected.contains(source.id)) &&
+              (_topic == null || source.topics.contains(_topic)) &&
+              (_language == null || source.language == _language) &&
               (_query.isEmpty ||
                   source.name.toLowerCase().contains(_query) ||
                   source
@@ -124,6 +128,92 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen> {
                         hintText: l10n.discoverSourcesSearchHint,
                         onChanged: (value) =>
                             setState(() => _query = value.trim().toLowerCase()),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final twoColumns =
+                              constraints.maxWidth >=
+                              MediaQuery.textScalerOf(
+                                context,
+                              ).scale(AppLayout.formMaxWidth);
+                          final width = twoColumns
+                              ? (constraints.maxWidth - AppSpacing.sm) / 2
+                              : constraints.maxWidth;
+                          return Wrap(
+                            spacing: AppSpacing.sm,
+                            runSpacing: AppSpacing.compact,
+                            children: [
+                              SizedBox(
+                                width: width,
+                                child: DropdownButtonFormField<DiscoverTopic>(
+                                  key: const ValueKey('discover-topic-filter'),
+                                  initialValue: _topic,
+                                  isExpanded: true,
+                                  isDense: false,
+                                  itemHeight: null,
+                                  decoration: InputDecoration(
+                                    labelText: l10n.discoverTopic,
+                                  ),
+                                  items: [
+                                    DropdownMenuItem(
+                                      value: null,
+                                      child: Text(l10n.discoverAllTopics),
+                                    ),
+                                    for (final topic in DiscoverTopic.values)
+                                      DropdownMenuItem(
+                                        value: topic,
+                                        child: Text(
+                                          discoverTopicLabel(l10n, topic),
+                                        ),
+                                      ),
+                                  ],
+                                  onChanged: (value) =>
+                                      setState(() => _topic = value),
+                                ),
+                              ),
+                              SizedBox(
+                                width: width,
+                                child:
+                                    DropdownButtonFormField<
+                                      DiscoverSourceLanguage
+                                    >(
+                                      key: const ValueKey(
+                                        'discover-language-filter',
+                                      ),
+                                      initialValue: _language,
+                                      isExpanded: true,
+                                      isDense: false,
+                                      itemHeight: null,
+                                      decoration: InputDecoration(
+                                        labelText: l10n.discoverContentLanguage,
+                                      ),
+                                      items: [
+                                        DropdownMenuItem(
+                                          value: null,
+                                          child: Text(
+                                            l10n.discoverAllLanguages,
+                                          ),
+                                        ),
+                                        for (final language
+                                            in DiscoverSourceLanguage.values)
+                                          DropdownMenuItem(
+                                            value: language,
+                                            child: Text(
+                                              discoverSourceLanguageLabel(
+                                                l10n,
+                                                language,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                      onChanged: (value) =>
+                                          setState(() => _language = value),
+                                    ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                       const SizedBox(height: AppSpacing.sm),
                       Wrap(
@@ -247,6 +337,32 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen> {
                                             ),
                                             Text(
                                               source.description(languageCode),
+                                              style: theme.textTheme.bodySmall,
+                                            ),
+                                            const SizedBox(
+                                              height: AppSpacing.xs,
+                                            ),
+                                            Text(
+                                              l10n.discoverSourceTopics(
+                                                source.topics
+                                                    .map(
+                                                      (topic) =>
+                                                          discoverTopicLabel(
+                                                            l10n,
+                                                            topic,
+                                                          ),
+                                                    )
+                                                    .join(', '),
+                                              ),
+                                              style: theme.textTheme.bodySmall,
+                                            ),
+                                            Text(
+                                              l10n.discoverSourceContentLanguage(
+                                                discoverSourceLanguageLabel(
+                                                  l10n,
+                                                  source.language,
+                                                ),
+                                              ),
                                               style: theme.textTheme.bodySmall,
                                             ),
                                           ],

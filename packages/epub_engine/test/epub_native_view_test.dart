@@ -599,6 +599,69 @@ void main() {
     });
   }
 
+  for (final spread in [false, true]) {
+    testWidgets(
+      'short SVG packs between text on one ${spread ? 'spread' : 'single'} page',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(1200, 800);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPhysicalSize);
+        final size = Size(spread ? 1000 : 360, 600);
+        final book = _htmlBook(
+          '<p style="margin: 0">BEFORE SVG</p>'
+          '<img src="../images/wide.svg"/>'
+          '<p style="margin: 0">AFTER SVG</p>',
+          images: {
+            'OEBPS/images/wide.svg': Uint8List.fromList(
+              utf8.encode(
+                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 100">'
+                '<rect width="400" height="100" fill="red"/></svg>',
+              ),
+            ),
+          },
+        );
+        EpubLocation? latest;
+        await tester.pumpWidget(
+          _frame(
+            EpubNativeView(
+              epub: book,
+              settings: ReaderSettings(
+                readingMode: ReadingMode.horizontal,
+                enableDualPageSpread: spread,
+                horizontalPadding: 20,
+              ),
+              theme: ThemeData.dark(),
+              onLocationChanged: (location, _) => latest = location,
+            ),
+            size: size,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final before = tester.getRect(find.text('BEFORE SVG'));
+        final image = tester.getRect(find.byType(SvgPicture));
+        final after = tester.getRect(find.text('AFTER SVG'));
+        final pageWidth = spread ? size.width * .48 : size.width;
+        expect(before.width, closeTo(pageWidth - 40, .01));
+        expect(image.width, closeTo(before.width, .01));
+        expect(image.height, closeTo(image.width / 4, .01));
+        expect(image.left, closeTo(before.left, .01));
+        expect(after.left, closeTo(before.left, .01));
+        expect(after.right, closeTo(before.right, .01));
+        expect(before.top, greaterThanOrEqualTo(24));
+        expect(image.top, greaterThanOrEqualTo(before.bottom));
+        expect(after.top, greaterThanOrEqualTo(image.bottom));
+        expect(after.bottom, lessThanOrEqualTo(size.height - 24));
+        final offset = latest!.charOffset;
+        await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+        await tester.pumpAndSettle();
+        expect(latest!.charOffset, offset);
+        expect(find.text('BEFORE SVG'), findsOneWidget);
+        expect(find.text('AFTER SVG'), findsOneWidget);
+      },
+    );
+  }
+
   testWidgets(
     'spread margins constrain tables and images to the same page boxes',
     (tester) async {
@@ -653,11 +716,165 @@ void main() {
         expect(table.width, closeTo(576 - padding * 2, .01));
         expect(image.width, closeTo(table.width, .01));
         expect(table.left, closeTo(padding, .01));
-        expect(image.left, closeTo(624 + padding, .01));
+        final imagePage = [
+          const Rect.fromLTWH(0, 24, 576, 452),
+          const Rect.fromLTWH(624, 24, 576, 452),
+        ].singleWhere((page) => page.contains(image.center));
+        expect(image.left, closeTo(imagePage.left + padding, .01));
+        expect(image.right, lessThanOrEqualTo(imagePage.right - padding + .01));
+        expect(image.top, greaterThanOrEqualTo(imagePage.top));
+        expect(image.bottom, lessThanOrEqualTo(imagePage.bottom));
         expect(image.height, closeTo(image.width / 2, .01));
       }
     },
   );
+
+  testWidgets(
+    'a fitting styled paragraph uses the current page before continuing',
+    (tester) async {
+      final firstLines = List.generate(12, (index) => 'FIRST $index');
+      final secondLines = List.generate(
+        12,
+        (index) => 'B${index.toString().padLeft(2, '0')} 😀 á 👩‍💻',
+      );
+      final firstText = firstLines.join('\n');
+      final secondText = secondLines.join('\n');
+      final book = _htmlBook(
+        '<p style="margin: 0">${firstLines.join('<br/>')}</p>'
+        '<p style="margin: 0">'
+        '${secondLines.map((line) => '<b>$line</b>').join('<br/>')}</p>',
+      );
+      EpubLocation? latest;
+      const viewport = Rect.fromLTWH(0, 24, 360, 552);
+      await tester.pumpWidget(
+        _frame(
+          EpubNativeView(
+            epub: book,
+            settings: const ReaderSettings(
+              readingMode: ReadingMode.horizontal,
+              enableDualPageSpread: false,
+              fontSize: 18,
+              lineHeight: 1.5,
+              horizontalPadding: 20,
+            ),
+            theme: ThemeData.dark(),
+            onLocationChanged: (location, _) => latest = location,
+          ),
+          size: const Size(360, 600),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final firstPage = _visibleParagraphs(tester, viewport).toList();
+      expect(firstPage, hasLength(2));
+      expect(firstPage.first.text.toPlainText(), firstText);
+      final beginning = firstPage.last.text.toPlainText();
+      expect(beginning, startsWith(secondLines.first));
+      expect(beginning.length, lessThan(secondText.length));
+      expect(secondText, startsWith(beginning));
+      final fullParagraph = TextPainter(
+        text: TextSpan(style: firstPage.last.text.style, text: secondText),
+        textDirection: TextDirection.ltr,
+        textScaler: TextScaler.noScaling,
+        textHeightBehavior: const TextHeightBehavior(),
+      )..layout(maxWidth: firstPage.last.size.width);
+      expect(fullParagraph.height, lessThan(viewport.height));
+      expect(
+        fullParagraph.height,
+        greaterThan(viewport.height - firstPage.first.size.height),
+      );
+      fullParagraph.dispose();
+      void checkFragments() {
+        var styledUnicode = false;
+        for (final paragraph in _visibleParagraphs(tester, viewport)) {
+          final rect = paragraph.localToGlobal(Offset.zero) & paragraph.size;
+          expect(rect.top, greaterThanOrEqualTo(viewport.top));
+          expect(rect.bottom, lessThanOrEqualTo(viewport.bottom + .01));
+          paragraph.text.visitChildren((span) {
+            if (span is TextSpan && (span.text?.contains('😀') ?? false)) {
+              expect(span.style?.fontWeight, FontWeight.bold);
+              styledUnicode = true;
+            }
+            return true;
+          });
+        }
+        expect(styledUnicode, isTrue);
+      }
+
+      checkFragments();
+      final firstPageText = firstPage
+          .map((paragraph) => paragraph.text.toPlainText())
+          .join();
+      await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+      await tester.pumpAndSettle();
+      expect(latest!.hasExactCharOffset, isTrue);
+      expect(latest!.charOffset, firstPageText.length);
+      final continuation = _visibleParagraphs(
+        tester,
+        viewport,
+      ).map((paragraph) => paragraph.text.toPlainText()).join();
+      expect(firstPageText + continuation, firstText + secondText);
+      checkFragments();
+      final endOffset = latest!.charOffset;
+      await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+      await tester.pumpAndSettle();
+      expect(latest!.charOffset, endOffset);
+      await tester.sendKeyEvent(LogicalKeyboardKey.pageUp);
+      await tester.pumpAndSettle();
+      expect(latest!.charOffset, 0);
+      expect(
+        _visibleParagraphs(
+          tester,
+          viewport,
+        ).map((paragraph) => paragraph.text.toPlainText()).join(),
+        firstPageText,
+      );
+    },
+  );
+
+  testWidgets('a page with less than one line left advances without clipping', (
+    tester,
+  ) async {
+    final lines = List.generate(13, (index) => 'BOUNDARY $index');
+    final firstText = lines.join('\n');
+    EpubLocation? latest;
+    await tester.pumpWidget(
+      _frame(
+        EpubNativeView(
+          epub: _htmlBook(
+            '<p style="margin: 0">${lines.join('<br/>')}</p>'
+            '<p style="margin: 0">NEXT FULL LINE</p>',
+          ),
+          settings: const ReaderSettings(
+            readingMode: ReadingMode.horizontal,
+            enableDualPageSpread: false,
+            fontSize: 18,
+            lineHeight: 1.5,
+            horizontalPadding: 20,
+          ),
+          theme: ThemeData.dark(),
+          onLocationChanged: (location, _) => latest = location,
+        ),
+        size: const Size(360, 400),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(_renderedText(tester), firstText);
+    final filledPage = tester.getRect(find.text(firstText));
+    expect(filledPage.bottom, greaterThan(375 - .01));
+    expect(filledPage.bottom, lessThanOrEqualTo(376.01));
+    await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+    await tester.pumpAndSettle();
+    expect(_renderedText(tester), 'NEXT FULL LINE');
+    expect(latest!.hasExactCharOffset, isTrue);
+    expect(latest!.charOffset, firstText.length);
+    final nextLine = tester.getRect(find.text('NEXT FULL LINE'));
+    expect(nextLine.top, greaterThanOrEqualTo(24));
+    expect(nextLine.bottom, lessThanOrEqualTo(376.01));
+    final offset = latest!.charOffset;
+    await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+    await tester.pumpAndSettle();
+    expect(latest!.charOffset, offset);
+  });
 
   testWidgets('styled paragraph pages concatenate to exact original text', (
     tester,
@@ -713,11 +930,11 @@ void main() {
         expect(paragraph.textAlign, TextAlign.right);
         expect(rect.left, closeTo(paragraphLeft, 0.01));
         expect(rect.width, closeTo(paragraphWidth, 0.01));
-        expect(rect.top, closeTo(34, 0.01));
-        expect(
-          paragraph.localToGlobal(Offset(0, paragraph.size.height)).dy,
-          lessThanOrEqualTo(320.01),
-        );
+        expect(rect.top, greaterThanOrEqualTo(24));
+        expect(rect.bottom, lessThanOrEqualTo(336.01));
+        if (paragraph.text.toPlainText().endsWith(pieces.last)) {
+          expect(rect.bottom, lessThanOrEqualTo(320.01));
+        }
       }
       final previous = offset;
       await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
@@ -1780,54 +1997,97 @@ void main() {
   );
 
   testWidgets(
-    'late raster dimensions repaginate without losing a restored text target',
+    'late raster dimensions pack with text without losing a restored target',
     (tester) async {
-      final bytes = (await tester.runAsync(() => _rasterBytes(16, 1)))!;
-      final book = _htmlBook(
-        '<table><tr><td><img src="../images/wide.png"/></td>'
-        '<td>RASTER ROW</td></tr></table><p id="after">AFTER RASTER</p>',
-        images: {'OEBPS/images/wide.png': bytes},
-      );
-      final leaves = contentLeaves(
-        XhtmlParser(
-          html: book.chapters.single.htmlContent,
-          images: book.images,
-          documentPath: book.chapters.single.fileName,
-          baseStyle: const TextStyle(fontSize: 18),
-        ).parse(),
-      );
-      final offset = leaves.whereType<TextBlock>().last.charStart;
-      EpubLocation? latest;
-      await tester.pumpWidget(
-        _frame(
-          EpubNativeView(
-            epub: book,
-            initialLocation: EpubLocation.fromPosition(
-              chapterIndex: 0,
-              charOffset: offset,
-              hasExactCharOffset: true,
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1200, 800);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      for (final layout in [
+        (inTable: true, spread: false),
+        (inTable: false, spread: false),
+        (inTable: false, spread: true),
+      ]) {
+        final bytes = (await tester.runAsync(() => _rasterBytes(16, 1)))!;
+        final figure = layout.inTable
+            ? '<table><tr><td><img src="../images/wide.png"/></td>'
+                  '<td>RASTER ROW</td></tr></table>'
+            : '<img src="../images/wide.png"/>';
+        final book = _htmlBook(
+          '<p style="margin: 0">BEFORE RASTER</p>$figure'
+          '<p id="after" style="margin: 0">AFTER RASTER</p>',
+          images: {'OEBPS/images/wide.png': bytes},
+        );
+        final leaves = contentLeaves(
+          XhtmlParser(
+            html: book.chapters.single.htmlContent,
+            images: book.images,
+            documentPath: book.chapters.single.fileName,
+            baseStyle: const TextStyle(fontSize: 18),
+          ).parse(),
+        );
+        final offset = leaves.whereType<TextBlock>().last.charStart;
+        final size = layout.inTable
+            ? const Size(600, 400)
+            : Size(layout.spread ? 1000 : 360, 600);
+        final viewport = Rect.fromLTWH(0, 24, size.width, size.height - 48);
+        final reports = <EpubLocation>[];
+        void checkFrame() {
+          _expectFragmentVisible(tester, 'AFTER RASTER', viewport);
+          for (final report in reports) {
+            expect(report.hasExactCharOffset, isTrue);
+            expect(report.chapterIndex, 0);
+            expect(report.charOffset, offset);
+          }
+        }
+
+        await tester.pumpWidget(
+          _frame(
+            EpubNativeView(
+              key: ValueKey(layout),
+              epub: book,
+              initialLocation: EpubLocation.fromPosition(
+                chapterIndex: 0,
+                charOffset: offset,
+                hasExactCharOffset: true,
+              ),
+              settings: ReaderSettings(
+                readingMode: ReadingMode.horizontal,
+                enableDualPageSpread: layout.spread,
+                horizontalPadding: 20,
+              ),
+              theme: ThemeData.dark(),
+              onLocationChanged: (value, _) => reports.add(value),
             ),
-            settings: const ReaderSettings(
-              readingMode: ReadingMode.horizontal,
-              enableDualPageSpread: false,
-            ),
-            theme: ThemeData.dark(),
-            onLocationChanged: (value, _) => latest = value,
+            size: size,
           ),
-        ),
-      );
-      await tester.runAsync(
-        () => precacheImage(
-          MemoryImage(bytes),
-          tester.element(find.byType(EpubNativeView)),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(latest!.charOffset, offset);
-      expect(_cellRect(tester, 'RASTER ROW').height, lessThan(140));
-      final target = tester.getRect(find.text('AFTER RASTER'));
-      expect(target.top, greaterThanOrEqualTo(24));
-      expect(target.bottom, lessThanOrEqualTo(376));
+        );
+        checkFrame();
+        await tester.runAsync(
+          () => precacheImage(
+            MemoryImage(bytes),
+            tester.element(find.byType(EpubNativeView)),
+          ),
+        );
+        await _pumpEveryFrame(tester, checkFrame);
+        expect(reports, isNotEmpty);
+        final before = tester.getRect(find.text('BEFORE RASTER'));
+        final target = tester.getRect(find.text('AFTER RASTER'));
+        expect(before.top, greaterThanOrEqualTo(viewport.top));
+        expect(target.bottom, lessThanOrEqualTo(viewport.bottom));
+        expect(target.left, closeTo(before.left, .01));
+        expect(target.right, closeTo(before.right, .01));
+        if (layout.inTable) {
+          expect(_cellRect(tester, 'RASTER ROW').height, lessThan(140));
+        } else {
+          final image = tester.getRect(find.byType(Image));
+          expect(image.width, closeTo(before.width, .01));
+          expect(image.height, closeTo(image.width / 16, .01));
+          expect(image.left, closeTo(before.left, .01));
+          expect(image.top, greaterThanOrEqualTo(before.bottom));
+          expect(target.top, greaterThanOrEqualTo(image.bottom));
+        }
+      }
     },
   );
 

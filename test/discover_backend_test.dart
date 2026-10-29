@@ -242,6 +242,120 @@ void main() {
     },
   );
 
+  test('approved publisher feeds retain real dates, authors and covers', () {
+    // Reduced entries from the six publishers' public RSS/Atom feeds.
+    final entries = [
+      (
+        id: 'batrachospermum',
+        xml: '''<rss xmlns:dc="http://purl.org/dc/elements/1.1/"><channel><item>
+<title>Безногий морской огурец на колесиках</title>
+<link>https://batrachospermum.ru/2026/08/acanthotrochus-verruciosseous/</link>
+<dc:creator><![CDATA[Батрахоспермум]]></dc:creator>
+<pubDate>Mon, 17 Aug 2026 20:35:42 +0000</pubDate>
+<description><![CDATA[Сантиметровая гантелька с колесиками обнаружена в тихоокеанской донной пучине.]]></description>
+</item></channel></rss>''',
+        author: 'Батрахоспермум',
+        date: DateTime.utc(2026, 8, 17, 20, 35, 42),
+        image: null,
+      ),
+      (
+        id: 'elementy',
+        xml: '''<rss><channel><item>
+<title>Древнейший осьминог оказался наутилусом</title>
+<link>https://elementy.ru/novosti_nauki/434442/Drevneyshiy_osminog_okazalsya_nautilusom</link>
+<description>&lt;p&gt;В 2000 году на территории знаменитого местонахождения Мазон-Крик в США нашли хорошо сохранившийся отпечаток.&lt;/p&gt;</description>
+<image><url>https://elementy.ru/images/news/synchrotron_data_reveal_nautiloid_characters_in_pohlsepia_mazonensis_6_100.jpg</url></image>
+<pubDate>26 Oct 2026 07:44:00 +0300</pubDate>
+</item></channel></rss>''',
+        author: '',
+        date: DateTime.utc(2026, 10, 26, 4, 44),
+        image:
+            'https://elementy.ru/images/news/synchrotron_data_reveal_nautiloid_characters_in_pohlsepia_mazonensis_6_100.jpg',
+      ),
+      (
+        id: 'our-world-in-data',
+        xml: '''<feed xmlns="http://www.w3.org/2005/Atom"><entry>
+<title><![CDATA[How much development aid is spent on climate change?]]></title>
+<link rel="alternate" href="https://ourworldindata.org/how-much-development-aid-is-spent-on-climate-change"/>
+<published>2026-10-26T00:00:00.000Z</published>
+<author><name>Hannah Ritchie</name></author><author><name>Pablo Arriagada</name></author>
+<summary><![CDATA[Around one-fifth of development aid is spent on climate-related projects.<br><br><a href="https://ourworldindata.org/how-much-development-aid-is-spent-on-climate-change"><img src="https://ourworldindata.org/cdn-cgi/imagedelivery/qLq-8BTgXU8yG0N6HnOy8g/59464533-c5ca-4a7e-7686-358fc7608500/w=1024"/></a>]]></summary>
+</entry></feed>''',
+        author: 'Hannah Ritchie, Pablo Arriagada',
+        date: DateTime.utc(2026, 10, 26),
+        image:
+            'https://ourworldindata.org/cdn-cgi/imagedelivery/qLq-8BTgXU8yG0N6HnOy8g/59464533-c5ca-4a7e-7686-358fc7608500/w=1024',
+      ),
+      (
+        id: 'jstor-daily',
+        xml:
+            '''<rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><item>
+<title>London’s Railway for the Dead</title><link>https://daily.jstor.org/londons-railway-for-the-dead/</link>
+<dc:creator><![CDATA[Amelia Soth]]></dc:creator><pubDate>Thu, 29 Oct 2026 13:43:00 +0000</pubDate>
+<description><![CDATA[<p>As London's graveyards overflowed, a private company proposed a remarkable new way to bury the dead.</p>]]></description>
+<content:encoded><![CDATA[<figure class="wp-caption"><img src="https://daily.jstor.org/wp-content/uploads/2026/10/london_necropolis_1_1050.jpg"/><figcaption>Enon Chapel</figcaption></figure>]]></content:encoded>
+</item></channel></rss>''',
+        author: 'Amelia Soth',
+        date: DateTime.utc(2026, 10, 29, 13, 43),
+        image:
+            'https://daily.jstor.org/wp-content/uploads/2026/10/london_necropolis_1_1050.jpg',
+      ),
+      (
+        id: 'aeon',
+        xml: '''<rss xmlns:dc="http://purl.org/dc/elements/1.1/"><channel><item>
+<title><![CDATA[The physics of getting fired]]></title><link>https://aeon.co/essays/how-to-use-physics-to-make-sense-of-the-messiness-of-life</link>
+<dc:creator><![CDATA[Zahaan Bharmal]]></dc:creator><pubDate>Thu, 29 Oct 2026 10:00:00 GMT</pubDate>
+<description><![CDATA[<p><img src="https://images.aeonmedia.co/images/afb6d18f-037c-451b-a48b-e7420fcaa8b4/essay-v1-test-v1-jiran-family-4srj_3nontc-unsplash.jpg?width=1200&quality=75&format=auto"/></p><p>Physics offered me a sense of order and purpose.</p>]]></description>
+</item></channel></rss>''',
+        author: 'Zahaan Bharmal',
+        date: DateTime.utc(2026, 10, 29, 10),
+        image:
+            'https://images.aeonmedia.co/images/afb6d18f-037c-451b-a48b-e7420fcaa8b4/essay-v1-test-v1-jiran-family-4srj_3nontc-unsplash.jpg?width=1200&quality=75&format=auto',
+      ),
+      (
+        id: 'mongabay',
+        xml: '''<rss xmlns:dc="http://purl.org/dc/elements/1.1/"><channel><item>
+<title>Between revered and hunted: The journey of human-otter coexistence in the Amazon</title>
+<link>https://news.mongabay.com/2026/10/between-revered-and-hunted-the-journey-of-human-otter-coexistence-in-the-amazon/</link>
+<pubDate>29 Oct 2026 16:21:07 +0000</pubDate><dc:creator><![CDATA[Sarah Brown]]></dc:creator><author><![CDATA[Latoya Abulu]]></author>
+<enclosure url="https://imgs.mongabay.com/wp-content/uploads/sites/20/2026/10/29131318/pteronura-brasiliensis-2-768x512.jpg" type="image/jpeg"/>
+<description><![CDATA[On a warm, humid morning, along the Içana River in Brazil’s upper Rio Negro Basin.]]></description>
+</item></channel></rss>''',
+        author: 'Sarah Brown',
+        date: DateTime.utc(2026, 10, 29, 16, 21, 7),
+        image:
+            'https://imgs.mongabay.com/wp-content/uploads/sites/20/2026/10/29131318/pteronura-brasiliensis-2-768x512.jpg',
+      ),
+    ];
+    for (final entry in entries) {
+      final source = discoverSourceCatalog.firstWhere(
+        (source) => source.id == entry.id,
+      );
+      final item = parseDiscoverMetadata(entry.xml, source).single;
+      expect(item.sourceId, entry.id);
+      expect(item.author, entry.author, reason: entry.id);
+      expect(item.publishedAt, entry.date, reason: entry.id);
+      expect(item.imageUrl?.toString(), entry.image, reason: entry.id);
+      expect(item.summary, isNot(contains('<p>')), reason: entry.id);
+    }
+  });
+
+  test('Atom author names exclude profile metadata and unsafe covers', () {
+    final item = parseDiscoverMetadata(
+      '''<feed xmlns="http://www.w3.org/2005/Atom"><entry>
+<title>Development aid</title><link href="https://ourworldindata.org/aid"/>
+<author><name>Hannah Ritchie</name><uri>https://ourworldindata.org/team/hannah-ritchie</uri></author>
+<author><name>Pablo Arriagada</name><email>editor@example.org</email></author>
+<summary><![CDATA[<img src="https://secret@images.example.org/tracker.png"/>]]></summary>
+</entry></feed>''',
+      discoverSourceCatalog.firstWhere(
+        (source) => source.id == 'our-world-in-data',
+      ),
+    ).single;
+    expect(item.author, 'Hannah Ritchie, Pablo Arriagada');
+    expect(item.imageUrl, isNull);
+  });
+
   test(
     'RFC searches the official index by number, abstract and author',
     () async {

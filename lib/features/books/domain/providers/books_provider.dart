@@ -162,10 +162,7 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
     state = AsyncData([...currentBooks, newBook]);
   }
 
-  Future<void> downloadAndImportBook(
-    SearchResultItem book,
-    WidgetRef ref,
-  ) async {
+  Future<void> downloadAndImportBook(SearchResultItem book) async {
     final currentBooks = state.value ?? [];
 
     // Duplicate check by title and author as requested
@@ -229,7 +226,7 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
       await booksDir.create(recursive: true);
     }
 
-    final extension = book.format;
+    final extension = book.format.toLowerCase();
     final bookId = const Uuid().v4();
     final newFilePath = p.join(booksDir.path, '$bookId.$extension');
 
@@ -243,7 +240,11 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
         connectTimeout: const Duration(seconds: 20),
         sendTimeout: const Duration(seconds: 20),
         receiveTimeout: const Duration(minutes: 2),
-        headers: {'User-Agent': _desktopUserAgent},
+        headers: {
+          'User-Agent': zLibApi == null
+              ? _desktopUserAgent
+              : ZLibraryApi.userAgent,
+        },
       ),
     );
     dio.httpClientAdapter = IOHttpClientAdapter(
@@ -253,6 +254,9 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
 
     // Try links until one works
     bool success = false;
+    ParsedEpub? downloadedEpub;
+    PdfDocument? downloadedPdf;
+    Object? lastDownloadError;
     for (final link in downloadLinks) {
       try {
         var target = Uri.parse(link);
@@ -304,12 +308,33 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
             target = target.resolve(location);
             continue;
           }
+          final contentType =
+              response.headers
+                  .value(Headers.contentTypeHeader)
+                  ?.toLowerCase() ??
+              '';
+          if (contentType.contains('text/html') ||
+              contentType.contains('application/xhtml+xml')) {
+            throw const FormatException(
+              'The source returned a web page instead of a book.',
+            );
+          }
+          if (extension == 'epub') {
+            downloadedEpub = await EpubParser.parse(
+              await File(newFilePath).readAsBytes(),
+            );
+          } else if (extension == 'pdf') {
+            downloadedPdf = await PdfDocument.openFile(newFilePath);
+          } else {
+            throw UnsupportedError('Unsupported file format: $extension');
+          }
           success = true;
           break;
         }
         if (!success) throw StateError('Too many book download redirects');
         break; // Successfully downloaded
       } on DioException catch (e) {
+        lastDownloadError = e;
         if (e.type == DioExceptionType.cancel) {
           // User cancelled — clean up partial file if exists
           final partialFile = File(newFilePath);
@@ -323,6 +348,7 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
         print('Download from link failed: $link - $e');
         continue;
       } catch (e) {
+        lastDownloadError = e;
         // ignore: avoid_print
         print('Download from link failed: $link - $e');
         continue;
@@ -333,7 +359,14 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
     ref.read(downloadNotifierProvider.notifier).finish(book.id);
 
     if (!success) {
-      throw Exception('Failed to download from all available links');
+      final partialFile = File(newFilePath);
+      if (await partialFile.exists()) {
+        await partialFile.delete();
+      }
+      throw Exception(
+        'Failed to download a valid book from the available links: '
+        '$lastDownloadError',
+      );
     }
 
     // Extract cover and metadata dynamically like import
@@ -342,62 +375,63 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
     int pageCount = 0;
     int fileSizeBytes = await File(newFilePath).length();
 
-    if (extension == 'epub') {
-      try {
-        final bytes = await File(newFilePath).readAsBytes();
-        final parsed = await EpubParser.parse(bytes);
-        if (author.isEmpty) {
-          author = parsed.author;
-        }
-        // Estimate page count based on total characters (~1800 chars/page)
-        final totalChars = parsed.chapters.fold<int>(
-          0,
-          (sum, c) =>
-              sum + c.htmlContent.replaceAll(RegExp(r'<[^>]*>'), '').length,
-        );
-        pageCount = (totalChars / 1800).ceil().clamp(1, 999999);
-
-        if (parsed.coverImage != null) {
-          final coversDir = Directory(p.join(appDocDir.path, 'covers'));
-          if (!await coversDir.exists()) {
-            await coversDir.create(recursive: true);
-          }
-          coverPath = p.join(coversDir.path, '$bookId.jpg');
-          await File(coverPath).writeAsBytes(parsed.coverImage!);
-        }
-      } catch (e) {
-        print('Error extracting EPUB metadata: $e');
+    final parsed = downloadedEpub;
+    if (parsed != null) {
+      if (author.isEmpty) {
+        author = parsed.author;
       }
-    } else if (extension == 'pdf') {
+      final totalChars = parsed.chapters.fold<int>(
+        0,
+        (sum, c) =>
+            sum + c.htmlContent.replaceAll(RegExp(r'<[^>]*>'), '').length,
+      );
+      pageCount = (totalChars / 1800).ceil().clamp(1, 999999);
+      final coverImage = parsed.coverImage;
+      if (coverImage != null) {
+        try {
+          final coversDir = Directory(p.join(appDocDir.path, 'covers'));
+          await coversDir.create(recursive: true);
+          final path = p.join(coversDir.path, '$bookId.jpg');
+          await File(path).writeAsBytes(coverImage);
+          coverPath = path;
+        } catch (e) {
+          print('Error saving EPUB cover: $e');
+        }
+      }
+    }
+    final doc = downloadedPdf;
+    if (doc != null) {
       try {
-        final doc = await PdfDocument.openFile(newFilePath);
         pageCount = doc.pages.length;
-
         if (doc.pages.isNotEmpty) {
-          final page = doc.pages[0];
+          final page = doc.pages.first;
           final pdfImage = await page.render(
             fullWidth: 300,
             fullHeight: (300 * page.height / page.width).roundToDouble(),
           );
           if (pdfImage != null) {
-            final coversDir = Directory(p.join(appDocDir.path, 'covers'));
-            if (!await coversDir.exists()) {
-              await coversDir.create(recursive: true);
-            }
-            coverPath = p.join(coversDir.path, '$bookId.png');
-            final pngBytes = await _encodePng(
-              pdfImage.pixels,
-              pdfImage.width,
-              pdfImage.height,
-            );
-            if (pngBytes != null) {
-              await File(coverPath).writeAsBytes(pngBytes);
+            try {
+              final pngBytes = await _encodePng(
+                pdfImage.pixels,
+                pdfImage.width,
+                pdfImage.height,
+              );
+              if (pngBytes != null) {
+                final coversDir = Directory(p.join(appDocDir.path, 'covers'));
+                await coversDir.create(recursive: true);
+                final path = p.join(coversDir.path, '$bookId.png');
+                await File(path).writeAsBytes(pngBytes);
+                coverPath = path;
+              }
+            } finally {
+              pdfImage.dispose();
             }
           }
         }
-        doc.dispose();
       } catch (e) {
         print('Error extracting PDF cover: $e');
+      } finally {
+        await doc.dispose();
       }
     }
 
@@ -517,35 +551,24 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
     return imageUrl;
   }
 
-  /// Encode raw BGRA pixels (from pdfrx) to PNG
-  /// pdfrx returns BGRA order, but dart:ui expects RGBA
+  /// Encode raw BGRA pixels from pdfrx without resampling.
   Future<Uint8List?> _encodePng(Uint8List pixels, int width, int height) async {
     try {
-      // Convert BGRA to RGBA by swapping R and B channels
-      final rgbaPixels = Uint8List(pixels.length);
-      for (int i = 0; i < pixels.length; i += 4) {
-        final b = pixels[i];
-        final g = pixels[i + 1];
-        final r = pixels[i + 2];
-        final a = pixels[i + 3];
-        // Write as RGBA
-        rgbaPixels[i] = r;
-        rgbaPixels[i + 1] = g;
-        rgbaPixels[i + 2] = b;
-        rgbaPixels[i + 3] = a;
-      }
-
       final completer = Completer<ui.Image>();
       ui.decodeImageFromPixels(
-        rgbaPixels,
+        pixels,
         width,
         height,
-        ui.PixelFormat.rgba8888,
+        ui.PixelFormat.bgra8888,
         (image) => completer.complete(image),
       );
       final image = await completer.future;
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      return byteData?.buffer.asUint8List();
+      try {
+        final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+        return byteData?.buffer.asUint8List();
+      } finally {
+        image.dispose();
+      }
     } catch (e) {
       // ignore: avoid_print
       print('Error encoding PNG: $e');

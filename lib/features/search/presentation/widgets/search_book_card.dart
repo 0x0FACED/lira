@@ -164,7 +164,7 @@ class SearchBookCard extends ConsumerWidget {
     try {
       await ref
           .read(booksControllerProvider.notifier)
-          .downloadAndImportBook(book, ref);
+          .downloadAndImportBook(book);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.bookDownloaded(book.title))),

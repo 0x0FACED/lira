@@ -266,6 +266,18 @@ const _contentTags = {
 
 _ExtractedMaterial _extractHtml(String raw, DiscoverItem item, Uri base) {
   final document = html.parse(raw);
+  // Elementy publishes root-relative resources through an explicit HTML base.
+  // Do not let an unrelated or unsafe base change the publisher's origin.
+  final declaredBase = document.querySelector('base[href]')?.attributes['href'];
+  if (base.host == 'elementy.ru' && declaredBase != null) {
+    final resolved = base.resolve(declaredBase);
+    if ({'http', 'https'}.contains(resolved.scheme) &&
+        resolved.userInfo.isEmpty &&
+        resolved.host == base.host) {
+      base = resolved;
+    }
+  }
+  final host = base.host;
   dom.Element? root;
   if (item.documentNumber != null) {
     final meta = document
@@ -284,6 +296,8 @@ _ExtractedMaterial _extractHtml(String raw, DiscoverItem item, Uri base) {
     }
   } else {
     for (final selector in [
+      if (host == 'elementy.ru') '.memo',
+      if (host == 'aeon.co') '.article-content .has-dropcap',
       '[itemprop="articleBody"]',
       '.article-content',
       '.post-content',
@@ -306,6 +320,23 @@ _ExtractedMaterial _extractHtml(String raw, DiscoverItem item, Uri base) {
   }
   if (root == null)
     throw const FormatException('No full article content was found');
+  final excluded = switch (host) {
+    'elementy.ru' => '.zoom',
+    'daily.jstor.org' =>
+      '.daily-explore.more-to-explore, .daily_email_signup, .j-icon, '
+          '[class*="jpass-incontent-banner"]',
+    'ourworldindata.org' =>
+      '.recirc, .centered-article-header__breadcrumbs-container, .deep-link, '
+          '.centered-article-header__title-container, '
+          '.centered-article-header__meta-container',
+    'news.mongabay.com' => '#single-article-footer, .article-comments',
+    _ => null,
+  };
+  if (excluded != null) {
+    for (final node in root.querySelectorAll(excluded)) {
+      node.remove();
+    }
+  }
   final images = <_ImageRequest>[];
   final imagePaths = <String, String>{};
   final seenIds = <String>{};
@@ -313,10 +344,69 @@ _ExtractedMaterial _extractHtml(String raw, DiscoverItem item, Uri base) {
   List<XmlNode> convert(dom.Node node) {
     if (node is dom.Text) return [XmlText(_xmlText(node.data))];
     if (node is! dom.Element) return const [];
-    final tag = node.localName ?? '';
+    var tag = node.localName ?? '';
     if (node.attributes.containsKey('hidden') ||
         node.attributes['aria-hidden'] == 'true') {
       return const [];
+    }
+    if (host == 'ourworldindata.org' &&
+        node.classes.contains('GrapherWithFallback')) {
+      final image = node.querySelector('img.GrapherImage[src]');
+      final source = image?.attributes['src'];
+      final uri = source == null ? null : base.resolve(source);
+      if (image != null && uri != null && _isOwidChart(uri, image: true)) {
+        final original = uri.replace(
+          path: uri.path.substring(0, uri.path.length - 4),
+        );
+        return [
+          _element('figure', {}, [
+            ...convert(image),
+            _element('figcaption', {}, [
+              _element(
+                'a',
+                {'href': original.toString()},
+                [XmlText(original.toString())],
+              ),
+            ]),
+          ]),
+        ];
+      }
+    }
+    if (tag == 'iframe') {
+      final source = node.attributes['src'];
+      final uri = source == null ? null : base.resolve(source);
+      if (uri != null && _isOwidChart(uri)) {
+        final image = dom.Element.tag('img')
+          ..attributes['src'] = uri
+              .removeFragment()
+              .replace(path: '${uri.path}.png')
+              .toString()
+          ..attributes['alt'] = node.attributes['title'] ?? '';
+        return [
+          _element('figure', {}, [
+            ...convert(image),
+            _element('figcaption', {}, [
+              _element(
+                'a',
+                {'href': uri.toString()},
+                [XmlText(node.attributes['title'] ?? uri.toString())],
+              ),
+            ]),
+          ]),
+        ];
+      }
+    }
+    if (host == 'ourworldindata.org' &&
+        tag == 'aside' &&
+        node.classes.contains('article-block__aside')) {
+      tag = 'blockquote';
+    }
+    if (host == 'elementy.ru' && tag == 'div') {
+      if (node.classes.contains('ill_block')) tag = 'figure';
+      if (node.classes.contains('comment') &&
+          node.parent?.classes.contains('ill_block') == true) {
+        tag = 'figcaption';
+      }
     }
     if ({'video', 'audio', 'iframe'}.contains(tag)) {
       final result = <XmlNode>[];
@@ -444,6 +534,15 @@ _ExtractedMaterial _extractHtml(String raw, DiscoverItem item, Uri base) {
   final language = document.documentElement?.attributes['lang'] ?? 'en';
   return _ExtractedMaterial(content.toXmlString(), language, images);
 }
+
+final _owidChartPath = RegExp(r'^/grapher/[a-zA-Z0-9_-]+$');
+final _owidChartImagePath = RegExp(r'^/grapher/[a-zA-Z0-9_-]+\.(?:png|svg)$');
+
+bool _isOwidChart(Uri uri, {bool image = false}) =>
+    (uri.scheme == 'http' || uri.scheme == 'https') &&
+    uri.host == 'ourworldindata.org' &&
+    uri.userInfo.isEmpty &&
+    (image ? _owidChartImagePath : _owidChartPath).hasMatch(uri.path);
 
 String _xmlText(String value) =>
     value.replaceAll(RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f]'), '');

@@ -24,6 +24,26 @@ IconData discoverCategoryIcon(DiscoverCategory category) => switch (category) {
   DiscoverCategory.documents => Icons.description_outlined,
 };
 
+String discoverTopicLabel(AppLocalizations l10n, DiscoverTopic topic) =>
+    switch (topic) {
+      DiscoverTopic.technology => l10n.discoverTopicTechnology,
+      DiscoverTopic.economics => l10n.discoverTopicEconomics,
+      DiscoverTopic.nature => l10n.discoverTopicNature,
+      DiscoverTopic.history => l10n.discoverTopicHistory,
+      DiscoverTopic.culture => l10n.discoverTopicCulture,
+      DiscoverTopic.psychology => l10n.discoverTopicPsychology,
+      DiscoverTopic.science => l10n.discoverTopicScience,
+    };
+
+String discoverSourceLanguageLabel(
+  AppLocalizations l10n,
+  DiscoverSourceLanguage language,
+) => switch (language) {
+  DiscoverSourceLanguage.russian => l10n.discoverLanguageRussian,
+  DiscoverSourceLanguage.english => l10n.discoverLanguageEnglish,
+  DiscoverSourceLanguage.multilingual => l10n.discoverLanguageMultilingual,
+};
+
 String discoverDate(
   BuildContext context,
   DateTime date, {

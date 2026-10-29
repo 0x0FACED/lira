@@ -593,6 +593,58 @@ class AppLocalizationsEn extends AppLocalizations {
   String get discoverSelectedOnly => 'Selected only';
 
   @override
+  String get discoverTopic => 'Topic';
+
+  @override
+  String get discoverAllTopics => 'All topics';
+
+  @override
+  String get discoverTopicTechnology => 'Technology';
+
+  @override
+  String get discoverTopicEconomics => 'Economics';
+
+  @override
+  String get discoverTopicNature => 'Nature';
+
+  @override
+  String get discoverTopicHistory => 'History';
+
+  @override
+  String get discoverTopicCulture => 'Culture';
+
+  @override
+  String get discoverTopicPsychology => 'Psychology';
+
+  @override
+  String get discoverTopicScience => 'Science';
+
+  @override
+  String get discoverContentLanguage => 'Content language';
+
+  @override
+  String get discoverAllLanguages => 'All languages';
+
+  @override
+  String get discoverLanguageRussian => 'Russian';
+
+  @override
+  String get discoverLanguageEnglish => 'English';
+
+  @override
+  String get discoverLanguageMultilingual => 'Multilingual';
+
+  @override
+  String discoverSourceTopics(String topics) {
+    return 'Topics: $topics';
+  }
+
+  @override
+  String discoverSourceContentLanguage(String language) {
+    return 'Content language: $language';
+  }
+
+  @override
   String discoverSelectedCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

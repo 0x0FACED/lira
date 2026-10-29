@@ -1148,6 +1148,102 @@ abstract class AppLocalizations {
   /// **'Selected only'**
   String get discoverSelectedOnly;
 
+  /// No description provided for @discoverTopic.
+  ///
+  /// In en, this message translates to:
+  /// **'Topic'**
+  String get discoverTopic;
+
+  /// No description provided for @discoverAllTopics.
+  ///
+  /// In en, this message translates to:
+  /// **'All topics'**
+  String get discoverAllTopics;
+
+  /// No description provided for @discoverTopicTechnology.
+  ///
+  /// In en, this message translates to:
+  /// **'Technology'**
+  String get discoverTopicTechnology;
+
+  /// No description provided for @discoverTopicEconomics.
+  ///
+  /// In en, this message translates to:
+  /// **'Economics'**
+  String get discoverTopicEconomics;
+
+  /// No description provided for @discoverTopicNature.
+  ///
+  /// In en, this message translates to:
+  /// **'Nature'**
+  String get discoverTopicNature;
+
+  /// No description provided for @discoverTopicHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get discoverTopicHistory;
+
+  /// No description provided for @discoverTopicCulture.
+  ///
+  /// In en, this message translates to:
+  /// **'Culture'**
+  String get discoverTopicCulture;
+
+  /// No description provided for @discoverTopicPsychology.
+  ///
+  /// In en, this message translates to:
+  /// **'Psychology'**
+  String get discoverTopicPsychology;
+
+  /// No description provided for @discoverTopicScience.
+  ///
+  /// In en, this message translates to:
+  /// **'Science'**
+  String get discoverTopicScience;
+
+  /// No description provided for @discoverContentLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Content language'**
+  String get discoverContentLanguage;
+
+  /// No description provided for @discoverAllLanguages.
+  ///
+  /// In en, this message translates to:
+  /// **'All languages'**
+  String get discoverAllLanguages;
+
+  /// No description provided for @discoverLanguageRussian.
+  ///
+  /// In en, this message translates to:
+  /// **'Russian'**
+  String get discoverLanguageRussian;
+
+  /// No description provided for @discoverLanguageEnglish.
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get discoverLanguageEnglish;
+
+  /// No description provided for @discoverLanguageMultilingual.
+  ///
+  /// In en, this message translates to:
+  /// **'Multilingual'**
+  String get discoverLanguageMultilingual;
+
+  /// No description provided for @discoverSourceTopics.
+  ///
+  /// In en, this message translates to:
+  /// **'Topics: {topics}'**
+  String discoverSourceTopics(String topics);
+
+  /// No description provided for @discoverSourceContentLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Content language: {language}'**
+  String discoverSourceContentLanguage(String language);
+
   /// No description provided for @discoverSelectedCount.
   ///
   /// In en, this message translates to:

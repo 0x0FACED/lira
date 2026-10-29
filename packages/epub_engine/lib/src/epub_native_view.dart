@@ -1521,36 +1521,8 @@ class EpubNativeViewState extends State<EpubNativeView>
       var currentHeight = 0.0;
       var isFirst = true;
 
-      for (final rawElement in elements) {
-        final paginatedElements = _splitElementForPagination(
-          rawElement,
-          contentWidth,
-          contentHeight,
-        );
-
-        for (final element in paginatedElements) {
-          final h = _measureElementHeight(element, contentWidth, contentHeight);
-
-          if (currentElements.isNotEmpty && currentHeight + h > contentHeight) {
-            _paginatedPages.add(
-              _PageInfo(
-                chapterIndex: ci,
-                pageIndex: pageIndexCounter++,
-                elements: currentElements,
-                isChapterStart: isFirst,
-              ),
-            );
-            isFirst = false;
-            currentElements = [element];
-            currentHeight = h;
-          } else {
-            currentElements.add(element);
-            currentHeight += h;
-          }
-        }
-      }
-
-      if (currentElements.isNotEmpty) {
+      void flushPage() {
+        if (currentElements.isEmpty) return;
         _paginatedPages.add(
           _PageInfo(
             chapterIndex: ci,
@@ -1559,7 +1531,45 @@ class EpubNativeViewState extends State<EpubNativeView>
             isChapterStart: isFirst,
           ),
         );
+        isFirst = false;
+        currentElements = <ContentElement>[];
+        currentHeight = 0;
       }
+
+      for (final rawElement in elements) {
+        if (rawElement is TextBlock) {
+          for (final fragment in _textFragmentsForPagination(
+            rawElement,
+            contentWidth,
+            contentHeight,
+            firstPageHeight: contentHeight - currentHeight,
+            hasPageContent: currentElements.isNotEmpty,
+          )) {
+            if (fragment.startsNewPage) flushPage();
+            currentElements.add(fragment.block);
+            currentHeight += fragment.height;
+          }
+          continue;
+        }
+
+        final paginatedElements = rawElement is TableBlock
+            ? _splitTableForPagination(rawElement, contentWidth, contentHeight)
+            : [rawElement];
+        for (final element in paginatedElements) {
+          final height = _measureElementHeight(
+            element,
+            contentWidth,
+            contentHeight,
+          );
+          if (currentElements.isNotEmpty &&
+              currentHeight + height > contentHeight) {
+            flushPage();
+          }
+          currentElements.add(element);
+          currentHeight += height;
+        }
+      }
+      flushPage();
     }
 
     _lastPaginationGeometry = geometry;
@@ -1568,128 +1578,193 @@ class EpubNativeViewState extends State<EpubNativeView>
   double _measureElementHeight(
     ContentElement element,
     double contentWidth,
-    double pageHeight, {
-    bool inTable = false,
-  }) {
+    double pageHeight,
+  ) {
     if (element is TextBlock) {
       return _measureTextBlockHeight(element, contentWidth);
     } else if (element is TableBlock) {
       return _layoutTable(element, contentWidth).height;
     } else if (element is ImageBlock) {
-      return inTable
-          ? _tableImageHeight(element, contentWidth, pageHeight)
-          : pageHeight;
+      return _imageHeight(element, contentWidth, pageHeight);
     } else if (element is DividerBlock) {
       return 49.0;
     }
     return 0;
   }
 
-  List<ContentElement> _splitElementForPagination(
-    ContentElement element,
-    double contentWidth,
-    double contentHeight,
-  ) {
-    if (element is TableBlock) {
-      return _splitTableForPagination(element, contentWidth, contentHeight);
-    }
-    if (element is! TextBlock) {
-      return [element];
-    }
-
-    if (_measureTextBlockHeight(element, contentWidth) <= contentHeight) {
-      return [element];
-    }
-
-    return _splitTextBlockForPagination(element, contentWidth, contentHeight);
-  }
-
-  List<TextBlock> _splitTextBlockForPagination(
+  Iterable<({TextBlock block, double height, bool startsNewPage})>
+  _textFragmentsForPagination(
     TextBlock block,
     double contentWidth,
-    double contentHeight,
-  ) {
-    if (block.span is! TextSpan) {
-      return [block];
+    double pageHeight, {
+    required double firstPageHeight,
+    required bool hasPageContent,
+  }) sync* {
+    final painter = _layoutTextBlock(block, contentWidth);
+    final insets = _textBlockInsets(block);
+    final height = painter.height + insets.vertical;
+    final keepTogether = switch (block.type) {
+      TextBlockType.h1 ||
+      TextBlockType.h2 ||
+      TextBlockType.h3 ||
+      TextBlockType.h4 ||
+      TextBlockType.h5 ||
+      TextBlockType.h6 => true,
+      _ => false,
+    };
+    if (height <= firstPageHeight ||
+        block.span is! TextSpan ||
+        (keepTogether && height <= pageHeight)) {
+      painter.dispose();
+      yield (
+        block: block,
+        height: height,
+        startsNewPage: hasPageContent && height > firstPageHeight,
+      );
+      return;
     }
 
     final plainText = block.span.toPlainText(includeSemanticsLabels: false);
-    final totalLength = plainText.length;
-    if (totalLength <= 1) {
-      return [block];
-    }
-
-    final boundaries = <int>[0];
-    for (final grapheme in plainText.characters) {
-      boundaries.add(boundaries.last + grapheme.length);
-    }
-    final chunks = <TextBlock>[];
-    var boundaryStart = 0;
-    while (boundaryStart + 1 < boundaries.length) {
-      final localStart = boundaries[boundaryStart];
-      var low = boundaryStart + 1;
-      var high = boundaries.length - 1;
-      var bestBoundary = low;
-
-      while (low <= high) {
-        final mid = (low + high) ~/ 2;
-        final candidateSpan = _sliceInlineSpan(
-          block.span,
-          localStart,
-          boundaries[mid],
-        );
-        if (candidateSpan == null) {
-          high = mid - 1;
-          continue;
-        }
-
-        final candidateHeight = _measureTextBlockHeight(
-          block,
-          contentWidth,
-          overrideSpan: candidateSpan,
-        );
-        if (candidateHeight <= contentHeight) {
-          bestBoundary = mid;
-          low = mid + 1;
-        } else {
-          high = mid - 1;
-        }
-      }
-
-      if (bestBoundary < boundaries.length - 1) {
-        final minBoundary =
-            boundaryStart +
-            math.max(1, ((bestBoundary - boundaryStart) * 0.6).round());
-        for (var index = bestBoundary; index > minBoundary; index--) {
-          if (_isChunkBoundaryChar(plainText[boundaries[index] - 1])) {
-            bestBoundary = index;
-            break;
-          }
-        }
-      }
-      final bestEnd = boundaries[bestBoundary];
-
-      final chunkSpan = _sliceInlineSpan(block.span, localStart, bestEnd)!;
-      chunks.add(
-        TextBlock(
-          span: chunkSpan,
-          type: block.type,
-          listIndex: block.listIndex,
-          indent: block.indent,
-          textAlign: block.textAlign,
-          margin: block.margin,
-          charStart: block.charStart + localStart,
-          charEnd: block.charStart + bestEnd,
-        ),
+    if (plainText.isEmpty) {
+      painter.dispose();
+      yield (
+        block: block,
+        height: height,
+        startsNewPage: hasPageContent && height > firstPageHeight,
       );
-      boundaryStart = bestBoundary;
+      return;
     }
+    final lines = _textPaginationLines(painter, plainText);
+    painter.dispose();
 
-    return chunks.isEmpty ? [block] : chunks;
+    var localStart = 0;
+    var firstLine = 0;
+    var availableHeight = firstPageHeight;
+    var startsNewPage = false;
+    while (firstLine < lines.length) {
+      final precedingBottom = firstLine == 0
+          ? 0.0
+          : lines[firstLine - 1].bottom;
+      final topMargin = localStart == 0 ? insets.top : 0.0;
+      var lastLine = firstLine;
+      while (lastLine + 1 < lines.length) {
+        final next = lines[lastLine + 1];
+        final estimatedHeight =
+            next.bottom -
+            precedingBottom +
+            topMargin +
+            (next.end == plainText.length ? insets.bottom : 0.0);
+        if (estimatedHeight > availableHeight) break;
+        lastLine++;
+      }
+
+      var fragment = _textBlockFragment(
+        block,
+        localStart,
+        lines[lastLine].end,
+        plainText.length,
+      );
+      var fragmentHeight = _measureTextBlockHeight(fragment, contentWidth);
+      // Retain every hard break in the source slice. A terminal newline adds
+      // an empty line when rendered independently, so verify actual height and
+      // retreat only along complete original lines, never through a word.
+      while (fragmentHeight > availableHeight && lastLine > firstLine) {
+        lastLine--;
+        fragment = _textBlockFragment(
+          block,
+          localStart,
+          lines[lastLine].end,
+          plainText.length,
+        );
+        fragmentHeight = _measureTextBlockHeight(fragment, contentWidth);
+      }
+      if (fragmentHeight > availableHeight && hasPageContent) {
+        availableHeight = pageHeight;
+        hasPageContent = false;
+        startsNewPage = true;
+        continue;
+      }
+
+      // An oversized first line owns a page rather than retrying forever or
+      // cutting a grapheme. The page's existing scrolling handles its extent.
+      yield (
+        block: fragment,
+        height: fragmentHeight,
+        startsNewPage: startsNewPage,
+      );
+      localStart = lines[lastLine].end;
+      firstLine = lastLine + 1;
+      availableHeight = pageHeight;
+      hasPageContent = false;
+      startsNewPage = true;
+    }
   }
 
-  bool _isChunkBoundaryChar(String char) {
-    return RegExp(r'[\s\.\,\!\?\:\;\)\]\}]').hasMatch(char);
+  List<({int end, double bottom})> _textPaginationLines(
+    TextPainter painter,
+    String plainText,
+  ) {
+    final metrics = painter.computeLineMetrics();
+    final lines = <({int end, double bottom})>[];
+    final graphemes = plainText.characters.iterator;
+    var graphemeEnd = 0;
+    for (var index = 0; index < metrics.length; index++) {
+      var end = plainText.length;
+      if (index + 1 < metrics.length) {
+        final nextLine = metrics[index + 1];
+        final position = painter.getPositionForOffset(
+          Offset(
+            nextLine.left + nextLine.width / 2,
+            nextLine.baseline - nextLine.ascent / 2,
+          ),
+        );
+        // The next line's logical start includes any preceding hard break in
+        // this slice; getLineBoundary(...).end itself excludes that break.
+        end = painter.getLineBoundary(position).start;
+      }
+      while (graphemeEnd < end && graphemes.moveNext()) {
+        graphemeEnd += graphemes.current.length;
+      }
+      if (end != graphemeEnd || end <= 0) continue;
+      final bottom = index + 1 == metrics.length
+          ? painter.height
+          : metrics[index].baseline + metrics[index].descent;
+      if (lines.isNotEmpty && end <= lines.last.end) {
+        if (end == lines.last.end) {
+          // A trailing source newline has a final empty visual line but no
+          // additional UTF-16 units; keep its height with the final slice.
+          lines[lines.length - 1] = (end: end, bottom: bottom);
+        }
+        continue;
+      }
+      lines.add((end: end, bottom: bottom));
+    }
+    return lines;
+  }
+
+  TextBlock _textBlockFragment(
+    TextBlock block,
+    int start,
+    int end,
+    int totalLength,
+  ) {
+    if (start == 0 && end == totalLength) return block;
+    final insets = _textBlockInsets(block);
+    return TextBlock(
+      span: _sliceInlineSpan(block.span, start, end)!,
+      type: block.type,
+      listIndex: block.listIndex,
+      indent: block.indent,
+      textAlign: block.textAlign,
+      margin: EdgeInsets.fromLTRB(
+        insets.left - block.indent,
+        start == 0 ? insets.top : 0,
+        insets.right,
+        end == totalLength ? insets.bottom : 0,
+      ),
+      charStart: block.charStart + start,
+      charEnd: block.charStart + end,
+    );
   }
 
   TextPainter _layoutTextBlock(
@@ -1791,7 +1866,6 @@ class EpubNativeViewState extends State<EpubNativeView>
           element,
           contentWidth,
           imageExtent ?? 0,
-          inTable: imageExtent != null,
         );
       }
     }
@@ -1834,12 +1908,7 @@ class EpubNativeViewState extends State<EpubNativeView>
       );
       var height = _tableCellInsets.vertical;
       for (final element in cell.elements) {
-        height += _measureElementHeight(
-          element,
-          innerWidth,
-          imageExtent,
-          inTable: true,
-        );
+        height += _measureElementHeight(element, innerWidth, imageExtent);
       }
       cellHeights.add(height);
       if (cell.rowSpan == 1) {
@@ -2694,7 +2763,7 @@ class EpubNativeViewState extends State<EpubNativeView>
     WidgetsBinding.instance.ensureVisualUpdate();
   }
 
-  double _tableImageHeight(
+  double _imageHeight(
     ImageBlock block,
     double contentWidth,
     double imageExtent,

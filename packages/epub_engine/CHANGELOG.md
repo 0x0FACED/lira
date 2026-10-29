@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Pack horizontal pages using actual image heights and remaining-space-aware text line splits; preserve styled Unicode text, hard breaks and exact positions, omit repeated continuation margins, and repaginate decoded raster dimensions without losing the reading target.
 - Fix horizontal page turns in release/profile builds by keeping debug-only repaint checks out of runtime snapshot capture, for both single pages and spreads.
 - Add interactive cylindrical paper curls in horizontal mode, including center-spine spread turns, theme-aware shadows, cancellation and reduced motion; publish progress only after a completed turn and retain native selection/oversized-page scrolling.
 - Use OPF spine as the authoritative reading order; preserve front matter, documents absent from TOC, and hierarchical navigation anchors.

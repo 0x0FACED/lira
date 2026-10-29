@@ -266,6 +266,28 @@
   "discoverArticles": "Articles",
   "discoverDocuments": "RFC",
   "discoverSelectedOnly": "Selected only",
+  "discoverTopic": "Topic",
+  "discoverAllTopics": "All topics",
+  "discoverTopicTechnology": "Technology",
+  "discoverTopicEconomics": "Economics",
+  "discoverTopicNature": "Nature",
+  "discoverTopicHistory": "History",
+  "discoverTopicCulture": "Culture",
+  "discoverTopicPsychology": "Psychology",
+  "discoverTopicScience": "Science",
+  "discoverContentLanguage": "Content language",
+  "discoverAllLanguages": "All languages",
+  "discoverLanguageRussian": "Russian",
+  "discoverLanguageEnglish": "English",
+  "discoverLanguageMultilingual": "Multilingual",
+  "discoverSourceTopics": "Topics: {topics}",
+  "@discoverSourceTopics": {
+    "placeholders": {"topics": {"type": "String"}}
+  },
+  "discoverSourceContentLanguage": "Content language: {language}",
+  "@discoverSourceContentLanguage": {
+    "placeholders": {"language": {"type": "String"}}
+  },
   "discoverSelectedCount": "{count, plural, one {{count} selected source} other {{count} selected sources}}",
   "@discoverSelectedCount": {
     "placeholders": {"count": {"type": "int"}}

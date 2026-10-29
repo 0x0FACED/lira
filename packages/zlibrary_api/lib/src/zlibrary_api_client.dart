@@ -248,9 +248,10 @@ class ZLibraryApi {
             'Unrecognized book page; login or browser verification may be required.');
       }
       final links = document
-          .querySelectorAll('a.addDownloadedBook[href], a.dlButton[href]')
+          .querySelectorAll('a.addDownloadedBook[href]')
           .where((link) =>
               !_isHidden(link) &&
+              !link.classes.contains('reader-link') &&
               (link.attributes['href']?.trim().isNotEmpty ?? false) &&
               !link.text.toLowerCase().contains('unavailable'));
       if (links.isEmpty) {
@@ -308,7 +309,8 @@ class ZLibraryApi {
         '$operation failed on the approved mirrors. ${failures.join(' ')}');
   }
 
-  static const _userAgent =
+  /// Binary downloads must use the same identity as browser-verified requests.
+  static const userAgent =
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
   static const _requestTimeout = Duration(seconds: 25);
   static final _hiddenStyle =
@@ -343,7 +345,7 @@ class ZLibraryApi {
         throw const ZLibraryException('The mirror returned a redirect loop.');
       }
       final request = http.Request(method, uri)..followRedirects = false;
-      request.headers['User-Agent'] = _userAgent;
+      request.headers['User-Agent'] = userAgent;
       if (cookieHeader.isNotEmpty) request.headers['Cookie'] = cookieHeader;
       if (body != null && method != 'GET') request.bodyFields = body;
       final streamed = await _client.send(request).timeout(_requestTimeout);

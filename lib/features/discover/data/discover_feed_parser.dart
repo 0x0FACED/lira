@@ -202,8 +202,26 @@ List<DiscoverItem> parseDiscoverMetadata(String raw, DiscoverSource source) {
           .querySelector('img')
           ?.attributes['src'],
     );
-    var author = _child(entry, 'creator');
-    if (author.isEmpty) author = _child(entry, 'author');
+    final entryImage = entry.childElements
+        .where((element) => element.name.local == 'image')
+        .firstOrNull;
+    image ??= entryImage == null
+        ? null
+        : _imageUrl(base, _child(entryImage, 'url'));
+    final creators = entry.childElements
+        .where((element) => element.name.local == 'creator')
+        .map((element) => _text(element.innerText))
+        .where((name) => name.isNotEmpty)
+        .toList();
+    final authors = creators.isNotEmpty
+        ? creators
+        : entry.childElements
+              .where((element) => element.name.local == 'author')
+              .map((element) {
+                final name = _child(element, 'name');
+                return _text(name.isEmpty ? element.innerText : name);
+              })
+              .where((name) => name.isNotEmpty);
     items.putIfAbsent(
       url.toString(),
       () => DiscoverItem(
@@ -211,7 +229,7 @@ List<DiscoverItem> parseDiscoverMetadata(String raw, DiscoverSource source) {
         sourceId: source.id,
         title: title,
         url: url,
-        author: _text(author),
+        author: authors.join(', '),
         summary: _text(summary),
         imageUrl: image,
         publishedAt: _date(
@@ -237,7 +255,9 @@ List<DiscoverItem> parseDiscoverMetadata(String raw, DiscoverSource source) {
 Uri? _imageUrl(Uri base, String? candidate) {
   if (candidate == null || candidate.trim().isEmpty) return null;
   final uri = base.resolve(candidate);
-  return {'http', 'https'}.contains(uri.scheme) && uri.host.isNotEmpty
+  return {'http', 'https'}.contains(uri.scheme) &&
+          uri.host.isNotEmpty &&
+          uri.userInfo.isEmpty
       ? uri
       : null;
 }

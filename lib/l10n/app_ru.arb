@@ -266,6 +266,28 @@
   "discoverArticles": "Статьи",
   "discoverDocuments": "RFC",
   "discoverSelectedOnly": "Только выбранные",
+  "discoverTopic": "Тема",
+  "discoverAllTopics": "Все темы",
+  "discoverTopicTechnology": "Технологии",
+  "discoverTopicEconomics": "Экономика",
+  "discoverTopicNature": "Природа",
+  "discoverTopicHistory": "История",
+  "discoverTopicCulture": "Культура",
+  "discoverTopicPsychology": "Психология",
+  "discoverTopicScience": "Наука",
+  "discoverContentLanguage": "Язык публикаций",
+  "discoverAllLanguages": "Все языки",
+  "discoverLanguageRussian": "Русский",
+  "discoverLanguageEnglish": "Английский",
+  "discoverLanguageMultilingual": "Несколько языков",
+  "discoverSourceTopics": "Темы: {topics}",
+  "@discoverSourceTopics": {
+    "placeholders": {"topics": {"type": "String"}}
+  },
+  "discoverSourceContentLanguage": "Язык публикаций: {language}",
+  "@discoverSourceContentLanguage": {
+    "placeholders": {"language": {"type": "String"}}
+  },
   "discoverSelectedCount": "{count, plural, one {Выбран {count} источник} few {Выбрано {count} источника} many {Выбрано {count} источников} other {Выбрано {count} источника}}",
   "@discoverSelectedCount": {
     "placeholders": {"count": {"type": "int"}}

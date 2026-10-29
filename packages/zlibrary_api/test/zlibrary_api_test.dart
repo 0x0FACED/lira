@@ -36,6 +36,7 @@ const _detailsPage = '''
 <div class="details-book cardBooks" data-book_id="2954024">
  <h1 class="book-title">Learning HTTP/2: A Practical Guide for Beginners</h1>
  <template><a class="addDownloadedBook" href="/dl/trap" hidden></a></template>
+ <a class="btn btn-primary dlButton reader-link" href="https://reader.z-library.biz/read/session/book/example">Read Online</a>
  <a class="btn btn-default dlButton addDownloadedBook" href="/dl/z3m7nyx5WE">epub, 1.78 MB</a>
 </div>
 ''';
@@ -298,6 +299,22 @@ void main() {
       addTearDown(api.close);
       final book = (await api.search(query: 'HTTP')).single;
       details = true;
+      await expectLater(
+          api.fetchBookDetails(book), throwsA(isA<ZLibraryException>()));
+    });
+
+    test('an online reader without a file download is not a download link',
+        () async {
+      final page = _detailsPage.replaceFirst(
+          '<a class="btn btn-default dlButton addDownloadedBook" href="/dl/z3m7nyx5WE">epub, 1.78 MB</a>',
+          '');
+      final api = ZLibraryApi(
+          mirrors: ['https://catalog.test'],
+          client: MockClient((request) async => http.Response(
+              request.url.path.startsWith('/s/') ? _searchPage : page, 200,
+              headers: _htmlHeaders)));
+      addTearDown(api.close);
+      final book = (await api.search(query: 'HTTP')).single;
       await expectLater(
           api.fetchBookDetails(book), throwsA(isA<ZLibraryException>()));
     });
