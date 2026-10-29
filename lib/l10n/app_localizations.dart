@@ -1646,6 +1646,114 @@ abstract class AppLocalizations {
   /// **'Could not save the browser session.'**
   String get annaSessionSaveError;
 
+  /// No description provided for @readerSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search in book'**
+  String get readerSearch;
+
+  /// No description provided for @readerSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Word or phrase'**
+  String get readerSearchHint;
+
+  /// No description provided for @readerSearchPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Find a passage in this book. Search works offline.'**
+  String get readerSearchPrompt;
+
+  /// No description provided for @readerSearching.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching…'**
+  String get readerSearching;
+
+  /// No description provided for @readerSearchNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No matches'**
+  String get readerSearchNoResults;
+
+  /// No description provided for @readerSearchNoResultsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Try another word or a shorter phrase.'**
+  String get readerSearchNoResultsHint;
+
+  /// No description provided for @readerSearchNoPdfText.
+  ///
+  /// In en, this message translates to:
+  /// **'This PDF has no searchable text layer. Search does not recognize text in scanned images.'**
+  String get readerSearchNoPdfText;
+
+  /// No description provided for @readerSearchError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not search this book'**
+  String get readerSearchError;
+
+  /// No description provided for @readerSearchRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get readerSearchRetry;
+
+  /// No description provided for @readerSearchPrevious.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous match'**
+  String get readerSearchPrevious;
+
+  /// No description provided for @readerSearchNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next match'**
+  String get readerSearchNext;
+
+  /// No description provided for @readerSearchFinish.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish search'**
+  String get readerSearchFinish;
+
+  /// No description provided for @readerSearchReturn.
+  ///
+  /// In en, this message translates to:
+  /// **'Return to reading'**
+  String get readerSearchReturn;
+
+  /// No description provided for @readerSearchNavigationError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open this location. Try again.'**
+  String get readerSearchNavigationError;
+
+  /// No description provided for @readerSearchCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No matches} one{1 match} other{{count} matches}}'**
+  String readerSearchCount(int count);
+
+  /// No description provided for @readerSearchPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'{current} of {total}'**
+  String readerSearchPosition(int current, int total);
+
+  /// No description provided for @readerSearchPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Page {number}'**
+  String readerSearchPage(int number);
+
+  /// No description provided for @readerSearchChapter.
+  ///
+  /// In en, this message translates to:
+  /// **'Chapter {number}'**
+  String readerSearchChapter(int number);
+
   /// No description provided for @annaSessionOpenError.
   ///
   /// In en, this message translates to:

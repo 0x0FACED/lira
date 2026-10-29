@@ -887,6 +887,81 @@ class AppLocalizationsRu extends AppLocalizations {
   String get annaSessionSaveError => 'Не удалось сохранить сессию браузера.';
 
   @override
+  String get readerSearch => 'Поиск по книге';
+
+  @override
+  String get readerSearchHint => 'Слово или фраза';
+
+  @override
+  String get readerSearchPrompt =>
+      'Найдите нужный фрагмент в книге. Поиск работает без интернета.';
+
+  @override
+  String get readerSearching => 'Ищем…';
+
+  @override
+  String get readerSearchNoResults => 'Совпадений нет';
+
+  @override
+  String get readerSearchNoResultsHint =>
+      'Попробуйте другое слово или более короткую фразу.';
+
+  @override
+  String get readerSearchNoPdfText =>
+      'В этом PDF нет текстового слоя для поиска. Текст на сканах и изображениях не распознаётся.';
+
+  @override
+  String get readerSearchError => 'Не удалось выполнить поиск по книге';
+
+  @override
+  String get readerSearchRetry => 'Повторить';
+
+  @override
+  String get readerSearchPrevious => 'Предыдущее совпадение';
+
+  @override
+  String get readerSearchNext => 'Следующее совпадение';
+
+  @override
+  String get readerSearchFinish => 'Завершить поиск';
+
+  @override
+  String get readerSearchReturn => 'Вернуться к чтению';
+
+  @override
+  String get readerSearchNavigationError =>
+      'Не удалось открыть это место. Попробуйте ещё раз.';
+
+  @override
+  String readerSearchCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count совпадения',
+      many: '$count совпадений',
+      few: '$count совпадения',
+      one: '$count совпадение',
+      zero: 'Совпадений нет',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String readerSearchPosition(int current, int total) {
+    return '$current из $total';
+  }
+
+  @override
+  String readerSearchPage(int number) {
+    return 'Страница $number';
+  }
+
+  @override
+  String readerSearchChapter(int number) {
+    return 'Глава $number';
+  }
+
+  @override
   String get annaSessionOpenError =>
       'Не удалось открыть Anna’s Archive в браузере.';
 }

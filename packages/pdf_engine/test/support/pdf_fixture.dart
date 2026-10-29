@@ -33,6 +33,39 @@ Uint8List readerPdfFixtureBytes() {
     '<< /Type /Annot /Subtype /Link /Rect [30 295 190 325] '
         '/Border [0 0 0] /Dest [7 0 R /Fit] >>',
   ];
+  return _pdfFixtureBytes(objects);
+}
+
+/// Repeated text at different positions, a phrase across two lines, and a
+/// graphics-only final page. [hasText] false makes every page graphics-only.
+Uint8List searchPdfFixtureBytes({bool hasText = true}) {
+  const graphics = '0.2 0.4 0.8 rg 30 80 200 240 re f';
+  final streams = hasText
+      ? const [
+          'BT /F1 16 Tf 30 340 Td (Repeat target repeat target) Tj '
+              '0 -50 Td (Repeat target) Tj '
+              '0 -50 Td (Whitespace) Tj '
+              '0 -24 Td (phrase) Tj ET',
+          'BT /F1 16 Tf 30 340 Td (repeat target) Tj ET',
+          graphics,
+        ]
+      : const [graphics, graphics, graphics];
+  final objects = <String>[
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R 5 0 R 7 0 R] /Count 3 >>',
+    for (var page = 0; page < streams.length; page++) ...[
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 400] '
+          '/Resources << /Font << /F1 9 0 R >> >> '
+          '/Contents ${4 + page * 2} 0 R >>',
+      '<< /Length ${streams[page].length} >>\n'
+          'stream\n${streams[page]}\nendstream',
+    ],
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  return _pdfFixtureBytes(objects);
+}
+
+Uint8List _pdfFixtureBytes(List<String> objects) {
   final bytes = BytesBuilder(copy: false);
   void append(String value) => bytes.add(ascii.encode(value));
   append('%PDF-1.4\n');

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:epub_engine/epub_engine.dart';
 
 import '../models/book_location.dart';
+import '../models/book_search.dart';
 
 /// A common interface for book rendering engines (EPUB, PDF, etc.)
 abstract class BookReaderEngine {
@@ -28,6 +29,10 @@ abstract class BookReaderEngine {
 
   /// Navigates to a specific location in the book
   Future<void> goToLocation(BookLocation location);
+
+  /// Searches rendered text without changing the current reading position.
+  /// Results use the same exact locators as selection and navigation.
+  Future<BookSearchResults> search(BookSearchRequest request);
 
   /// Returns the hierarchical Table of Contents
   List<TOCItem> getToc();

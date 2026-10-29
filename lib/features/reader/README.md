@@ -4,8 +4,8 @@
 
 ## Ответственность
 
-- `ReaderScreen`: загрузка локального файла, lifecycle, панели, TOC, настройки, сохранение progress/highlights/notes/bookmarks.
-- `BookReaderEngine`: выбор содержимого и навигация через непрозрачный `BookLocation.locator`.
+- `ReaderScreen`: загрузка локального файла, lifecycle, панели, TOC, поиск, настройки, сохранение progress/highlights/notes/bookmarks.
+- `BookReaderEngine`: выбор содержимого, поиск и навигация через непрозрачный `BookLocation.locator`.
 - `EpubBookReaderEngine`: нативный Flutter renderer из `packages/epub_engine`.
 - `PdfBookReaderEngine`: `pdfrx` viewer из `packages/pdf_engine`.
 
@@ -23,6 +23,8 @@
 - PDF highlights: `{highlightId, location, color}`, где декодирование location принадлежит PDF-пакету.
 
 Общий интерфейс не должен интерпретировать PDF rectangles или EPUB HTML.
+
+`search(BookSearchRequest)` ищет без навигации и возвращает контекст, раздел/страницу и точный range locator. `ReaderSearchController` владеет debounce/отменой и временной выдачей; экран сохраняет исходное место поисковой сессии и добавляет её подсветки только к render data. Поисковые диапазоны не записываются в БД и не подменяют пользовательские пометки. Подробнее — [READER.md](../../../READER.md#поиск-по-книге).
 
 ## Сохранение
 

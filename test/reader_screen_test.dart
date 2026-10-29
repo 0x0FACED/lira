@@ -20,6 +20,7 @@ import 'package:lira/features/progress/data/repositories/reading_progress_local_
 import 'package:lira/features/progress/domain/models/reading_progress_dto.dart';
 import 'package:lira/features/reader/presentation/reader_screen.dart';
 import 'package:lira/features/reader/presentation/reader_annotations_panel.dart';
+import 'package:lira/features/reader/presentation/reader_search_panel.dart';
 import 'package:lira/features/settings/data/settings_provider.dart';
 import 'package:lira/l10n/app_localizations.dart';
 
@@ -393,6 +394,85 @@ void main() {
       },
     );
   }
+
+  testWidgets(
+    'search leaves reading fixed until selection, navigates matches and returns without saving annotations',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      await _open(tester, readable);
+      await tester.drag(find.byType(EpubNativeView), const Offset(0, -600));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      final origin = progress.persisted!.location;
+      final viewport = tester.getRect(find.byType(EpubNativeView));
+      final visibleBefore = _visibleParagraphs(tester);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+      expect(find.byType(ReaderSearchPanel), findsOneWidget);
+      final field = find.descendant(
+        of: find.byType(ReaderSearchPanel),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(field, 'Paragraph 4');
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+      expect(_visibleParagraphs(tester), visibleBefore);
+      expect(progress.persisted!.location, origin);
+
+      addTearDown(tester.view.resetViewInsets);
+      tester.view.viewInsets = FakeViewPadding(
+        bottom: 220 * tester.view.devicePixelRatio,
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getRect(find.byType(EpubNativeView)), viewport);
+      expect(_visibleParagraphs(tester), visibleBefore);
+      await tester.tap(
+        find
+            .descendant(
+              of: find.byType(ReaderSearchPanel),
+              matching: find.byType(ListTile),
+            )
+            .first,
+      );
+      tester.view.resetViewInsets();
+      await tester.pumpAndSettle();
+      expect(
+        _visibleParagraphs(
+          tester,
+        ).any((paragraph) => paragraph.$1.startsWith('Paragraph 4.')),
+        isTrue,
+      );
+      await tester.tap(find.byTooltip('Next match'));
+      await tester.pumpAndSettle();
+      expect(
+        _visibleParagraphs(
+          tester,
+        ).any((paragraph) => paragraph.$1.startsWith('Paragraph 40.')),
+        isTrue,
+      );
+      expect(highlights.values, isEmpty);
+      expect(bookmarks.values, isEmpty);
+      await tester.tap(find.text('Return to reading'));
+      await tester.pumpAndSettle();
+      _expectSavedTextVisible(tester, EpubLocation.fromJson(origin)!);
+      expect(find.byType(ReaderSearchNavigation), findsNothing);
+      expect(
+        tester.widget<EpubNativeView>(find.byType(EpubNativeView)).highlights,
+        isEmpty,
+      );
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      expect(progress.persisted!.location, origin);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   testWidgets('both reader bars slide out before leaving the viewport', (
     tester,

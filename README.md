@@ -30,6 +30,7 @@ A good reader should make it easier to stay with a book. Lira keeps your library
 - **Bring the books you already have.** Import EPUB and PDF files from your device and give them a home on your own shelf.
 - **Leave the connection behind.** Once a book is on your device, you can read it offline. Your progress, highlights, notes, and bookmarks are saved locally.
 - **Keep more than your place.** Bookmark a reading position, highlight a passage, add a thought, and jump back when you need it. Highlights and bookmarks have separate tabs. Close the book and return to where you left off.
+- **Find the passage you need.** Search words and phrases offline in EPUBs and text-based PDFs, browse highlighted results with chapter/page context, and return to where you started reading. Open search from the reader toolbar or with Ctrl/Cmd+F. Scanned PDF images are not OCR-searched.
 - **Make the page yours.** For EPUBs, adjust the font, text size, line spacing, margins, and reading background. Scroll vertically, turn pages horizontally, or use a two-page spread when there is room.
 - **Read both formats their own way.** EPUB text adapts to your page; PDFs keep their original layout. Both share the same library and reading tools.
 - **Find your next read.** Discover recent articles from Cloudflare and GitHub Engineering, browse new RFCs, or search Anna's Archive and Z-Library for books. Choose which sources appear and participate in search. Source availability and access requirements vary.

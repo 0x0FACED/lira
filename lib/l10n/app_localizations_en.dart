@@ -882,6 +882,79 @@ class AppLocalizationsEn extends AppLocalizations {
   String get annaSessionSaveError => 'Could not save the browser session.';
 
   @override
+  String get readerSearch => 'Search in book';
+
+  @override
+  String get readerSearchHint => 'Word or phrase';
+
+  @override
+  String get readerSearchPrompt =>
+      'Find a passage in this book. Search works offline.';
+
+  @override
+  String get readerSearching => 'Searching…';
+
+  @override
+  String get readerSearchNoResults => 'No matches';
+
+  @override
+  String get readerSearchNoResultsHint =>
+      'Try another word or a shorter phrase.';
+
+  @override
+  String get readerSearchNoPdfText =>
+      'This PDF has no searchable text layer. Search does not recognize text in scanned images.';
+
+  @override
+  String get readerSearchError => 'Could not search this book';
+
+  @override
+  String get readerSearchRetry => 'Try again';
+
+  @override
+  String get readerSearchPrevious => 'Previous match';
+
+  @override
+  String get readerSearchNext => 'Next match';
+
+  @override
+  String get readerSearchFinish => 'Finish search';
+
+  @override
+  String get readerSearchReturn => 'Return to reading';
+
+  @override
+  String get readerSearchNavigationError =>
+      'Could not open this location. Try again.';
+
+  @override
+  String readerSearchCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count matches',
+      one: '1 match',
+      zero: 'No matches',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String readerSearchPosition(int current, int total) {
+    return '$current of $total';
+  }
+
+  @override
+  String readerSearchPage(int number) {
+    return 'Page $number';
+  }
+
+  @override
+  String readerSearchChapter(int number) {
+    return 'Chapter $number';
+  }
+
+  @override
   String get annaSessionOpenError =>
       'Could not open Anna’s Archive in the browser.';
 }
