@@ -12,35 +12,31 @@ const _indentGlyphStyle = TextStyle(
   letterSpacing: 0,
 );
 
-// SkParagraph adds leading tracking at a style-run boundary. Calibrate the
-// following glyph's caret, not the isolated spacer width, so the indent stays
-// exact with both native fonts and Flutter's deterministic test font.
-final (double, double) _indentGlyphMetrics = _measureIndentGlyph();
+// Reserve the indent with a real glyph advance, not tracking. SkParagraph's
+// justification handles leading letterSpacing differently from caret layout,
+// so a tracking-based spacer can push the first line past the right margin.
+// The transparent run stays one pixel high; zero height means the font's normal
+// height in SkParagraph and would enlarge the first line.
+final double _indentGlyphAdvance = _measureIndentGlyph();
 
-(double, double) _measureIndentGlyph() {
-  double advance(double spacing) {
-    final painter = TextPainter(
-      text: TextSpan(
-        children: [
-          TextSpan(
-            text: 'x',
-            style: _indentGlyphStyle.copyWith(letterSpacing: spacing),
-          ),
-          const TextSpan(text: 'A', style: TextStyle(fontSize: 16)),
-        ],
-      ),
-      textDirection: TextDirection.ltr,
-      textScaler: TextScaler.noScaling,
-    )..layout();
-    final result = painter
-        .getOffsetForCaret(const TextPosition(offset: 1), Rect.zero)
-        .dx;
-    painter.dispose();
-    return result;
-  }
+double _measureIndentGlyph() {
+  final painter = TextPainter(
+    text: const TextSpan(text: 'x', style: _indentGlyphStyle),
+    textDirection: TextDirection.ltr,
+    textScaler: TextScaler.noScaling,
+  )..layout();
+  final advance = painter.width;
+  painter.dispose();
+  return advance;
+}
 
-  final unspaced = advance(0);
-  return (unspaced, advance(1) - unspaced);
+TextSpan _buildIndentSpan(double width) {
+  final fontSize = width / _indentGlyphAdvance;
+  return TextSpan(
+    text: 'x',
+    semanticsLabel: '',
+    style: _indentGlyphStyle.copyWith(fontSize: fontSize, height: 1 / fontSize),
+  );
 }
 
 class _PatternNode {
@@ -251,17 +247,7 @@ class ReaderTextPresentation {
     final displayToSource = reuseCoordinates?._displayToSource ?? <int>[0];
     final indentSpan =
         reuseCoordinates?._indentSpan ??
-        (firstLineIndent > 0
-            ? TextSpan(
-                text: 'x',
-                semanticsLabel: '',
-                style: _indentGlyphStyle.copyWith(
-                  letterSpacing:
-                      (firstLineIndent - _indentGlyphMetrics.$1) /
-                      _indentGlyphMetrics.$2,
-                ),
-              )
-            : null);
+        (firstLineIndent > 0 ? _buildIndentSpan(firstLineIndent) : null);
     if (reuseCoordinates == null) {
       var displayOffset = 0;
       for (var offset = 0; offset <= text.length; offset++) {

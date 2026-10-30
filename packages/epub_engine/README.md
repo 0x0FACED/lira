@@ -32,6 +32,8 @@ Page margins are applied independently to each page in a spread and shared by me
 
 Reader typography includes first-line indent and paragraph spacing in em, font weight, paragraph alignment and optional language-aware EN/RU Liang hyphenation with bundled licensed TeX patterns (`LICENSE.hyphenation`). Language inherits from package metadata through XHTML and inline language attributes; absent/unsupported languages are not guessed. Headings, lists and preformatted blocks retain their structural layout. Continued paragraph pages do not repeat the first-line indent.
 
+First-line indentation reserves a transparent glyph's native advance, with a one-pixel-high run and no tracking. Do not replace this with leading `letterSpacing`: SkParagraph's justification can then paint the first line beyond the content edge despite a seemingly correct starting caret. Source/display mapping still adds only one display unit. App regressions load the actual Lora, Literata, Inter and PT Serif fonts and check every visible glyph's bounds in both reading modes.
+
 `ReaderSettings` resolves independent page/text/link/selection colors and text contrast. Palette/contrast changes repaint cached spans without reparsing XHTML or invalidating pagination; extra software dimming belongs to the application overlay and does not change engine geometry. Typography changes retain source UTF-16 positions during reflow.
 
 Horizontal turns follow touch/stylus drags and settle or roll back on release. Edge taps, keyboard and trackpad navigation use the same animation; system reduced motion switches immediately. Progress is published only for completed turns, and navigation/reflow cancels an unfinished preview. Native long-press/mouse selection and vertical scrolling inside oversized pages remain available. Viewport snapshots are captured once per turn (an additional destination snapshot for spreads), capped at 2× pixel ratio; animation frames repaint cached images rather than rebuilding text.
@@ -56,6 +58,7 @@ From the Lira repository root:
 
 ```bash
 flutter test packages/epub_engine/test
+flutter test test/reader_justification_test.dart
 
 dart --packages=.dart_tool/package_config.json \
   packages/epub_engine/bin/debug_epub_parser.dart path/to/book.epub

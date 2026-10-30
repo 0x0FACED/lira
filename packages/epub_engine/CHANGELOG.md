@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix justified first-line overflow with paragraph indentation and hyphenation: reserve a real glyph advance instead of leading letter spacing, without changing source offsets or line height. Cover glyph bounds using the bundled reader fonts in both reading modes.
 - Add first-line indent, paragraph spacing/alignment, reader font weight and language-aware EN/RU hyphenation using bundled TeX patterns; retain source UTF-16 coordinates for selection, copy, links, search, pagination and reflow.
 - Add configurable text/link/selection palettes and independent text contrast; keep parsed chapters and pagination across paint-only changes. Export source/display offset mapping for render-geometry consumers.
 - Pack horizontal pages using actual image heights and remaining-space-aware text line splits; preserve styled Unicode text, hard breaks and exact positions, omit repeated continuation margins, and repaginate decoded raster dimensions without losing the reading target.
