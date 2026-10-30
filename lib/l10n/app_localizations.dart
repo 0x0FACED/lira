@@ -434,11 +434,41 @@ abstract class AppLocalizations {
   /// **'Reader Settings'**
   String get readerSettings;
 
-  /// No description provided for @readerSettingsHint.
+  /// No description provided for @readerPreviewTitle.
   ///
   /// In en, this message translates to:
-  /// **'Font size, theme, and other settings will be available in a future update.'**
-  String get readerSettingsHint;
+  /// **'Reader preview'**
+  String get readerPreviewTitle;
+
+  /// No description provided for @readerPreviewBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Sample book'**
+  String get readerPreviewBook;
+
+  /// No description provided for @readerCurrentBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Current book'**
+  String get readerCurrentBook;
+
+  /// No description provided for @readerPreviewError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the sample book.'**
+  String get readerPreviewError;
+
+  /// No description provided for @readerCloseSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Close reader settings'**
+  String get readerCloseSettings;
+
+  /// No description provided for @readerCustomize.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize reader'**
+  String get readerCustomize;
 
   /// No description provided for @readerVertical.
   ///
@@ -866,53 +896,179 @@ abstract class AppLocalizations {
   /// **'Page margins'**
   String get readerPageMargins;
 
-  /// No description provided for @readerBrightness.
-  ///
-  /// In en, this message translates to:
-  /// **'Brightness'**
-  String get readerBrightness;
-
   /// No description provided for @readerBackground.
   ///
   /// In en, this message translates to:
   /// **'Page background'**
   String get readerBackground;
 
-  /// No description provided for @readerPaper.
+  /// No description provided for @readerTypography.
   ///
   /// In en, this message translates to:
-  /// **'Warm paper'**
-  String get readerPaper;
+  /// **'Typography'**
+  String get readerTypography;
 
-  /// No description provided for @readerNight.
+  /// No description provided for @readerLayout.
   ///
   /// In en, this message translates to:
-  /// **'Night'**
-  String get readerNight;
+  /// **'Layout'**
+  String get readerLayout;
 
-  /// No description provided for @readerCharcoal.
+  /// No description provided for @readerColors.
   ///
   /// In en, this message translates to:
-  /// **'Charcoal'**
-  String get readerCharcoal;
+  /// **'Colors'**
+  String get readerColors;
 
-  /// No description provided for @readerGraphite.
+  /// No description provided for @readerFontWeight.
   ///
   /// In en, this message translates to:
-  /// **'Graphite'**
-  String get readerGraphite;
+  /// **'Font weight'**
+  String get readerFontWeight;
 
-  /// No description provided for @readerWhite.
+  /// No description provided for @readerParagraphIndent.
   ///
   /// In en, this message translates to:
-  /// **'White'**
-  String get readerWhite;
+  /// **'First-line indent'**
+  String get readerParagraphIndent;
 
-  /// No description provided for @readerSepia.
+  /// No description provided for @readerParagraphSpacing.
   ///
   /// In en, this message translates to:
-  /// **'Sepia'**
-  String get readerSepia;
+  /// **'Paragraph spacing'**
+  String get readerParagraphSpacing;
+
+  /// No description provided for @readerEmUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'em'**
+  String get readerEmUnit;
+
+  /// No description provided for @readerHyphenation.
+  ///
+  /// In en, this message translates to:
+  /// **'Word hyphenation'**
+  String get readerHyphenation;
+
+  /// No description provided for @readerHyphenationHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Break words across lines using the book’s language.'**
+  String get readerHyphenationHint;
+
+  /// No description provided for @readerReadingMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading mode'**
+  String get readerReadingMode;
+
+  /// No description provided for @readerTextAlignment.
+  ///
+  /// In en, this message translates to:
+  /// **'Text alignment'**
+  String get readerTextAlignment;
+
+  /// No description provided for @readerAlignOriginal.
+  ///
+  /// In en, this message translates to:
+  /// **'From book'**
+  String get readerAlignOriginal;
+
+  /// No description provided for @readerAlignLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Left'**
+  String get readerAlignLeft;
+
+  /// No description provided for @readerAlignJustify.
+  ///
+  /// In en, this message translates to:
+  /// **'Justified'**
+  String get readerAlignJustify;
+
+  /// No description provided for @readerPalette.
+  ///
+  /// In en, this message translates to:
+  /// **'Reader palette'**
+  String get readerPalette;
+
+  /// No description provided for @readerPaletteDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Day'**
+  String get readerPaletteDay;
+
+  /// No description provided for @readerPalettePaper.
+  ///
+  /// In en, this message translates to:
+  /// **'Paper'**
+  String get readerPalettePaper;
+
+  /// No description provided for @readerPaletteDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Readable dark'**
+  String get readerPaletteDark;
+
+  /// No description provided for @readerPaletteEvening.
+  ///
+  /// In en, this message translates to:
+  /// **'Warm evening'**
+  String get readerPaletteEvening;
+
+  /// No description provided for @readerPaletteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Presets set page, text, link and selection colors without changing extra dimming.'**
+  String get readerPaletteHint;
+
+  /// No description provided for @readerTextColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Text color'**
+  String get readerTextColor;
+
+  /// No description provided for @readerHexColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Hex color'**
+  String get readerHexColor;
+
+  /// No description provided for @readerEditColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit color'**
+  String get readerEditColor;
+
+  /// No description provided for @readerHexColorError.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter six hexadecimal digits, for example #AABBCC.'**
+  String get readerHexColorError;
+
+  /// No description provided for @readerTextContrast.
+  ///
+  /// In en, this message translates to:
+  /// **'Text contrast'**
+  String get readerTextContrast;
+
+  /// No description provided for @readerTextContrastHint.
+  ///
+  /// In en, this message translates to:
+  /// **'100% uses the chosen text color. Lower values blend it toward the page background.'**
+  String get readerTextContrastHint;
+
+  /// No description provided for @readerAdditionalDimming.
+  ///
+  /// In en, this message translates to:
+  /// **'Additional dimming'**
+  String get readerAdditionalDimming;
+
+  /// No description provided for @readerAdditionalDimmingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Darkens the entire page, including letters. Separate from your device’s system brightness.'**
+  String get readerAdditionalDimmingHint;
 
   /// No description provided for @readerSavePositionError.
   ///

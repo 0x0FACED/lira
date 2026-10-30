@@ -16,6 +16,8 @@ import '../../search/domain/providers/book_source_clients.dart';
 import '../../search/presentation/zlibrary_mirrors_screen.dart';
 import '../../search/presentation/anna_access_screen.dart';
 
+import 'reader_settings_workspace.dart';
+
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
@@ -201,6 +203,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       AppSection(
                         title: l10n.appearance,
                         children: [
+                          ListTile(
+                            leading: const Icon(Icons.menu_book_outlined),
+                            title: Text(l10n.readerCustomize),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => Navigator.of(context).push<void>(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    const ReaderCustomizationScreen(),
+                              ),
+                            ),
+                          ),
+                          const Divider(),
                           SwitchListTile(
                             secondary: Icon(
                               themeMode == ThemeMode.dark

@@ -182,8 +182,22 @@ class AppLocalizationsRu extends AppLocalizations {
   String get readerSettings => 'Настройки чтения';
 
   @override
-  String get readerSettingsHint =>
-      'Размер шрифта, тема и другие настройки будут доступны в следующем обновлении.';
+  String get readerPreviewTitle => 'Предпросмотр чтения';
+
+  @override
+  String get readerPreviewBook => 'Пример книги';
+
+  @override
+  String get readerCurrentBook => 'Текущая книга';
+
+  @override
+  String get readerPreviewError => 'Не удалось открыть пример книги.';
+
+  @override
+  String get readerCloseSettings => 'Закрыть настройки чтения';
+
+  @override
+  String get readerCustomize => 'Настроить ридер';
 
   @override
   String get readerVertical => 'Вертикально';
@@ -427,28 +441,96 @@ class AppLocalizationsRu extends AppLocalizations {
   String get readerPageMargins => 'Отступы страницы';
 
   @override
-  String get readerBrightness => 'Яркость';
-
-  @override
   String get readerBackground => 'Фон страницы';
 
   @override
-  String get readerPaper => 'Тёплая бумага';
+  String get readerTypography => 'Шрифт';
 
   @override
-  String get readerNight => 'Ночь';
+  String get readerLayout => 'Макет';
 
   @override
-  String get readerCharcoal => 'Уголь';
+  String get readerColors => 'Цвета';
 
   @override
-  String get readerGraphite => 'Графит';
+  String get readerFontWeight => 'Насыщенность шрифта';
 
   @override
-  String get readerWhite => 'Белый';
+  String get readerParagraphIndent => 'Красная строка';
 
   @override
-  String get readerSepia => 'Сепия';
+  String get readerParagraphSpacing => 'Интервал между абзацами';
+
+  @override
+  String get readerEmUnit => 'em';
+
+  @override
+  String get readerHyphenation => 'Перенос слов';
+
+  @override
+  String get readerHyphenationHint =>
+      'Переносить слова по правилам языка книги.';
+
+  @override
+  String get readerReadingMode => 'Режим чтения';
+
+  @override
+  String get readerTextAlignment => 'Выравнивание текста';
+
+  @override
+  String get readerAlignOriginal => 'Как в книге';
+
+  @override
+  String get readerAlignLeft => 'По левому краю';
+
+  @override
+  String get readerAlignJustify => 'По ширине';
+
+  @override
+  String get readerPalette => 'Палитра чтения';
+
+  @override
+  String get readerPaletteDay => 'Дневная';
+
+  @override
+  String get readerPalettePaper => 'Бумага';
+
+  @override
+  String get readerPaletteDark => 'Чёткая тёмная';
+
+  @override
+  String get readerPaletteEvening => 'Тёплый вечер';
+
+  @override
+  String get readerPaletteHint =>
+      'Палитра задаёт цвета страницы, текста, ссылок и выделения, не меняя дополнительное затемнение.';
+
+  @override
+  String get readerTextColor => 'Цвет текста';
+
+  @override
+  String get readerHexColor => 'Цвет в HEX';
+
+  @override
+  String get readerEditColor => 'Изменить цвет';
+
+  @override
+  String get readerHexColorError =>
+      'Введите шесть шестнадцатеричных цифр, например #AABBCC.';
+
+  @override
+  String get readerTextContrast => 'Контраст текста';
+
+  @override
+  String get readerTextContrastHint =>
+      'При 100% используется выбранный цвет текста. Меньшие значения приближают его к цвету фона.';
+
+  @override
+  String get readerAdditionalDimming => 'Дополнительное затемнение';
+
+  @override
+  String get readerAdditionalDimmingHint =>
+      'Затемняет всю страницу, включая буквы. Не меняет системную яркость устройства.';
 
   @override
   String readerSavePositionError(String error) {

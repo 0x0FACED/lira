@@ -2,7 +2,7 @@ name: lira
 description: "Lira is your free feature-rich library"
 publish_to: 'none'
 
-version: 0.6.10+14
+version: 0.6.11+15
 
 environment:
   sdk: ^3.9.4
@@ -77,6 +77,8 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/reader/reading_sample.epub
+    - packages/epub_engine/LICENSE.hyphenation
     - assets/fonts/Inter-OFL.txt
     - assets/fonts/Lora-OFL.txt
     - assets/fonts/Literata-OFL.txt

@@ -29,6 +29,11 @@ void main() async {
       ], await rootBundle.loadString(font.licenseAsset));
     });
   }
+  LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks([
+      'epub_engine hyphenation',
+    ], await rootBundle.loadString('packages/epub_engine/LICENSE.hyphenation'));
+  });
 
   configureDependencies();
   runApp(const ProviderScope(child: LiraApp()));

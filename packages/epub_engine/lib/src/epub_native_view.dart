@@ -5,7 +5,21 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart'
-    show MatrixUtils, RenderObject, RenderParagraph, RenderRepaintBoundary, Selectable, SelectionRegistrar, SelectedContent, SelectedContentRange, SelectionEdgeUpdateEvent, SelectionEvent, SelectionEventType, SelectionResult, ScrollDirection;
+    show
+        MatrixUtils,
+        RenderObject,
+        RenderParagraph,
+        RenderRepaintBoundary,
+        Selectable,
+        SelectionRegistrar,
+        SelectedContent,
+        SelectedContentRange,
+        SelectionGeometry,
+        SelectionEdgeUpdateEvent,
+        SelectionEvent,
+        SelectionEventType,
+        SelectionResult,
+        ScrollDirection;
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
@@ -17,6 +31,7 @@ import 'models/reader_settings.dart';
 import 'models/epub_location.dart';
 import 'page_curl.dart';
 import 'xhtml_parser.dart';
+import 'reader_text.dart';
 
 /// A single page of content in horizontal pagination mode.
 class _PageInfo {
@@ -207,21 +222,85 @@ class _SourceOrderSelectionDelegate extends StaticSelectionContainerDelegate {
   }
 }
 
+/// Keeps Flutter's selectable geometry in display space, while exposing only
+/// original XHTML text and UTF-16 boundaries to copying and selection ranges.
+class _SourceTextSelectable implements Selectable {
+  final Selectable child;
+  final ReaderTextPresentation presentation;
+
+  const _SourceTextSelectable(this.child, this.presentation);
+
+  @override
+  SelectionGeometry get value => child.value;
+  @override
+  void addListener(VoidCallback listener) => child.addListener(listener);
+  @override
+  void removeListener(VoidCallback listener) => child.removeListener(listener);
+  @override
+  Matrix4 getTransformTo(RenderObject? ancestor) =>
+      child.getTransformTo(ancestor);
+  @override
+  Size get size => child.size;
+  @override
+  List<Rect> get boundingBoxes => child.boundingBoxes;
+  @override
+  int get contentLength => presentation.sourceText.length;
+  @override
+  void dispose() => child.dispose();
+  @override
+  void pushHandleLayers(LayerLink? startHandle, LayerLink? endHandle) =>
+      child.pushHandleLayers(startHandle, endHandle);
+  @override
+  SelectionResult dispatchSelectionEvent(SelectionEvent event) =>
+      child.dispatchSelectionEvent(event);
+  @override
+  SelectedContentRange? getSelection() {
+    final range = child.getSelection();
+    return range == null
+        ? null
+        : SelectedContentRange(
+            startOffset: presentation.toSource(range.startOffset),
+            endOffset: presentation.toSource(range.endOffset),
+          );
+  }
+
+  @override
+  SelectedContent? getSelectedContent() {
+    final range = getSelection();
+    return range == null
+        ? null
+        : SelectedContent(
+            plainText: presentation.sourceText.substring(
+              math.min(range.startOffset, range.endOffset),
+              math.max(range.startOffset, range.endOffset),
+            ),
+          );
+  }
+}
+
 class _SourceOrderRegistrar implements SelectionRegistrar {
   final _SourceOrderSelectionDelegate delegate;
   final int offset;
+  final ReaderTextPresentation presentation;
+  final Map<Selectable, Selectable> _mapped = Map.identity();
 
-  const _SourceOrderRegistrar(this.delegate, this.offset);
+  _SourceOrderRegistrar(this.delegate, this.offset, this.presentation);
 
   @override
-  void add(Selectable selectable) => delegate.addAt(selectable, offset);
+  void add(Selectable selectable) {
+    final mapped = _SourceTextSelectable(selectable, presentation);
+    _mapped[selectable] = mapped;
+    delegate.addAt(mapped, offset);
+  }
 
   @override
-  void remove(Selectable selectable) => delegate.remove(selectable);
+  void remove(Selectable selectable) {
+    final mapped = _mapped.remove(selectable);
+    if (mapped != null) delegate.remove(mapped);
+  }
 }
 
 class _SelectionScopeData {
-  final SelectionListenerNotifier notifier;
   int chapterIndex;
   List<ContentElement> elements;
   final Map<int, GlobalKey> textKeys = {};
@@ -229,17 +308,14 @@ class _SelectionScopeData {
   final Map<int, GlobalKey> elementKeys = {};
   final Map<int, int> textEnds = {};
   final selectionDelegate = _SourceOrderSelectionDelegate();
+  final Map<int, _SourceOrderRegistrar> textRegistrars = {};
   ScrollController? pageScrollController;
   GlobalKey? pageScrollKey;
 
-  _SelectionScopeData({
-    required this.notifier,
-    required this.chapterIndex,
-    required this.elements,
-  });
+  _SelectionScopeData({required this.chapterIndex, required this.elements});
 }
 
-/// Render keys and selection notifiers belong to each mounted chapter/page,
+/// Render keys and selection delegates belong to each mounted chapter/page,
 /// independently of other copies in the lazy list or page-turn destination.
 class _MountedContentScope extends StatefulWidget {
   final int chapterIndex;
@@ -267,7 +343,6 @@ class _MountedContentScopeState extends State<_MountedContentScope> {
   void initState() {
     super.initState();
     scope = _SelectionScopeData(
-      notifier: SelectionListenerNotifier(),
       chapterIndex: widget.chapterIndex,
       elements: widget.elements,
     );
@@ -283,6 +358,7 @@ class _MountedContentScopeState extends State<_MountedContentScope> {
       scope.elementKeys.clear();
       scope.imageKeys.clear();
       scope.textEnds.clear();
+      scope.textRegistrars.clear();
     }
     scope.chapterIndex = widget.chapterIndex;
     scope.elements = widget.elements;
@@ -291,7 +367,6 @@ class _MountedContentScopeState extends State<_MountedContentScope> {
   @override
   void dispose() {
     widget.onUnmount(scope);
-    scope.notifier.dispose();
     scope.selectionDelegate.dispose();
     scope.pageScrollController?.dispose();
     super.dispose();
@@ -362,6 +437,14 @@ class EpubNativeViewState extends State<EpubNativeView>
   // Parsed content per chapter (lazy, cached)
   final Map<int, List<ContentElement>> _parsedChapters = {};
   final Map<TableBlock, _TableLayout> _tableLayouts = {};
+  final Map<TextBlock, ReaderTextPresentation> _textPresentations =
+      Map.identity();
+  final Map<TextBlock, double> _presentationWidths = Map.identity();
+  final Map<TextBlock, TextSpan> _paintedText = Map.identity();
+  late TextStyle _baseTextStyle;
+  late Color _textColor;
+  late Color _linkColor;
+  late Color _selectionColor;
   final Map<Uint8List, _RasterImageData> _rasterImages = Map.identity();
   bool _imageLayoutScheduled = false;
 
@@ -418,6 +501,10 @@ class EpubNativeViewState extends State<EpubNativeView>
   @override
   void initState() {
     super.initState();
+    _updateTextStyle();
+    _textColor = widget.settings.resolvedTextColor;
+    _linkColor = widget.settings.resolvedLinkColor;
+    _selectionColor = widget.settings.resolvedSelectionColor;
     _pageTurnController = AnimationController(vsync: this);
     _pendingRestore =
         widget.initialLocation ??
@@ -432,21 +519,41 @@ class EpubNativeViewState extends State<EpubNativeView>
   @override
   void didUpdateWidget(covariant EpubNativeView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!listEquals(oldWidget.highlights, widget.highlights)) _readHighlights();
+    final highlightsChanged = !listEquals(
+      oldWidget.highlights,
+      widget.highlights,
+    );
+    if (highlightsChanged) _readHighlights();
     final needsReparse =
         oldWidget.epub != widget.epub ||
         oldWidget.settings.fontFamily != widget.settings.fontFamily ||
         oldWidget.settings.fontSize != widget.settings.fontSize ||
-        oldWidget.settings.lineHeight != widget.settings.lineHeight ||
-        oldWidget.settings.backgroundColor != widget.settings.backgroundColor;
+        oldWidget.settings.fontWeight != widget.settings.fontWeight ||
+        oldWidget.settings.lineHeight != widget.settings.lineHeight;
     final needsRepagination =
         needsReparse ||
-        oldWidget.epub != widget.epub ||
+        oldWidget.settings.paragraphIndent != widget.settings.paragraphIndent ||
+        oldWidget.settings.paragraphSpacing !=
+            widget.settings.paragraphSpacing ||
+        oldWidget.settings.hyphenation != widget.settings.hyphenation ||
+        oldWidget.settings.textAlign != widget.settings.textAlign ||
         oldWidget.settings.horizontalPadding !=
             widget.settings.horizontalPadding ||
         oldWidget.settings.readingMode != widget.settings.readingMode ||
         oldWidget.settings.enableDualPageSpread !=
             widget.settings.enableDualPageSpread;
+    final textColor = widget.settings.resolvedTextColor;
+    final linkColor = widget.settings.resolvedLinkColor;
+    final selectionColor = widget.settings.resolvedSelectionColor;
+    final paletteChanged =
+        _textColor != textColor ||
+        _linkColor != linkColor ||
+        _selectionColor != selectionColor ||
+        oldWidget.settings.backgroundColor != widget.settings.backgroundColor;
+    _textColor = textColor;
+    _linkColor = linkColor;
+    _selectionColor = selectionColor;
+    if (paletteChanged) _clearPageTurn();
 
     if (oldWidget.epub != widget.epub) {
       for (final image in _rasterImages.values) {
@@ -463,6 +570,11 @@ class EpubNativeViewState extends State<EpubNativeView>
     } else if (needsRepagination) {
       _pendingRestore ??= _captureLocation(oldWidget.settings.readingMode);
     }
+    if (needsReparse) _updateTextStyle();
+    if (needsRepagination) _textPresentations.clear();
+    if (needsRepagination) _presentationWidths.clear();
+    if (needsRepagination || paletteChanged || highlightsChanged)
+      _paintedText.clear();
     if (needsReparse) {
       _parsedChapters.clear();
       _chapterAnchors.clear();
@@ -545,8 +657,8 @@ class EpubNativeViewState extends State<EpubNativeView>
           if (start >= end) continue;
           final boxes = render.getBoxesForSelection(
             TextSelection(
-              baseOffset: start - blockStart,
-              extentOffset: end - blockStart,
+              baseOffset: readerDisplayOffset(render.text, start - blockStart),
+              extentOffset: readerDisplayOffset(render.text, end - blockStart),
             ),
           );
           if (boxes.any((box) => box.toRect().contains(local))) {
@@ -966,7 +1078,11 @@ class EpubNativeViewState extends State<EpubNativeView>
     return EpubLocation.fromPosition(
       hasExactCharOffset: true,
       chapterIndex: firstScope.chapterIndex,
-      charOffset: firstStart + position,
+      charOffset:
+          firstStart +
+          (paragraph == null
+              ? 0
+              : readerSourceOffset(paragraph.text, position)),
     );
   }
 
@@ -1100,13 +1216,16 @@ class EpubNativeViewState extends State<EpubNativeView>
   // Parsing
   // ---------------------------------------------------------------------------
 
-  TextStyle get _baseTextStyle => TextStyle(
-    inherit: false,
-    fontFamily: widget.settings.fontFamily,
-    fontSize: widget.settings.fontSize,
-    height: widget.settings.lineHeight,
-    color: _computeTextColor(widget.settings.backgroundColor),
-  );
+  void _updateTextStyle() {
+    _baseTextStyle = TextStyle(
+      inherit: false,
+      fontFamily: widget.settings.fontFamily,
+      fontSize: widget.settings.fontSize,
+      fontWeight: FontWeight
+          .values[(widget.settings.fontWeight ~/ 100 - 1).clamp(0, 8)],
+      height: widget.settings.lineHeight,
+    );
+  }
 
   void _parseChapter(int index) {
     if (_parsedChapters.containsKey(index)) return;
@@ -1122,6 +1241,7 @@ class EpubNativeViewState extends State<EpubNativeView>
       documentPath: chapter.fileName,
       stylesheets: widget.epub.stylesheets,
       highlights: const [],
+      language: widget.epub.language,
       baseStyle: baseStyle,
     );
 
@@ -1130,12 +1250,45 @@ class EpubNativeViewState extends State<EpubNativeView>
     _chapterLinks[index] = List.of(parser.links);
   }
 
-  Color _computeTextColor(int bgColor) {
-    final color = Color(bgColor);
-    return color.computeLuminance() > 0.5
-        ? const Color(0xFF1A1A1A)
-        : const Color(0xFFE0E0E0);
+  ReaderTextPresentation _presentationFor(TextBlock block, [double? width]) {
+    final cached = _textPresentations[block];
+    final maxWidth = widget.settings.hyphenation
+        ? width ?? double.infinity
+        : double.infinity;
+    if (cached != null &&
+        (width == null || _presentationWidths[block] == maxWidth)) {
+      return cached;
+    }
+    final presentation = ReaderTextPresentation(
+      source: block.span,
+      hyphenationOffsets:
+          widget.settings.hyphenation &&
+              block.type != TextBlockType.pre &&
+              block.type != TextBlockType.code
+          ? block.hyphenationOffsets ?? readerHyphenationOffsets(block.span)
+          : const [],
+      firstLineIndent:
+          block.type == TextBlockType.paragraph && !block.isContinuation
+          ? widget.settings.paragraphIndent * widget.settings.fontSize
+          : 0,
+      trailingHyphen: block.trailingHyphen,
+      maxWidth: maxWidth,
+      baseStyle: _baseTextStyle,
+    );
+    _textPresentations[block] = presentation;
+    _presentationWidths[block] = maxWidth;
+    _paintedText.remove(block);
+    return presentation;
   }
+
+  TextAlign _alignmentFor(TextBlock block) =>
+      block.type != TextBlockType.paragraph
+      ? block.textAlign
+      : switch (widget.settings.textAlign) {
+          ReaderTextAlign.original => block.textAlign,
+          ReaderTextAlign.left => TextAlign.left,
+          ReaderTextAlign.justify => TextAlign.justify,
+        };
 
   // ---------------------------------------------------------------------------
   // Navigation
@@ -1501,6 +1654,9 @@ class EpubNativeViewState extends State<EpubNativeView>
 
     _paginatedPages = [];
     _tableLayouts.clear();
+    _textPresentations.clear();
+    _presentationWidths.clear();
+    _paintedText.clear();
     final contentWidth = pageWidth - paddingH * 2;
     final contentHeight = pageHeight - contentInsets.vertical;
 
@@ -1624,7 +1780,9 @@ class EpubNativeViewState extends State<EpubNativeView>
       return;
     }
 
-    final plainText = block.span.toPlainText(includeSemanticsLabels: false);
+    final plainText = _presentationFor(
+      block,
+    ).span.toPlainText(includeSemanticsLabels: false);
     if (plainText.isEmpty) {
       painter.dispose();
       yield (
@@ -1634,7 +1792,18 @@ class EpubNativeViewState extends State<EpubNativeView>
       );
       return;
     }
-    final lines = _textPaginationLines(painter, plainText);
+    final presentation = _presentationFor(block);
+    final lines = <({int end, double bottom})>[];
+    for (final line in _textPaginationLines(painter, plainText)) {
+      final sourceEnd = presentation.toSource(line.end);
+      if (sourceEnd <= 0) continue;
+      if (lines.isNotEmpty &&
+          presentation.toSource(lines.last.end) == sourceEnd) {
+        lines[lines.length - 1] = line;
+      } else {
+        lines.add(line);
+      }
+    }
     painter.dispose();
 
     var localStart = 0;
@@ -1661,8 +1830,8 @@ class EpubNativeViewState extends State<EpubNativeView>
       var fragment = _textBlockFragment(
         block,
         localStart,
-        lines[lastLine].end,
-        plainText.length,
+        presentation.toSource(lines[lastLine].end),
+        presentation.sourceText.length,
       );
       var fragmentHeight = _measureTextBlockHeight(fragment, contentWidth);
       // Retain every hard break in the source slice. A terminal newline adds
@@ -1673,8 +1842,8 @@ class EpubNativeViewState extends State<EpubNativeView>
         fragment = _textBlockFragment(
           block,
           localStart,
-          lines[lastLine].end,
-          plainText.length,
+          presentation.toSource(lines[lastLine].end),
+          presentation.sourceText.length,
         );
         fragmentHeight = _measureTextBlockHeight(fragment, contentWidth);
       }
@@ -1692,7 +1861,7 @@ class EpubNativeViewState extends State<EpubNativeView>
         height: fragmentHeight,
         startsNewPage: startsNewPage,
       );
-      localStart = lines[lastLine].end;
+      localStart = presentation.toSource(lines[lastLine].end);
       firstLine = lastLine + 1;
       availableHeight = pageHeight;
       hasPageContent = false;
@@ -1756,6 +1925,14 @@ class EpubNativeViewState extends State<EpubNativeView>
       listIndex: block.listIndex,
       indent: block.indent,
       textAlign: block.textAlign,
+      isContinuation: block.isContinuation || start > 0,
+      hyphenationOffsets: [
+        for (final offset in _presentationFor(block).hyphenationOffsets)
+          if (offset > start && offset < end) offset - start,
+      ],
+      trailingHyphen:
+          end < totalLength && _presentationFor(block).hasVisibleHyphenAt(end),
+      continuesOnNextPage: end < totalLength,
       margin: EdgeInsets.fromLTRB(
         insets.left - block.indent,
         start == 0 ? insets.top : 0,
@@ -1772,21 +1949,21 @@ class EpubNativeViewState extends State<EpubNativeView>
     double contentWidth, {
     InlineSpan? overrideSpan,
   }) {
+    final width = math.max(
+      1.0,
+      contentWidth - _textBlockInsets(block).horizontal,
+    );
+    final presentation = _presentationFor(block, width);
     return TextPainter(
       text: TextSpan(
         style: _baseTextStyle,
-        children: [overrideSpan ?? block.span],
+        children: [overrideSpan ?? presentation.span],
       ),
       textDirection: TextDirection.ltr,
       textScaler: TextScaler.noScaling,
       textHeightBehavior: const TextHeightBehavior(),
-      textAlign: block.textAlign,
-    )..layout(
-      maxWidth: math.max(
-        1.0,
-        contentWidth - _textBlockInsets(block).horizontal,
-      ),
-    );
+      textAlign: _alignmentFor(block),
+    )..layout(maxWidth: width);
   }
 
   double _measureTextBlockHeight(
@@ -1817,9 +1994,11 @@ class EpubNativeViewState extends State<EpubNativeView>
           final painter = _layoutTextBlock(element, contentWidth);
           final caret = painter.getOffsetForCaret(
             TextPosition(
-              offset: (charOffset - element.charStart).clamp(
-                0,
-                element.charEnd - element.charStart,
+              offset: _presentationFor(element).toDisplay(
+                (charOffset - element.charStart).clamp(
+                  0,
+                  element.charEnd - element.charStart,
+                ),
               ),
             ),
             Rect.zero,
@@ -1873,12 +2052,19 @@ class EpubNativeViewState extends State<EpubNativeView>
   }
 
   EdgeInsets _textBlockInsets(TextBlock block) {
-    final margin =
-        block.margin ??
-        EdgeInsets.only(
-          top: block.type == TextBlockType.h1 ? 24 : 4,
-          bottom: block.type == TextBlockType.paragraph ? 12 : 8,
-        );
+    final margin = block.type == TextBlockType.paragraph
+        ? EdgeInsets.only(
+            left: block.margin?.left ?? 0,
+            right: block.margin?.right ?? 0,
+            bottom: block.continuesOnNextPage
+                ? 0
+                : widget.settings.paragraphSpacing * widget.settings.fontSize,
+          )
+        : block.margin ??
+              EdgeInsets.only(
+                top: block.type == TextBlockType.h1 ? 24 : 4,
+                bottom: 8,
+              );
     return margin + EdgeInsets.only(left: block.indent);
   }
 
@@ -2128,11 +2314,6 @@ class EpubNativeViewState extends State<EpubNativeView>
         if (MediaQuery.disableAnimationsOf(context) && _pageTurnImage != null) {
           _clearPageTurn();
         }
-        if (widget.settings.readingMode == ReadingMode.horizontal) {
-          for (int i = 0; i < widget.epub.chapters.length; i++) {
-            _parseChapter(i);
-          }
-        }
 
         final paddingH = widget.settings.horizontalPadding;
         final content = Listener(
@@ -2380,9 +2561,7 @@ class EpubNativeViewState extends State<EpubNativeView>
       final leftIdx = index;
       final rightIdx = leftIdx + 1;
 
-      final dividerColor = _computeTextColor(
-        widget.settings.backgroundColor,
-      ).withAlpha(30);
+      final dividerColor = _textColor.withAlpha(30);
 
       return SizedBox(
         key: ValueKey('sel_spread_$leftIdx'),
@@ -2539,10 +2718,7 @@ class EpubNativeViewState extends State<EpubNativeView>
         _selectionScopes.remove(scope);
       },
       builder: (scope) {
-        final child = SelectionListener(
-          selectionNotifier: scope.notifier,
-          child: builder(scope),
-        );
+        final child = builder(scope);
         return ownSelectionArea
             ? _buildSelectionArea(
                 onSelectionChanged: (content) => _handleScopedSelectionChanged(
@@ -2571,9 +2747,7 @@ class EpubNativeViewState extends State<EpubNativeView>
       return Center(
         child: Text(
           'No content available.',
-          style: TextStyle(
-            color: _computeTextColor(widget.settings.backgroundColor),
-          ),
+          style: TextStyle(color: _textColor),
         ),
       );
     }
@@ -2633,9 +2807,7 @@ class EpubNativeViewState extends State<EpubNativeView>
       builder: (context, constraints) {
         final layout = _layoutTable(table, constraints.maxWidth);
         final columnWidth = layout.width / math.max(1, table.columnCount);
-        final borderColor = _computeTextColor(
-          widget.settings.backgroundColor,
-        ).withAlpha(100);
+        final borderColor = _textColor.withAlpha(100);
         return Padding(
           padding: EdgeInsets.only(left: table.indent),
           child: SizedBox(
@@ -2681,32 +2853,75 @@ class EpubNativeViewState extends State<EpubNativeView>
     _SelectionScopeData scope,
   ) {
     scope.textEnds[block.charStart] = block.charEnd;
-    final highlightedSpan = applyHighlightRanges(
-      block.span,
-      block.charStart,
-      _highlightsByChapter[chapterIndex] ?? const [],
-    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final presentation = _presentationFor(
+          block,
+          math.max(
+            1.0,
+            constraints.maxWidth - _textBlockInsets(block).horizontal,
+          ),
+        );
+        final painted = _paintedText.putIfAbsent(block, () {
+          final highlighted = applyHighlightRanges(
+            block.span,
+            block.charStart,
+            _highlightsByChapter[chapterIndex] ?? const [],
+          );
+          final colored = applyReaderPalette(
+            highlighted,
+            block.charStart,
+            _textColor,
+            _linkColor,
+            [
+              for (final link
+                  in _chapterLinks[chapterIndex] ?? const <ContentLink>[])
+                (link.startOffset, link.endOffset),
+            ],
+          );
+          return ReaderTextPresentation(
+            reuseCoordinates: presentation,
+            source: colored,
+            hyphenationOffsets: presentation.hyphenationOffsets,
+            firstLineIndent:
+                block.type == TextBlockType.paragraph && !block.isContinuation
+                ? widget.settings.paragraphIndent * widget.settings.fontSize
+                : 0,
+            trailingHyphen: block.trailingHyphen,
+          ).span;
+        });
+        final previousRegistrar = scope.textRegistrars[block.charStart];
+        if (!identical(previousRegistrar?.presentation, presentation)) {
+          scope.textRegistrars[block.charStart] = _SourceOrderRegistrar(
+            scope.selectionDelegate,
+            block.charStart,
+            presentation,
+          );
+        }
 
-    // Use Text.rich instead of RichText — Text.rich automatically registers
-    // with SelectionArea via its build context, enabling text selection.
-    // RichText created directly doesn't look up the SelectionRegistrar.
-    return SelectionRegistrarScope(
-      registrar: _SourceOrderRegistrar(
-        scope.selectionDelegate,
-        block.charStart,
-      ),
-      child: Padding(
-        padding: _textBlockInsets(block),
-        child: Text.rich(
-          highlightedSpan is TextSpan ? highlightedSpan : const TextSpan(),
-          key: scope.textKeys.putIfAbsent(block.charStart, () => GlobalKey()),
-          style: _baseTextStyle,
-          textDirection: TextDirection.ltr,
-          textHeightBehavior: const TextHeightBehavior(),
-          textAlign: block.textAlign,
-          textScaler: TextScaler.noScaling,
-        ),
-      ),
+        // Use Text.rich instead of RichText — Text.rich automatically registers
+        // with SelectionArea via its build context, enabling text selection.
+        // RichText created directly doesn't look up the SelectionRegistrar.
+        return SelectionRegistrarScope(
+          registrar: scope.textRegistrars[block.charStart]!,
+          child: Padding(
+            padding: _textBlockInsets(block),
+            child: Text.rich(
+              painted,
+              key: scope.textKeys.putIfAbsent(
+                block.charStart,
+                () => GlobalKey(),
+              ),
+              style: _baseTextStyle,
+              textDirection: TextDirection.ltr,
+              textHeightBehavior: const TextHeightBehavior(),
+              textAlign: _alignmentFor(block),
+              textScaler: TextScaler.noScaling,
+              selectionColor: _selectionColor,
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -2823,11 +3038,7 @@ class EpubNativeViewState extends State<EpubNativeView>
   Widget _buildDividerBlock() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 24),
-      child: Divider(
-        color: _computeTextColor(widget.settings.backgroundColor).withAlpha(60),
-        thickness: 1,
-        height: 1,
-      ),
+      child: Divider(color: _textColor.withAlpha(60), thickness: 1, height: 1),
     );
   }
 
@@ -2845,9 +3056,7 @@ class EpubNativeViewState extends State<EpubNativeView>
       return;
     }
 
-    final range = scope.notifier.registered
-        ? scope.notifier.selection.range
-        : null;
+    final range = scope.selectionDelegate.getSelection();
     if (range == null) {
       widget.onTextSelected?.call('', '');
       return;
@@ -2895,9 +3104,7 @@ class EpubNativeViewState extends State<EpubNativeView>
   ({int chapterIndex, int startOffset, int endOffset})?
   _resolveSelectionRange() {
     for (final scope in _selectionScopes) {
-      if (!scope.notifier.registered) continue;
-
-      final range = scope.notifier.selection.range;
+      final range = scope.selectionDelegate.getSelection();
       if (range == null) continue;
 
       final offsets = _mapSelectionRangeToChapterOffsets(scope.elements, range);

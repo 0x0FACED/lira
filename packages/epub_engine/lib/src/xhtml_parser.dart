@@ -24,6 +24,10 @@ class TextBlock extends ContentElement {
   final double indent;
   final TextAlign textAlign;
   final EdgeInsets? margin;
+  final bool isContinuation;
+  final List<int>? hyphenationOffsets;
+  final bool trailingHyphen;
+  final bool continuesOnNextPage;
 
   TextBlock({
     required this.span,
@@ -32,6 +36,10 @@ class TextBlock extends ContentElement {
     this.indent = 0,
     this.textAlign = TextAlign.start,
     this.margin,
+    this.isContinuation = false,
+    this.hyphenationOffsets,
+    this.trailingHyphen = false,
+    this.continuesOnNextPage = false,
     required super.charStart,
     required super.charEnd,
   });
@@ -50,6 +58,7 @@ enum TextBlockType {
   listItem,
   code,
   pre,
+  tableHeader,
 }
 
 /// An image block.
@@ -155,6 +164,7 @@ class XhtmlParser {
   final List<HighlightRange> highlights;
   final TextStyle baseStyle;
   final double lineHeight;
+  final String? language;
   final Map<String, int> anchors = {};
   final List<ContentLink> links = [];
   int _charOffset = 0;
@@ -168,6 +178,7 @@ class XhtmlParser {
     this.stylesheets = const {},
     this.highlights = const [],
     required this.baseStyle,
+    this.language,
     this.lineHeight = 1.5,
   });
 
@@ -178,11 +189,22 @@ class XhtmlParser {
     final document = _readDocument();
     final body = document.querySelector('body');
     if (body == null) return [];
+    final languageCode = language
+        ?.trim()
+        .toLowerCase()
+        .replaceAll('_', '-')
+        .split('-')
+        .first;
     _styles = EpubStyleResolver(
       document: document,
       documentPath: documentPath,
       stylesheets: stylesheets,
-      baseStyle: baseStyle.copyWith(height: baseStyle.height ?? lineHeight),
+      baseStyle: baseStyle.copyWith(
+        height: baseStyle.height ?? lineHeight,
+        locale: languageCode == null
+            ? baseStyle.locale
+            : Locale(languageCode.isEmpty ? 'und' : languageCode),
+      ),
     );
     _images = EpubImageResolver(
       images: images,
@@ -453,7 +475,8 @@ class XhtmlParser {
       var childType = type;
       if (tag == 'p' &&
           type != TextBlockType.blockquote &&
-          type != TextBlockType.listItem) {
+          type != TextBlockType.listItem &&
+          type != TextBlockType.tableHeader) {
         childType = TextBlockType.paragraph;
       } else if (_heading(tag)) {
         childType = TextBlockType.values[int.parse(tag[1])];
@@ -699,7 +722,14 @@ class XhtmlParser {
         }
         _recordAnchor(cell);
         final content = <ContentElement>[];
-        _flow(cell.nodes, content, cellStyle);
+        _flow(
+          cell.nodes,
+          content,
+          cellStyle,
+          type: cell.localName == 'th'
+              ? TextBlockType.tableHeader
+              : TextBlockType.paragraph,
+        );
         cells.add(
           TableCellContent(
             row: row,

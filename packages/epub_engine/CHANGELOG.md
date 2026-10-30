@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add first-line indent, paragraph spacing/alignment, reader font weight and language-aware EN/RU hyphenation using bundled TeX patterns; retain source UTF-16 coordinates for selection, copy, links, search, pagination and reflow.
+- Add configurable text/link/selection palettes and independent text contrast; keep parsed chapters and pagination across paint-only changes. Export source/display offset mapping for render-geometry consumers.
 - Pack horizontal pages using actual image heights and remaining-space-aware text line splits; preserve styled Unicode text, hard breaks and exact positions, omit repeated continuation margins, and repaginate decoded raster dimensions without losing the reading target.
 - Fix horizontal page turns in release/profile builds by keeping debug-only repaint checks out of runtime snapshot capture, for both single pages and spreads.
 - Add interactive cylindrical paper curls in horizontal mode, including center-spine spread turns, theme-aware shadows, cancellation and reduced motion; publish progress only after a completed turn and retain native selection/oversized-page scrolling.

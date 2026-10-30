@@ -180,8 +180,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readerSettings => 'Reader Settings';
 
   @override
-  String get readerSettingsHint =>
-      'Font size, theme, and other settings will be available in a future update.';
+  String get readerPreviewTitle => 'Reader preview';
+
+  @override
+  String get readerPreviewBook => 'Sample book';
+
+  @override
+  String get readerCurrentBook => 'Current book';
+
+  @override
+  String get readerPreviewError => 'Could not open the sample book.';
+
+  @override
+  String get readerCloseSettings => 'Close reader settings';
+
+  @override
+  String get readerCustomize => 'Customize reader';
 
   @override
   String get readerVertical => 'Vertical';
@@ -423,28 +437,96 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readerPageMargins => 'Page margins';
 
   @override
-  String get readerBrightness => 'Brightness';
-
-  @override
   String get readerBackground => 'Page background';
 
   @override
-  String get readerPaper => 'Warm paper';
+  String get readerTypography => 'Typography';
 
   @override
-  String get readerNight => 'Night';
+  String get readerLayout => 'Layout';
 
   @override
-  String get readerCharcoal => 'Charcoal';
+  String get readerColors => 'Colors';
 
   @override
-  String get readerGraphite => 'Graphite';
+  String get readerFontWeight => 'Font weight';
 
   @override
-  String get readerWhite => 'White';
+  String get readerParagraphIndent => 'First-line indent';
 
   @override
-  String get readerSepia => 'Sepia';
+  String get readerParagraphSpacing => 'Paragraph spacing';
+
+  @override
+  String get readerEmUnit => 'em';
+
+  @override
+  String get readerHyphenation => 'Word hyphenation';
+
+  @override
+  String get readerHyphenationHint =>
+      'Break words across lines using the book’s language.';
+
+  @override
+  String get readerReadingMode => 'Reading mode';
+
+  @override
+  String get readerTextAlignment => 'Text alignment';
+
+  @override
+  String get readerAlignOriginal => 'From book';
+
+  @override
+  String get readerAlignLeft => 'Left';
+
+  @override
+  String get readerAlignJustify => 'Justified';
+
+  @override
+  String get readerPalette => 'Reader palette';
+
+  @override
+  String get readerPaletteDay => 'Day';
+
+  @override
+  String get readerPalettePaper => 'Paper';
+
+  @override
+  String get readerPaletteDark => 'Readable dark';
+
+  @override
+  String get readerPaletteEvening => 'Warm evening';
+
+  @override
+  String get readerPaletteHint =>
+      'Presets set page, text, link and selection colors without changing extra dimming.';
+
+  @override
+  String get readerTextColor => 'Text color';
+
+  @override
+  String get readerHexColor => 'Hex color';
+
+  @override
+  String get readerEditColor => 'Edit color';
+
+  @override
+  String get readerHexColorError =>
+      'Enter six hexadecimal digits, for example #AABBCC.';
+
+  @override
+  String get readerTextContrast => 'Text contrast';
+
+  @override
+  String get readerTextContrastHint =>
+      '100% uses the chosen text color. Lower values blend it toward the page background.';
+
+  @override
+  String get readerAdditionalDimming => 'Additional dimming';
+
+  @override
+  String get readerAdditionalDimmingHint =>
+      'Darkens the entire page, including letters. Separate from your device’s system brightness.';
 
   @override
   String readerSavePositionError(String error) {

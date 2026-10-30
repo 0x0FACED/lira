@@ -31,7 +31,7 @@ A good reader should make it easier to stay with a book. Lira keeps your library
 - **Leave the connection behind.** Once a book is on your device, you can read it offline. Your progress, highlights, notes, and bookmarks are saved locally.
 - **Keep more than your place.** Bookmark a reading position, highlight a passage, add a thought, and jump back when you need it. Highlights and bookmarks have separate tabs. Close the book and return to where you left off.
 - **Find the passage you need.** Search words and phrases offline in EPUBs and text-based PDFs, browse highlighted results with chapter/page context, and return to where you started reading. Open search from the reader toolbar or with Ctrl/Cmd+F. Scanned PDF images are not OCR-searched.
-- **Make the page yours.** For EPUBs, adjust the font, text size, line spacing, margins, and reading background. Scroll vertically, turn pages horizontally, or use a two-page spread when there is room.
+- **Make the page yours.** Adjust EPUB font, weight, size, line/paragraph spacing, first-line indent, alignment, margins and Russian/English hyphenation. Pick a complete day, paper, readable-dark or warm-evening palette, customize text/background colors and contrast, and dim the page separately. Preview changes on your book or the bundled sample: settings sit beside the page on large screens and in a bottom panel on phones. Scroll vertically, turn pages horizontally, or use a two-page spread when there is room.
 - **Read both formats their own way.** EPUB text adapts to your page; PDFs keep their original layout. Both share the same library and reading tools.
 - **Find your next read.** Discover recent articles from Cloudflare and GitHub Engineering, browse new RFCs, or search Anna's Archive and Z-Library for books. Choose which sources appear and participate in search. Source availability and access requirements vary.
 
@@ -41,7 +41,7 @@ Warm light and dark themes, layouts for phones and desktops, and English and Rus
 <summary><strong>A closer look at the EPUB reading controls</strong></summary>
 <br />
 <p align="center">
-  <img src="docs/images/reading-settings.png" alt="EPUB controls for reading mode, font, text size, line spacing, margins, brightness, and page background" width="320" />
+  <img src="docs/images/reading-settings.png" alt="Live EPUB preview with typography, layout, complete color palettes, text contrast and independent extra dimming" width="320" />
 </p>
 </details>
 
@@ -64,6 +64,8 @@ Warm light and dark themes, layouts for phones and desktops, and English and Rus
 1. **Open Lira and continue as a guest.** You do not need a Lira account to read your own files.
 2. **Add a book.** Import an EPUB or PDF, or open **Discover** to search for a title through a supported source.
 3. **Settle in.** Open the book, adjust your EPUB reading settings, and start reading. Your place is saved as you go.
+
+You can also open **Settings → Customize reader** to try the controls on the bundled Russian/English EPUB without importing a book. Warm evening colors are a comfort option, not a promise of sleep; see the [reader notes and research](READER.md#палитры-и-вечернее-чтение).
 
 ### Discover books, articles and RFCs
 

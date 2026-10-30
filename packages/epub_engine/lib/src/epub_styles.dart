@@ -98,6 +98,17 @@ class EpubStyleResolver {
     String? value(String property) => winners[property]?.value;
 
     var style = parent.textStyle.merge(defaultTextStyle);
+    final language =
+        element.attributes['xml:lang'] ?? element.attributes['lang'];
+    if (language != null) {
+      final code = language
+          .trim()
+          .toLowerCase()
+          .replaceAll('_', '-')
+          .split('-')
+          .first;
+      style = style.copyWith(locale: Locale(code.isEmpty ? 'und' : code));
+    }
     final inheritedSize = parent.textStyle.fontSize ?? 16;
     if (element.localName == 'font') {
       final color = element.attributes['color'];
@@ -119,7 +130,9 @@ class EpubStyleResolver {
     final weight = value('font-weight');
     if (weight != null) {
       style = style.copyWith(
-        fontWeight: _fontWeight(weight, parent.textStyle.fontWeight),
+        fontWeight: weight == 'normal' || weight == '400'
+            ? root.textStyle.fontWeight ?? FontWeight.normal
+            : _fontWeight(weight, parent.textStyle.fontWeight),
       );
     }
     final fontStyle = value('font-style');

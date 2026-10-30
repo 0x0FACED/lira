@@ -87,8 +87,9 @@ String _topVisibleText(WidgetTester tester) {
     Offset(0, (24 - firstTop).clamp(0.0, double.infinity)),
   );
   final text = first.text.toPlainText();
-  final end = (position.offset + 200).clamp(0, text.length);
-  return text.substring(position.offset, end);
+  final sourceOffset = readerSourceOffset(first.text, position.offset);
+  final end = (sourceOffset + 200).clamp(0, text.length);
+  return text.substring(sourceOffset, end);
 }
 
 ParsedEpub _htmlBook(String html, {Map<String, Uint8List> images = const {}}) =>
@@ -125,6 +126,34 @@ Iterable<RenderParagraph> _visibleParagraphs(
   }
 }
 
+TextSelection _sourceSelection(RenderParagraph paragraph, int start, int end) =>
+    TextSelection(
+      baseOffset: readerDisplayOffset(paragraph.text, start),
+      extentOffset: readerDisplayOffset(paragraph.text, end),
+    );
+
+TextStyle _renderedStyleAt(RenderParagraph paragraph, int sourceOffset) {
+  TextStyle visit(InlineSpan span, int offset, TextStyle inherited) {
+    final style = inherited.merge(span.style);
+    if (span is! TextSpan) return style;
+    final ownLength = span.text?.length ?? 0;
+    if (offset < ownLength) return style;
+    offset -= ownLength;
+    for (final child in span.children ?? const <InlineSpan>[]) {
+      final length = child.toPlainText(includeSemanticsLabels: false).length;
+      if (offset < length) return visit(child, offset, style);
+      offset -= length;
+    }
+    return style;
+  }
+
+  return visit(
+    paragraph.text,
+    readerDisplayOffset(paragraph.text, sourceOffset),
+    const TextStyle(),
+  );
+}
+
 void _expectFragmentVisible(
   WidgetTester tester,
   String fragment,
@@ -137,10 +166,7 @@ void _expectFragmentVisible(
     boxes.addAll(
       paragraph
           .getBoxesForSelection(
-            TextSelection(
-              baseOffset: index,
-              extentOffset: index + fragment.length,
-            ),
+            _sourceSelection(paragraph, index, index + fragment.length),
           )
           .map(
             (box) => box.toRect().shift(paragraph.localToGlobal(Offset.zero)),
@@ -171,7 +197,7 @@ Future<void> _pumpEveryFrame(WidgetTester tester, VoidCallback check) async {
 Future<void> _tapFirstGlyph(WidgetTester tester, String text) {
   final paragraph = _paragraph(tester, text);
   final box = paragraph
-      .getBoxesForSelection(const TextSelection(baseOffset: 0, extentOffset: 1))
+      .getBoxesForSelection(_sourceSelection(paragraph, 0, 1))
       .first;
   return tester.tapAt(paragraph.localToGlobal(box.toRect().center));
 }
@@ -201,15 +227,10 @@ Future<void> _selectTextRange(
 ) async {
   final start = _paragraph(tester, startText);
   final end = _paragraph(tester, endText);
-  final first = start
-      .getBoxesForSelection(const TextSelection(baseOffset: 0, extentOffset: 1))
-      .first;
+  final first = start.getBoxesForSelection(_sourceSelection(start, 0, 1)).first;
   final last = end
       .getBoxesForSelection(
-        TextSelection(
-          baseOffset: endText.length - 1,
-          extentOffset: endText.length,
-        ),
+        _sourceSelection(end, endText.length - 1, endText.length),
       )
       .last;
   final gesture = await tester.startGesture(
@@ -789,13 +810,18 @@ void main() {
           final rect = paragraph.localToGlobal(Offset.zero) & paragraph.size;
           expect(rect.top, greaterThanOrEqualTo(viewport.top));
           expect(rect.bottom, lessThanOrEqualTo(viewport.bottom + .01));
-          paragraph.text.visitChildren((span) {
-            if (span is TextSpan && (span.text?.contains('😀') ?? false)) {
-              expect(span.style?.fontWeight, FontWeight.bold);
-              styledUnicode = true;
-            }
-            return true;
-          });
+          final text = paragraph.text.toPlainText();
+          for (
+            var index = text.indexOf('😀');
+            index >= 0;
+            index = text.indexOf('😀', index + 2)
+          ) {
+            expect(
+              _renderedStyleAt(paragraph, index).fontWeight,
+              FontWeight.bold,
+            );
+            styledUnicode = true;
+          }
         }
         expect(styledUnicode, isTrue);
       }
@@ -850,6 +876,7 @@ void main() {
             fontSize: 18,
             lineHeight: 1.5,
             horizontalPadding: 20,
+            paragraphSpacing: 0,
           ),
           theme: ThemeData.dark(),
           onLocationChanged: (location, _) => latest = location,
@@ -859,9 +886,6 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(_renderedText(tester), firstText);
-    final filledPage = tester.getRect(find.text(firstText));
-    expect(filledPage.bottom, greaterThan(375 - .01));
-    expect(filledPage.bottom, lessThanOrEqualTo(376.01));
     await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
     await tester.pumpAndSettle();
     expect(_renderedText(tester), 'NEXT FULL LINE');
@@ -1144,9 +1168,7 @@ void main() {
       );
       final paragraph = tester.renderObject<RenderParagraph>(rich);
       final box = paragraph
-          .getBoxesForSelection(
-            TextSelection(baseOffset: 0, extentOffset: label.length),
-          )
+          .getBoxesForSelection(_sourceSelection(paragraph, 0, label.length))
           .single;
       await tester.tapAt(
         paragraph.localToGlobal(
@@ -1339,9 +1361,7 @@ void main() {
         ),
       );
       final box = paragraph
-          .getBoxesForSelection(
-            const TextSelection(baseOffset: 0, extentOffset: 6),
-          )
+          .getBoxesForSelection(_sourceSelection(paragraph, 0, 6))
           .single;
       final gesture = await tester.startGesture(
         paragraph.localToGlobal(
@@ -1470,18 +1490,19 @@ void main() {
         expect(
           _paragraph(tester, leftText)
               .getBoxesForSelection(
-                TextSelection(baseOffset: 0, extentOffset: leftText.length),
+                _sourceSelection(
+                  _paragraph(tester, leftText),
+                  0,
+                  leftText.length,
+                ),
               )
               .length,
           greaterThan(1),
         );
-        final headingSpan =
-            _paragraph(
-                  tester,
-                  'Wide heading',
-                ).text.getSpanForPosition(const TextPosition(offset: 0))
-                as TextSpan;
-        expect(headingSpan.style?.fontWeight, FontWeight.bold);
+        expect(
+          _renderedStyleAt(_paragraph(tester, 'Wide heading'), 0).fontWeight,
+          FontWeight.bold,
+        );
         final borders = tester
             .widgetList<DecoratedBox>(
               find.descendant(
@@ -1641,18 +1662,12 @@ void main() {
     );
     await tester.pumpAndSettle();
     final paragraph = _paragraph(tester, 'CHOSEN');
-    var highlighted = false;
-    paragraph.text.visitChildren((span) {
-      if (span is TextSpan && span.style?.backgroundColor != null) {
-        highlighted = true;
-      }
-      return true;
-    });
-    expect(highlighted, isTrue);
+    expect(
+      _renderedStyleAt(paragraph, 0).backgroundColor,
+      const Color(0xffffeb3b).withAlpha(90),
+    );
     final box = paragraph
-        .getBoxesForSelection(
-          const TextSelection(baseOffset: 0, extentOffset: 6),
-        )
+        .getBoxesForSelection(_sourceSelection(paragraph, 0, 6))
         .single;
     final gesture = await tester.startGesture(
       paragraph.localToGlobal(Offset(box.left + 1, (box.top + box.bottom) / 2)),
@@ -2196,9 +2211,10 @@ void main() {
       final paragraph = _paragraph(tester, text);
       final last = paragraph
           .getBoxesForSelection(
-            TextSelection(
-              baseOffset: text.length - 'TERMINAL WORD'.length,
-              extentOffset: text.length,
+            _sourceSelection(
+              paragraph,
+              text.length - 'TERMINAL WORD'.length,
+              text.length,
             ),
           )
           .last

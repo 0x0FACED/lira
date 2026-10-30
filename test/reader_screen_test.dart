@@ -172,7 +172,12 @@ void _expectSavedTextVisible(WidgetTester tester, EpubLocation location) {
         paragraph.text.toPlainText() != block.span.toPlainText())
       continue;
     final caret = paragraph.getOffsetForCaret(
-      TextPosition(offset: location.charOffset - block.charStart),
+      TextPosition(
+        offset: readerDisplayOffset(
+          paragraph.text,
+          location.charOffset - block.charStart,
+        ),
+      ),
       Rect.zero,
     );
     final point = paragraph.localToGlobal(
@@ -310,6 +315,72 @@ void main() {
         );
     await getIt.reset();
   });
+
+  for (final size in [const Size(390, 844), const Size(1200, 800)]) {
+    testWidgets(
+      'settings and sample preserve the current passage at ${size.width}px',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = size;
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPhysicalSize);
+        await _open(tester, readable);
+        await tester.drag(find.byType(EpubNativeView), const Offset(0, -700));
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 1));
+        final saved = EpubLocation.fromJson(progress.persisted!.location)!;
+        final fullViewport = tester.getRect(find.byType(EpubNativeView));
+        await _showControls(tester);
+        await tester.tap(find.byTooltip('Reader Settings'));
+        await tester.pumpAndSettle();
+        final panel = tester.getRect(
+          find.byKey(const ValueKey('reader-settings-surface')),
+        );
+        final bookViewport = tester.getRect(find.byType(EpubNativeView));
+        if (size.width >= 760) {
+          expect(panel.left, 0);
+          expect(bookViewport.left, greaterThanOrEqualTo(panel.right));
+        } else {
+          expect(bookViewport, fullViewport);
+          expect(panel.top, greaterThan(bookViewport.top + 160));
+        }
+        _expectSavedTextVisible(tester, saved);
+        await tester.tap(find.text('Sample book'));
+        for (var attempt = 0; attempt < 50; attempt++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 20)),
+          );
+          await tester.pump(const Duration(milliseconds: 50));
+          if (find.byType(CircularProgressIndicator).evaluate().isEmpty) break;
+        }
+        await tester.pumpAndSettle();
+        expect(
+          find.textContaining('A Quiet Page', findRichText: true),
+          findsWidgets,
+        );
+        await tester.tap(find.byTooltip('Close reader settings'));
+        await tester.pumpAndSettle();
+        expect(
+          tester.getRect(find.byTooltip('Reader Settings')).bottom,
+          lessThanOrEqualTo(tester.getRect(find.byType(EpubNativeView)).top),
+        );
+        final sampleBeforeScroll = _visibleParagraphs(tester);
+        await tester.drag(find.byType(EpubNativeView), const Offset(0, -500));
+        await tester.pumpAndSettle();
+        expect(_visibleParagraphs(tester), isNot(sampleBeforeScroll));
+        await tester.tap(find.byTooltip('Reader Settings'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Current book'));
+        await tester.pumpAndSettle();
+        _expectSavedTextVisible(tester, saved);
+        await tester.tap(find.byTooltip('Close reader settings'));
+        await tester.pumpAndSettle();
+        await _showControls(tester);
+        _expectSavedTextVisible(tester, saved);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
 
   for (final mode in ReadingMode.values) {
     testWidgets(

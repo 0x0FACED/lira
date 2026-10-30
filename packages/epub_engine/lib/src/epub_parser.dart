@@ -10,6 +10,7 @@ import 'epub_paths.dart';
 class ParsedEpub {
   final String title;
   final String author;
+  final String? language;
   final Uint8List? coverImage;
   final List<EpubChapter> chapters;
   final List<TOCItem> toc;
@@ -19,6 +20,7 @@ class ParsedEpub {
   ParsedEpub({
     required this.title,
     required this.author,
+    this.language,
     this.coverImage,
     required this.chapters,
     required this.toc,
@@ -258,6 +260,7 @@ class EpubParser {
     return ParsedEpub(
       title: title,
       author: author,
+      language: _firstDescendantText(metadataNode, 'language'),
       coverImage: coverImage,
       chapters: flatChapters,
       toc: normalizedToc,

@@ -6,3 +6,4 @@ export 'src/models/reader_settings.dart';
 export 'src/models/epub_location.dart';
 export 'src/models/epub_cfi.dart';
 export 'src/xhtml_parser.dart';
+export 'src/reader_text.dart' show readerDisplayOffset, readerSourceOffset;

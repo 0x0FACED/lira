@@ -182,7 +182,10 @@ void main() {
     );
     final glyph = paragraph
         .getBoxesForSelection(
-          const TextSelection(baseOffset: 0, extentOffset: 1),
+          TextSelection(
+            baseOffset: readerDisplayOffset(paragraph.text, 0),
+            extentOffset: readerDisplayOffset(paragraph.text, 1),
+          ),
         )
         .first;
     final gesture = await tester.startGesture(
