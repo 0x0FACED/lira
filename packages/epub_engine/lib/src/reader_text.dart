@@ -267,56 +267,17 @@ class ReaderTextPresentation {
         }
       }
     }
-    var cursor = 0;
-    TextStyle? lastStyle;
-    InlineSpan transform(InlineSpan original, [TextStyle? inherited]) {
-      if (original is! TextSpan) return original;
-      final ownText = original.text ?? '';
-      final effectiveStyle = inherited?.merge(original.style) ?? original.style;
-      final children = <InlineSpan>[];
-      var start = 0;
-      for (var local = 0; local < ownText.length; local++) {
-        if (insertions.contains(cursor + local)) {
-          if (local > start)
-            children.add(TextSpan(text: ownText.substring(start, local)));
-          children.add(
-            TextSpan(
-              text: measureOpportunities ? '\u00ad' : '-',
-              semanticsLabel: '',
-              style: local == 0 ? lastStyle ?? effectiveStyle : effectiveStyle,
-            ),
-          );
-          start = local;
-        }
-      }
-      if (start < ownText.length)
-        children.add(TextSpan(text: ownText.substring(start)));
-      if (ownText.isNotEmpty) lastStyle = effectiveStyle;
-      cursor += ownText.length;
-      for (final child in original.children ?? const <InlineSpan>[]) {
-        children.add(transform(child, effectiveStyle));
-      }
-      return TextSpan(
-        style: original.style,
-        recognizer: original.recognizer,
-        mouseCursor: original.mouseCursor,
-        onEnter: original.onEnter,
-        onExit: original.onExit,
-        locale: original.locale,
-        spellOut: original.spellOut,
-        children: children,
-      );
-    }
-
     final displaySpan = _MappedTextSpan(
       sourceToDisplay,
       displayToSource,
-      children: [
-        if (indentSpan != null) indentSpan,
-        transform(source),
-        if (trailingHyphen)
-          TextSpan(text: '-', semanticsLabel: '', style: lastStyle),
-      ],
+      children: _readerDisplayChildren(
+        source,
+        insertions.toList()..sort(),
+        indentSpan,
+        trailingHyphen,
+        measureOpportunities,
+        baseStyle,
+      ),
     );
     return ReaderTextPresentation._(
       text,
@@ -339,6 +300,69 @@ class ReaderTextPresentation {
       _insertions.contains(sourceOffset);
 }
 
+List<InlineSpan> _readerDisplayChildren(
+  InlineSpan source,
+  List<int> insertions,
+  TextSpan? indentSpan,
+  bool trailingHyphen,
+  bool measureOpportunities,
+  TextStyle? baseStyle,
+) {
+  var cursor = 0;
+  var insertionIndex = 0;
+  TextStyle? lastStyle;
+  InlineSpan transform(InlineSpan original, [TextStyle? inherited]) {
+    if (original is! TextSpan) return original;
+    final ownText = original.text ?? '';
+    final effectiveStyle =
+        (inherited?.merge(original.style) ??
+                original.style ??
+                const TextStyle())
+            .copyWith(inherit: false);
+    final children = <InlineSpan>[];
+    var start = 0;
+    while (insertionIndex < insertions.length &&
+        insertions[insertionIndex] < cursor + ownText.length) {
+      final local = insertions[insertionIndex++] - cursor;
+      if (local < 0) continue;
+      if (local > start)
+        children.add(TextSpan(text: ownText.substring(start, local)));
+      children.add(
+        TextSpan(
+          text: measureOpportunities ? '\u00ad' : '-',
+          semanticsLabel: '',
+          style: local == 0 ? lastStyle ?? effectiveStyle : effectiveStyle,
+        ),
+      );
+      start = local;
+    }
+    if (start < ownText.length)
+      children.add(TextSpan(text: ownText.substring(start)));
+    if (ownText.isNotEmpty) lastStyle = effectiveStyle;
+    cursor += ownText.length;
+    for (final child in original.children ?? const <InlineSpan>[]) {
+      children.add(transform(child, effectiveStyle));
+    }
+    return TextSpan(
+      style: original.style,
+      recognizer: original.recognizer,
+      mouseCursor: original.mouseCursor,
+      onEnter: original.onEnter,
+      onExit: original.onExit,
+      locale: original.locale,
+      spellOut: original.spellOut,
+      children: children,
+    );
+  }
+
+  return [
+    if (indentSpan != null) indentSpan,
+    transform(source, baseStyle),
+    if (trailingHyphen)
+      TextSpan(text: '-', semanticsLabel: '', style: lastStyle),
+  ];
+}
+
 class _ReaderRun {
   final int start;
   final int end;
@@ -351,11 +375,14 @@ class _ReaderRun {
 class _ReaderRuns {
   final runs = <_ReaderRun>[];
 
-  _ReaderRuns(InlineSpan source) {
+  _ReaderRuns(InlineSpan source, TextStyle? baseStyle) {
     var offset = 0;
-    void visit(InlineSpan span, TextStyle? inherited) {
+    void visit(InlineSpan span, TextStyle? inherited, Locale? inheritedLocale) {
       if (span is! TextSpan) return;
-      final style = inherited?.merge(span.style) ?? span.style;
+      final style =
+          (inherited?.merge(span.style) ?? span.style ?? const TextStyle())
+              .copyWith(inherit: false);
+      final locale = span.locale ?? inheritedLocale;
       final text = span.text ?? '';
       if (text.isNotEmpty) {
         runs.add(
@@ -369,7 +396,7 @@ class _ReaderRuns {
               mouseCursor: span.mouseCursor,
               onEnter: span.onEnter,
               onExit: span.onExit,
-              locale: span.locale,
+              locale: locale,
               spellOut: span.spellOut,
             ),
           ),
@@ -377,14 +404,20 @@ class _ReaderRuns {
         offset += text.length;
       }
       for (final child in span.children ?? const <InlineSpan>[]) {
-        visit(child, style);
+        visit(child, style, locale);
       }
     }
 
-    visit(source, null);
+    visit(source, baseStyle, null);
   }
 
-  TextSpan slice(int start, int end) {
+  TextSpan slice(
+    int start,
+    int end, {
+    List<int> hyphenationOffsets = const [],
+    TextSpan? indentSpan,
+    bool trailingHyphen = false,
+  }) {
     var low = 0;
     var high = runs.length;
     while (low < high) {
@@ -395,7 +428,9 @@ class _ReaderRuns {
         high = middle;
       }
     }
-    final children = <InlineSpan>[];
+    final children = <InlineSpan>[if (indentSpan != null) indentSpan];
+    var opportunityIndex = 0;
+    TextStyle? lastStyle;
     for (
       var index = low;
       index < runs.length && runs[index].start < end;
@@ -403,41 +438,143 @@ class _ReaderRuns {
     ) {
       final run = runs[index];
       final span = run.span;
-      children.add(
-        TextSpan(
-          text: span.text!.substring(
-            (start - run.start).clamp(0, run.end - run.start),
-            (end - run.start).clamp(0, run.end - run.start),
+      final localStart = (start - run.start).clamp(0, run.end - run.start);
+      final localEnd = (end - run.start).clamp(0, run.end - run.start);
+      final hasOpportunities =
+          opportunityIndex < hyphenationOffsets.length &&
+          start + hyphenationOffsets[opportunityIndex] < run.start + localEnd;
+      List<InlineSpan>? pieces;
+      if (hasOpportunities) {
+        pieces = <InlineSpan>[];
+        var cursor = localStart;
+        while (opportunityIndex < hyphenationOffsets.length &&
+            start + hyphenationOffsets[opportunityIndex] <
+                run.start + localEnd) {
+          final local =
+              start + hyphenationOffsets[opportunityIndex] - run.start;
+          if (local > cursor) {
+            pieces.add(TextSpan(text: span.text!.substring(cursor, local)));
+          }
+          pieces.add(
+            TextSpan(
+              text: '\u00ad',
+              semanticsLabel: '',
+              style: local == localStart ? lastStyle ?? span.style : span.style,
+            ),
+          );
+          cursor = local;
+          opportunityIndex++;
+        }
+        if (cursor < localEnd) {
+          pieces.add(TextSpan(text: span.text!.substring(cursor, localEnd)));
+        }
+      }
+      if (pieces == null &&
+          localStart == 0 &&
+          localEnd == run.end - run.start) {
+        children.add(span);
+      } else {
+        children.add(
+          TextSpan(
+            text: pieces == null
+                ? span.text!.substring(localStart, localEnd)
+                : null,
+            style: span.style,
+            recognizer: span.recognizer,
+            mouseCursor: span.mouseCursor,
+            onEnter: span.onEnter,
+            onExit: span.onExit,
+            locale: span.locale,
+            spellOut: span.spellOut,
+            children: pieces,
           ),
-          style: span.style,
-          recognizer: span.recognizer,
-          mouseCursor: span.mouseCursor,
-          onEnter: span.onEnter,
-          onExit: span.onExit,
-          locale: span.locale,
-          spellOut: span.spellOut,
-        ),
-      );
+        );
+      }
+      lastStyle = span.style;
+    }
+    if (trailingHyphen) {
+      children.add(TextSpan(text: '-', semanticsLabel: '', style: lastStyle));
     }
     return TextSpan(children: children);
   }
 }
 
-TextPainter _readerProbe(
-  ReaderTextPresentation presentation,
-  TextStyle? baseStyle,
-  double width,
-) => TextPainter(
-  text: TextSpan(style: baseStyle, children: [presentation.span]),
-  textDirection: TextDirection.ltr,
-  textScaler: TextScaler.noScaling,
-  textHeightBehavior: const TextHeightBehavior(),
-)..layout(maxWidth: width);
+/// Probe windows need only a few boundary conversions, not two UTF-16-sized
+/// coordinate maps. Insertion i ends at sourceOffset + i + 1 (after the indent).
+class _ReaderProbeText {
+  final TextSpan span;
+  final int sourceLength;
+  final List<int> opportunities;
+  final bool indented;
+  final bool trailingHyphen;
 
-List<int> _displayLineEnds(
-  TextPainter painter,
-  ReaderTextPresentation presentation,
-) {
+  const _ReaderProbeText(
+    this.span,
+    this.sourceLength,
+    this.opportunities,
+    this.indented,
+    this.trailingHyphen,
+  );
+
+  int get displayLength =>
+      sourceLength +
+      opportunities.length +
+      (indented ? 1 : 0) +
+      (trailingHyphen ? 1 : 0);
+
+  int toSource(int offset) {
+    final unindented = offset - (indented ? 1 : 0);
+    var low = 0;
+    var high = opportunities.length;
+    while (low < high) {
+      final middle = (low + high) ~/ 2;
+      if (opportunities[middle] + middle < unindented) {
+        low = middle + 1;
+      } else {
+        high = middle;
+      }
+    }
+    return (unindented - low).clamp(0, sourceLength);
+  }
+
+  int toDisplay(int offset) {
+    var low = 0;
+    var high = opportunities.length;
+    while (low < high) {
+      final middle = (low + high) ~/ 2;
+      if (opportunities[middle] <= offset) {
+        low = middle + 1;
+      } else {
+        high = middle;
+      }
+    }
+    return offset +
+        low +
+        (indented ? 1 : 0) +
+        (offset == sourceLength && trailingHyphen ? 1 : 0);
+  }
+}
+
+class _ReaderProbe {
+  final TextStyle? baseStyle;
+  final TextPainter painter = TextPainter(
+    textDirection: TextDirection.ltr,
+    textScaler: TextScaler.noScaling,
+    textHeightBehavior: const TextHeightBehavior(),
+  );
+
+  _ReaderProbe(this.baseStyle);
+
+  TextPainter layout(InlineSpan span, double width) {
+    painter.text = TextSpan(style: baseStyle, children: [span]);
+    painter.layout(maxWidth: width);
+    return painter;
+  }
+
+  void dispose() => painter.dispose();
+}
+
+List<int> _displayLineEnds(TextPainter painter, int displayLength) {
   final metrics = painter.computeLineMetrics();
   final result = <int>[];
   for (var index = 1; index < metrics.length; index++) {
@@ -448,9 +585,21 @@ List<int> _displayLineEnds(
     final end = painter.getLineBoundary(position).start;
     if (result.isEmpty || end > result.last) result.add(end);
   }
-  final length = presentation._displayToSource.length - 1;
-  if (result.isEmpty || result.last < length) result.add(length);
+  if (result.isEmpty || result.last < displayLength) result.add(displayLength);
   return result;
+}
+
+int _firstDisplayLineEnd(TextPainter painter, int displayLength) {
+  final metrics = painter.computeLineMetrics();
+  if (metrics.length < 2) return displayLength;
+  final next = metrics[1];
+  return painter
+      .getLineBoundary(
+        painter.getPositionForOffset(
+          Offset(next.left + next.width / 2, next.baseline - next.ascent / 2),
+        ),
+      )
+      .start;
 }
 
 final _naturalReaderBreak = RegExp(r'\s+|[-‐–—/]');
@@ -467,145 +616,194 @@ Set<int> _chooseVisibleHyphens(
   TextStyle? baseStyle,
   double width,
 ) {
-  final opportunities = ReaderTextPresentation(
-    source: source,
-    hyphenationOffsets: candidates,
-    firstLineIndent: indent,
-    trailingHyphen: trailingHyphen,
-    measureOpportunities: true,
-  );
-  final baseline = _readerProbe(opportunities, baseStyle, width);
-  final baselineEnds = _displayLineEnds(
-    baseline,
-    opportunities,
-  ).map(opportunities.toSource).where((end) => end > 0).toList();
-  baseline.dispose();
-  if (baselineEnds.length == 1) return <int>{};
-  final runs = _ReaderRuns(source);
   final candidateSet = candidates.toSet();
-  final selected = <int>{};
-  var start = 0;
-  var baselineIndex = 0;
-  var candidateIndex = 0;
-  while (start < text.length) {
-    while (baselineIndex + 1 < baselineEnds.length &&
-        baselineEnds[baselineIndex] <= start) {
-      baselineIndex++;
-    }
-    final windowIndex = (baselineIndex + 2).clamp(0, baselineEnds.length - 1);
-    final windowEnd = baselineEnds[windowIndex];
-    while (candidateIndex < candidates.length &&
-        candidates[candidateIndex] <= start) {
-      candidateIndex++;
-    }
-    final windowCandidates = <int>[];
-    for (
-      var index = candidateIndex;
-      index < candidates.length && candidates[index] < windowEnd;
-      index++
-    ) {
-      windowCandidates.add(candidates[index] - start);
-    }
-    final lineIndent = start == 0 ? indent : 0.0;
-    final windowSource = runs.slice(start, windowEnd);
-    final window = ReaderTextPresentation(
-      source: windowSource,
-      hyphenationOffsets: windowCandidates,
-      firstLineIndent: lineIndent,
-      trailingHyphen: windowEnd == text.length && trailingHyphen,
-      measureOpportunities: true,
+  candidates = candidateSet.toList()..sort();
+  final indentSpan = indent > 0 ? _buildIndentSpan(indent) : null;
+  final probe = _ReaderProbe(baseStyle);
+  try {
+    final opportunities = _ReaderProbeText(
+      TextSpan(
+        children: _readerDisplayChildren(
+          source,
+          candidates,
+          indentSpan,
+          trailingHyphen,
+          true,
+          baseStyle,
+        ),
+      ),
+      text.length,
+      candidates,
+      indentSpan != null,
+      trailingHyphen,
     );
-    final painter = _readerProbe(window, baseStyle, width);
-    final ends = _displayLineEnds(painter, window);
-    var end = start + window.toSource(ends.first);
-    final tookOpportunity =
-        candidateSet.contains(end) &&
-        end < text.length &&
-        window.toDisplay(end - start) == ends.first;
-    painter.dispose();
-    if (tookOpportunity) {
-      final options = <int>{};
+    final baseline = probe.layout(opportunities.span, width);
+    final baselineEnds = _displayLineEnds(
+      baseline,
+      opportunities.displayLength,
+    ).map(opportunities.toSource).where((end) => end > 0).toList();
+    if (baselineEnds.length == 1) return <int>{};
+    final runs = _ReaderRuns(source, baseStyle);
+    final selected = <int>{};
+    var start = 0;
+    var baselineIndex = 0;
+    var candidateIndex = 0;
+    while (start < text.length) {
+      while (baselineIndex + 1 < baselineEnds.length &&
+          baselineEnds[baselineIndex] <= start) {
+        baselineIndex++;
+      }
+      final windowIndex = (baselineIndex + 2).clamp(0, baselineEnds.length - 1);
+      final windowEnd = baselineEnds[windowIndex];
+      while (candidateIndex < candidates.length &&
+          candidates[candidateIndex] <= start) {
+        candidateIndex++;
+      }
+      final windowCandidates = <int>[];
       for (
         var index = candidateIndex;
-        index < candidates.length && candidates[index] <= end;
+        index < candidates.length && candidates[index] < windowEnd;
         index++
       ) {
-        options.add(candidates[index]);
+        windowCandidates.add(candidates[index] - start);
       }
-      for (final match in _naturalReaderBreak.allMatches(
-        text.substring(start, end),
-      )) {
-        options.add(start + match.end);
-      }
-      final ordered = options.toList()..sort();
-      var low = 0;
-      var high = ordered.length;
-      while (low < high) {
-        final middle = (low + high) ~/ 2;
-        final option = ordered[middle];
-        final hyphen = candidateSet.contains(option);
-        var measureEnd = option;
-        if (!hyphen) {
-          while (measureEnd > start &&
-              text.substring(measureEnd - 1, measureEnd).trim().isEmpty) {
-            measureEnd--;
+      final lineIndent = start == 0 ? indentSpan : null;
+      final window = _ReaderProbeText(
+        runs.slice(
+          start,
+          windowEnd,
+          hyphenationOffsets: windowCandidates,
+          indentSpan: lineIndent,
+          trailingHyphen: windowEnd == text.length && trailingHyphen,
+        ),
+        windowEnd - start,
+        windowCandidates,
+        lineIndent != null,
+        windowEnd == text.length && trailingHyphen,
+      );
+      final painter = probe.layout(window.span, width);
+      final displayEnd = _firstDisplayLineEnd(painter, window.displayLength);
+      var end = start + window.toSource(displayEnd);
+      final tookOpportunity =
+          candidateSet.contains(end) &&
+          end < text.length &&
+          window.toDisplay(end - start) == displayEnd;
+      if (tookOpportunity) {
+        final options = <int>{};
+        for (
+          var index = candidateIndex;
+          index < candidates.length && candidates[index] <= end;
+          index++
+        ) {
+          options.add(candidates[index]);
+        }
+        for (final match in _naturalReaderBreak.allMatches(
+          text.substring(start, end),
+        )) {
+          options.add(start + match.end);
+        }
+        final ordered = options.toList()..sort();
+        bool fits(int option) {
+          final hyphen = candidateSet.contains(option);
+          var measureEnd = option;
+          if (!hyphen) {
+            while (measureEnd > start &&
+                text.substring(measureEnd - 1, measureEnd).trim().isEmpty) {
+              measureEnd--;
+            }
+          }
+          final trial = runs.slice(
+            start,
+            measureEnd,
+            indentSpan: lineIndent,
+            trailingHyphen: hyphen,
+          );
+          return probe.layout(trial, double.infinity).width <= width + 0.001;
+        }
+
+        var low = 0;
+        var high = ordered.length;
+        // Usually the soft break has room for its real hyphen already. Measure
+        // that exact shaped line once before searching earlier alternatives.
+        if (high > 0 && fits(ordered.last)) {
+          low = high;
+        } else {
+          high--;
+          while (low < high) {
+            final middle = (low + high) ~/ 2;
+            if (fits(ordered[middle])) {
+              low = middle + 1;
+            } else {
+              high = middle;
+            }
           }
         }
-        final trial = ReaderTextPresentation(
-          source: runs.slice(start, measureEnd),
-          firstLineIndent: lineIndent,
-          trailingHyphen: hyphen,
-        );
-        final measured = _readerProbe(trial, baseStyle, double.infinity);
-        final fits = measured.width <= width + 0.001;
-        measured.dispose();
-        if (fits) {
-          low = middle + 1;
+        if (low > 0) {
+          end = ordered[low - 1];
+          if (candidateSet.contains(end)) selected.add(end);
         } else {
-          high = middle;
+          // Preserve Flutter's ordinary emergency wrap when no linguistic
+          // break fits, without inventing a visible hyphen.
+          final plain = _ReaderProbeText(
+            runs.slice(
+              start,
+              windowEnd,
+              indentSpan: lineIndent,
+              trailingHyphen: windowEnd == text.length && trailingHyphen,
+            ),
+            windowEnd - start,
+            const [],
+            lineIndent != null,
+            windowEnd == text.length && trailingHyphen,
+          );
+          final plainPainter = probe.layout(plain.span, width);
+          end =
+              start +
+              plain.toSource(
+                _firstDisplayLineEnd(plainPainter, plain.displayLength),
+              );
         }
       }
-      if (low > 0) {
-        end = ordered[low - 1];
-        if (candidateSet.contains(end)) selected.add(end);
-      } else {
-        // No linguistic break fits the remaining first-line width. Preserve
-        // Flutter's ordinary emergency wrap, without inventing a visible hyphen.
-        final plain = ReaderTextPresentation(
-          source: windowSource,
-          firstLineIndent: lineIndent,
-          trailingHyphen: windowEnd == text.length && trailingHyphen,
-        );
-        final plainPainter = _readerProbe(plain, baseStyle, width);
-        end =
-            start + plain.toSource(_displayLineEnds(plainPainter, plain).first);
-        plainPainter.dispose();
+      if (end <= start) {
+        end = start + text.substring(start).characters.first.length;
       }
+      start = end;
     }
-    if (end <= start) {
-      end = start + text.substring(start).characters.first.length;
-    }
-    start = end;
-  }
 
-  // Final native shaping is authoritative. Contextual kerning or a font's
-  // unusual hyphen metrics must never leave a discretionary glyph mid-line.
-  // Removal is monotonic; unused opportunities never enter the painted span.
-  while (selected.isNotEmpty) {
-    final finalText = ReaderTextPresentation(
-      source: source,
-      selectedHyphens: selected,
-      firstLineIndent: indent,
-      trailingHyphen: trailingHyphen,
-    );
-    final painter = _readerProbe(finalText, baseStyle, width);
-    final ends = _displayLineEnds(painter, finalText).toSet();
-    painter.dispose();
-    final previousLength = selected.length;
-    selected.removeWhere((point) => !ends.contains(finalText.toDisplay(point)));
-    if (selected.length == previousLength) break;
+    // Final native shaping is authoritative. Contextual kerning or a font's
+    // unusual hyphen metrics must never leave a discretionary glyph mid-line.
+    // Keep the original span hierarchy here, not the flattened probe runs.
+    // Removal is monotonic; unused opportunities never enter the painted span.
+    while (selected.isNotEmpty) {
+      final ordered = selected.toList()..sort();
+      final finalText = _ReaderProbeText(
+        TextSpan(
+          children: _readerDisplayChildren(
+            source,
+            ordered,
+            indentSpan,
+            trailingHyphen,
+            false,
+            baseStyle,
+          ),
+        ),
+        text.length,
+        ordered,
+        indentSpan != null,
+        trailingHyphen,
+      );
+      final painter = probe.layout(finalText.span, width);
+      final ends = _displayLineEnds(painter, finalText.displayLength).toSet();
+      final previousLength = selected.length;
+      selected.removeWhere(
+        (point) => !ends.contains(finalText.toDisplay(point)),
+      );
+      if (selected.length == previousLength) break;
+    }
+    return selected;
+  } finally {
+    probe.dispose();
   }
-  return selected;
 }
 
 class _MappedTextSpan extends TextSpan {

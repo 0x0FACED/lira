@@ -301,12 +301,22 @@ void main() {
   testWidgets('continued paragraph pages cover the unmodified source once', (
     tester,
   ) async {
-    final text = 'associate representation hyphenation ' * 80;
+    final text = List.generate(
+      80,
+      (index) =>
+          'associate 👩‍🔬 á representation hyphenation${index % 7 == 0 ? '\n' : ' '}',
+    ).join();
+    final boundaries = <int>{0};
+    var boundary = 0;
+    for (final grapheme in text.characters) {
+      boundary += grapheme.length;
+      boundaries.add(boundary);
+    }
     var offset = -1;
     await tester.pumpWidget(
       _frame(
         EpubNativeView(
-          epub: _book('<p>$text</p>'),
+          epub: _book('<p>${text.replaceAll('\n', '<br/>')}</p>'),
           settings: const ReaderSettings(
             readingMode: ReadingMode.horizontal,
             enableDualPageSpread: false,
@@ -325,25 +335,36 @@ void main() {
     );
     await tester.pumpAndSettle();
     final fragments = <String>[];
+    var consumed = 0;
     for (var page = 0; page < 200; page++) {
       final paragraph = _paragraphs(tester).first;
       final fragment = paragraph.text.toPlainText();
       fragments.add(fragment);
+      consumed += fragment.length;
+      expect(boundaries, contains(consumed));
       _expectTakenHyphens(paragraph);
       if (page > 0) {
-        final glyph = paragraph
-            .getBoxesForSelection(
-              TextSelection(
-                baseOffset: readerDisplayOffset(paragraph.text, 0),
-                extentOffset: readerDisplayOffset(paragraph.text, 1),
-              ),
-            )
-            .first;
-        expect(
-          glyph.left,
-          closeTo(0, 0.1),
-          reason: 'Continued paragraphs must not acquire a fresh indent',
-        );
+        var first = 0;
+        while (first < fragment.length &&
+            (fragment[first] == '\n' || fragment[first] == '\r')) {
+          first++;
+        }
+        if (first < fragment.length) {
+          final end = first + fragment.substring(first).characters.first.length;
+          final glyph = paragraph
+              .getBoxesForSelection(
+                TextSelection(
+                  baseOffset: readerDisplayOffset(paragraph.text, first),
+                  extentOffset: readerDisplayOffset(paragraph.text, end),
+                ),
+              )
+              .first;
+          expect(
+            glyph.left,
+            closeTo(0, 0.1),
+            reason: 'Continued paragraphs must not acquire a fresh indent',
+          );
+        }
       }
       final previous = offset;
       await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);

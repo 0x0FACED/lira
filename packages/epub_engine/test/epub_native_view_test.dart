@@ -28,6 +28,37 @@ ParsedEpub _book() => ParsedEpub(
   images: const {},
 );
 
+ParsedEpub _paginationBook() => ParsedEpub(
+  title: 'Incremental pagination',
+  author: 'Lira',
+  chapters: [
+    for (var chapter = 0; chapter < 8; chapter++)
+      EpubChapter(
+        title: 'Chapter $chapter',
+        fileName: 'chapter$chapter.xhtml',
+        htmlContent:
+            '<p>${List.generate(160, (unit) => '[C$chapter:${unit.toString().padLeft(3, '0')}] 😀 á readable content. ').join()}</p>',
+      ),
+  ],
+  toc: const [],
+  images: const {},
+);
+
+EpubLocation _paginationLocation(ParsedEpub book, int chapter, String marker) {
+  final text = XhtmlParser(
+    html: book.chapters[chapter].htmlContent,
+    images: const {},
+    baseStyle: const TextStyle(fontSize: 18),
+  ).parse().whereType<TextBlock>().single.span.toPlainText();
+  final offset = text.indexOf(marker);
+  expect(offset, greaterThanOrEqualTo(0));
+  return EpubLocation.fromPosition(
+    chapterIndex: chapter,
+    charOffset: offset,
+    hasExactCharOffset: true,
+  );
+}
+
 String _renderedText(WidgetTester tester) => tester
     .widgetList<RichText>(find.byType(RichText))
     .map((widget) => widget.text.toPlainText())
@@ -401,7 +432,223 @@ void main() {
   );
 
   testWidgets(
-    'every reflow frame paints the saved text instead of chapter zero',
+    'opening a deep saved horizontal position never reports an earlier chapter',
+    (tester) async {
+      final book = _paginationBook();
+      final target = EpubLocation.fromJson(
+        _paginationLocation(book, 7, '[C7:120]').toJson(),
+      )!;
+      final reports = <EpubLocation>[];
+      await tester.pumpWidget(
+        _frame(
+          EpubNativeView(
+            epub: book,
+            initialLocation: target,
+            settings: const ReaderSettings(
+              readingMode: ReadingMode.horizontal,
+              enableDualPageSpread: false,
+            ),
+            theme: ThemeData.dark(),
+            onLocationChanged: (location, _) {
+              reports.add(location);
+              expect(location.hasExactCharOffset, isTrue);
+              expect(location.chapterIndex, target.chapterIndex);
+              expect(location.charOffset, target.charOffset);
+            },
+          ),
+          size: const Size(360, 400),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(reports, isNotEmpty);
+      _expectFragmentVisible(
+        tester,
+        '[C7:120]',
+        const Rect.fromLTWH(0, 24, 360, 352),
+      );
+      expect(_renderedText(tester), isNot(contains('[C0:')));
+    },
+  );
+
+  testWidgets(
+    'backward turn from a reopened chapter reaches the prior last page',
+    (tester) async {
+      EpubLocation? latest;
+      await tester.pumpWidget(
+        _frame(
+          EpubNativeView(
+            epub: _paginationBook(),
+            initialLocation: EpubLocation.fromPosition(
+              chapterIndex: 7,
+              hasExactCharOffset: true,
+            ),
+            settings: const ReaderSettings(
+              readingMode: ReadingMode.horizontal,
+              enableDualPageSpread: false,
+            ),
+            theme: ThemeData.dark(),
+            onLocationChanged: (location, _) => latest = location,
+          ),
+          size: const Size(360, 400),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(latest!.chapterIndex, 7);
+      expect(latest!.charOffset, 0);
+      await tester.sendKeyEvent(LogicalKeyboardKey.pageUp);
+      await tester.pumpAndSettle();
+      expect(latest!.chapterIndex, 6);
+      expect(latest!.charOffset, greaterThan(0));
+      expect(_renderedText(tester), contains('[C6:159]'));
+      expect(_renderedText(tester), isNot(contains('[C6:000]')));
+      await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+      await tester.pumpAndSettle();
+      expect(latest!.chapterIndex, 7);
+      expect(latest!.charOffset, 0);
+      expect(_renderedText(tester), contains('[C7:000]'));
+    },
+  );
+
+  testWidgets('empty spine documents do not skip their readable neighbours', (
+    tester,
+  ) async {
+    final book = ParsedEpub(
+      title: 'Empty spine neighbours',
+      author: 'Lira',
+      chapters: [
+        for (var chapter = 0; chapter < 4; chapter++)
+          EpubChapter(
+            title: 'Chapter $chapter',
+            fileName: 'chapter$chapter.xhtml',
+            htmlContent: chapter.isEven
+                ? '<p>READABLE CHAPTER $chapter</p>'
+                : '<html><body></body></html>',
+          ),
+      ],
+      toc: const [],
+      images: const {},
+    );
+    for (final chapter in [1, 3]) {
+      EpubLocation? latest;
+      await tester.pumpWidget(
+        _frame(
+          EpubNativeView(
+            key: ValueKey(chapter),
+            epub: book,
+            initialLocation: EpubLocation.fromPosition(
+              chapterIndex: chapter,
+              hasExactCharOffset: true,
+            ),
+            settings: const ReaderSettings(
+              readingMode: ReadingMode.horizontal,
+              enableDualPageSpread: false,
+            ),
+            theme: ThemeData.dark(),
+            onLocationChanged: (location, _) => latest = location,
+          ),
+          size: const Size(360, 400),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(latest!.chapterIndex, 2);
+      expect(find.text('READABLE CHAPTER 2'), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.pageUp);
+      await tester.pumpAndSettle();
+      expect(latest!.chapterIndex, 0);
+      expect(find.text('READABLE CHAPTER 0'), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+      await tester.pumpAndSettle();
+      expect(latest!.chapterIndex, 2);
+      expect(find.text('READABLE CHAPTER 2'), findsOneWidget);
+    }
+  });
+
+  testWidgets(
+    'latest navigation and settings survive interrupted horizontal reflows',
+    (tester) async {
+      final book = _paginationBook();
+      final key = GlobalKey<EpubNativeViewState>();
+      var expected = _paginationLocation(book, 7, '[C7:100]');
+      final initial = expected;
+      final reports = <EpubLocation>[];
+      var settings = const ReaderSettings(
+        readingMode: ReadingMode.horizontal,
+        enableDualPageSpread: false,
+      );
+      var size = const Size(600, 400);
+      late StateSetter rebuild;
+      await tester.pumpWidget(
+        StatefulBuilder(
+          builder: (context, setState) {
+            rebuild = setState;
+            return _frame(
+              EpubNativeView(
+                key: key,
+                epub: book,
+                initialLocation: initial,
+                settings: settings,
+                theme: ThemeData.dark(),
+                onLocationChanged: (location, _) {
+                  reports.add(location);
+                  expect(location.hasExactCharOffset, isTrue);
+                  expect(location.chapterIndex, expected.chapterIndex);
+                  expect(location.charOffset, expected.charOffset);
+                },
+              ),
+              size: size,
+            );
+          },
+        ),
+      );
+      expected = _paginationLocation(book, 2, '[C2:075]');
+      key.currentState!.goToLocation(expected);
+      await tester.pump();
+      rebuild(() {
+        size = const Size(520, 420);
+        settings = settings.copyWith(fontSize: 22, lineHeight: 1.8);
+      });
+      await tester.pump();
+      expected = _paginationLocation(book, 6, '[C6:105]');
+      key.currentState!.goToLocation(expected);
+      rebuild(() {
+        size = const Size(700, 480);
+        settings = settings.copyWith(
+          readingMode: ReadingMode.vertical,
+          fontSize: 30,
+        );
+      });
+      await tester.pump();
+      rebuild(() {
+        size = const Size(480, 360);
+        settings = settings.copyWith(
+          readingMode: ReadingMode.horizontal,
+          fontFamily: 'serif',
+          fontSize: 24,
+          lineHeight: 1.7,
+          horizontalPadding: 36,
+        );
+      });
+      await tester.pumpAndSettle();
+      expect(reports, isNotEmpty);
+      expect(reports.last.chapterIndex, expected.chapterIndex);
+      expect(reports.last.charOffset, expected.charOffset);
+      const viewport = Rect.fromLTWH(0, 24, 480, 312);
+      _expectFragmentVisible(tester, '[C6:105]', viewport);
+      final paragraph = _visibleParagraphs(tester, viewport).singleWhere(
+        (paragraph) => paragraph.text.toPlainText().contains('[C6:105]'),
+      );
+      final text = paragraph.text.toPlainText();
+      final style = _renderedStyleAt(paragraph, text.indexOf('[C6:105]'));
+      expect(style.fontSize, 24);
+      expect(style.fontFamily, 'serif');
+      expect(paragraph.size.width, closeTo(408, .01));
+      expect(paragraph.localToGlobal(Offset.zero).dx, closeTo(36, .01));
+      expect(text, isNot(contains('[C6:000]')));
+    },
+  );
+
+  testWidgets(
+    'reflow shows the saved text or loading without reporting chapter zero',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(1400, 900);
@@ -430,7 +677,11 @@ void main() {
       late StateSetter rebuild;
       void checkFrame() {
         final viewport = Rect.fromLTWH(0, 24, size.width, size.height - 48);
-        _expectFragmentVisible(tester, 'SECOND paragraph 6.', viewport);
+        if (find.byType(CircularProgressIndicator).evaluate().isEmpty) {
+          _expectFragmentVisible(tester, 'SECOND paragraph 6.', viewport);
+        } else {
+          expect(_visibleParagraphs(tester, viewport), isEmpty);
+        }
         for (final paragraph in _visibleParagraphs(tester, viewport)) {
           expect(
             paragraph.text.toPlainText(),
@@ -442,6 +693,12 @@ void main() {
           expect(report.chapterIndex, target.chapterIndex);
           expect(report.charOffset, target.charOffset);
         }
+      }
+
+      Future<void> checkReflow() async {
+        await _pumpEveryFrame(tester, checkFrame);
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+        checkFrame();
       }
 
       await tester.pumpWidget(
@@ -462,7 +719,7 @@ void main() {
         ),
       );
       checkFrame();
-      await _pumpEveryFrame(tester, checkFrame);
+      await checkReflow();
       for (final mode in [
         (ReadingMode.vertical, false),
         (ReadingMode.horizontal, false),
@@ -475,7 +732,7 @@ void main() {
             enableDualPageSpread: mode.$2,
           );
         });
-        await _pumpEveryFrame(tester, checkFrame);
+        await checkReflow();
         for (final update in [
           settings.copyWith(fontSize: 25),
           settings.copyWith(fontFamily: 'serif'),
@@ -484,11 +741,11 @@ void main() {
           settings.copyWith(horizontalPadding: 240),
         ]) {
           rebuild(() => settings = update);
-          await _pumpEveryFrame(tester, checkFrame);
+          await checkReflow();
         }
         for (final width in [440.0, 140.0, 1200.0]) {
           rebuild(() => size = Size(width, 500));
-          await _pumpEveryFrame(tester, checkFrame);
+          await checkReflow();
         }
       }
       expect(reports, isNotEmpty);
@@ -1029,6 +1286,135 @@ void main() {
     expect(_renderedText(tester), isNot(contains('FIRST CHAPTER')));
     expect(latest!.chapterIndex, 1);
   });
+
+  for (final spread in [false, true]) {
+    testWidgets(
+      'chapter-boundary turns preserve every source unit in ${spread ? 'spreads' : 'single pages'}',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(1200, 800);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPhysicalSize);
+        final chapterTexts = [
+          for (var chapter = 0; chapter < 5; chapter++)
+            '${chapter == 1 ? 'RIGHT DESTINATION. ' : ''}'
+                '${List.generate([1, 80, 1, 65, 1][chapter], (unit) => 'C$chapter[$unit] 😀 á content. ').join()}',
+        ];
+        final book = ParsedEpub(
+          title: 'Chapter boundaries',
+          author: 'Lira',
+          chapters: [
+            for (var chapter = 0; chapter < chapterTexts.length; chapter++)
+              EpubChapter(
+                title: 'Chapter $chapter',
+                fileName: 'chapter$chapter.xhtml',
+                htmlContent:
+                    '<p id="right" style="margin: 0">${chapterTexts[chapter]}</p>',
+              ),
+          ],
+          toc: const [],
+          images: const {},
+        );
+        final key = GlobalKey<EpubNativeViewState>();
+        var settings = ReaderSettings(
+          readingMode: ReadingMode.horizontal,
+          enableDualPageSpread: spread,
+        );
+        var size = Size(spread ? 1200 : 360, 400);
+        final reports = <EpubLocation>[];
+        late StateSetter rebuild;
+        String visibleText() {
+          final paragraphs =
+              _visibleParagraphs(
+                tester,
+                Rect.fromLTWH(0, 24, size.width, size.height - 48),
+              ).toList()..sort((a, b) {
+                final left = a.localToGlobal(Offset.zero);
+                final right = b.localToGlobal(Offset.zero);
+                final column = left.dx.compareTo(right.dx);
+                return column == 0 ? left.dy.compareTo(right.dy) : column;
+              });
+          return paragraphs
+              .map((paragraph) => paragraph.text.toPlainText())
+              .join();
+        }
+
+        await tester.pumpWidget(
+          StatefulBuilder(
+            builder: (context, setState) {
+              rebuild = setState;
+              return _frame(
+                EpubNativeView(
+                  key: key,
+                  epub: book,
+                  settings: settings,
+                  theme: ThemeData.dark(),
+                  onLocationChanged: (location, _) => reports.add(location),
+                ),
+                size: size,
+              );
+            },
+          ),
+        );
+        await tester.pumpAndSettle();
+        final pages = <String>[];
+        for (var turn = 0; turn < 100; turn++) {
+          final text = visibleText();
+          expect(text, isNotEmpty);
+          pages.add(text);
+          await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+          await tester.pumpAndSettle();
+          if (visibleText() == text) break;
+        }
+        expect(pages.join(), chapterTexts.join());
+        for (final text in pages.reversed.skip(1)) {
+          await tester.sendKeyEvent(LogicalKeyboardKey.pageUp);
+          await tester.pumpAndSettle();
+          expect(visibleText(), text);
+        }
+        await tester.sendKeyEvent(LogicalKeyboardKey.pageUp);
+        await tester.pumpAndSettle();
+        expect(visibleText(), pages.first);
+
+        if (spread) {
+          reports.clear();
+          key.currentState!.scrollToChapter('chapter1.xhtml#right');
+          await tester.pumpAndSettle();
+          expect(visibleText(), startsWith(chapterTexts.first));
+          final rightPage =
+              _visibleParagraphs(
+                tester,
+                const Rect.fromLTWH(0, 24, 1200, 352),
+              ).singleWhere(
+                (paragraph) =>
+                    paragraph.text.toPlainText().contains('RIGHT DESTINATION.'),
+              );
+          expect(
+            rightPage.localToGlobal(Offset.zero).dx,
+            greaterThan(size.width / 2),
+          );
+          rebuild(() {
+            size = const Size(1000, 420);
+            settings = settings.copyWith(fontSize: 22);
+          });
+          await tester.pumpAndSettle();
+          rebuild(() {
+            settings = settings.copyWith(enableDualPageSpread: false);
+          });
+          await tester.pumpAndSettle();
+          expect(visibleText(), startsWith('RIGHT DESTINATION.'));
+          expect(visibleText(), isNot(contains('C0[0]')));
+          expect(reports, isNotEmpty);
+          for (final location in reports) {
+            expect(location.hasExactCharOffset, isTrue);
+            expect(location.chapterIndex, 1);
+            expect(location.charOffset, 0);
+            expect(location.anchor, 'right');
+          }
+        }
+      },
+    );
+  }
 
   testWidgets(
     'relative internal links decode paths and fragments without center tap',

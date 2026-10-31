@@ -227,6 +227,94 @@ void main() {
   });
 
   test(
+    'styled probe windows keep hyphens at real breaks across UTF-16 and newlines',
+    () {
+      const baseStyle = TextStyle(fontFamily: 'Ahem', fontSize: 16);
+      const source = TextSpan(
+        style: TextStyle(locale: Locale('en')),
+        children: [
+          TextSpan(text: '😀 as'),
+          TextSpan(
+            text: 'sociate ',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          TextSpan(
+            children: [
+              TextSpan(text: 'associate\n'),
+              TextSpan(
+                text: 'associate',
+                style: TextStyle(fontStyle: FontStyle.italic),
+              ),
+            ],
+          ),
+        ],
+      );
+      final offsets = readerHyphenationOffsets(source);
+      for (final width in [80.0, 96.0, 112.0]) {
+        final presentation = ReaderTextPresentation(
+          source: source,
+          hyphenationOffsets: offsets,
+          firstLineIndent: 16,
+          baseStyle: baseStyle,
+          maxWidth: width,
+        );
+        final painter = TextPainter(
+          text: TextSpan(style: baseStyle, children: [presentation.span]),
+          textDirection: TextDirection.ltr,
+        )..layout(maxWidth: width);
+        final displayed = presentation.span.toPlainText(
+          includeSemanticsLabels: false,
+        );
+        final lines = painter.computeLineMetrics();
+        final lineEnds = <int>{
+          displayed.length,
+          for (final line in lines.skip(1))
+            painter
+                .getLineBoundary(
+                  painter.getPositionForOffset(
+                    Offset(
+                      line.left + line.width / 2,
+                      line.baseline - line.ascent / 2,
+                    ),
+                  ),
+                )
+                .start,
+        };
+        final visible = offsets.where(presentation.hasVisibleHyphenAt).toList();
+        expect(visible, isNotEmpty, reason: 'width $width');
+        for (final point in visible) {
+          final displayEnd = presentation.toDisplay(point);
+          expect(displayed[displayEnd - 1], '-');
+          expect(lineEnds, contains(displayEnd), reason: 'width $width');
+          final before = _effectiveStyleAt(source, point - 1, baseStyle);
+          final hyphen = _effectiveStyleAt(
+            presentation.span,
+            displayEnd - 1,
+            baseStyle,
+          );
+          expect(hyphen.fontSize, before.fontSize);
+          expect(hyphen.fontWeight, before.fontWeight);
+          expect(hyphen.locale, before.locale);
+        }
+        for (
+          var offset = 0;
+          offset <= presentation.sourceText.length;
+          offset++
+        ) {
+          expect(presentation.toSource(presentation.toDisplay(offset)), offset);
+        }
+        expect(presentation.span.toPlainText(), source.toPlainText());
+        expect(
+          lines.every((line) => line.width <= width + 0.001),
+          isTrue,
+          reason: 'width $width',
+        );
+        painter.dispose();
+      }
+    },
+  );
+
+  test(
     'reader palette keeps highlights and links at original source offsets',
     () {
       final source = applyHighlightRanges(

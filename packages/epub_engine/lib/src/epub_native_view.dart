@@ -51,6 +51,30 @@ class _PageInfo {
   int get charEnd => elements.last.charEnd;
 }
 
+class _PaginationWork {
+  final (Size, EdgeInsets) geometry;
+  final List<int> chapters;
+  final List<_PageInfo> pages = [];
+  final Set<int> completedChapters = {};
+  final Map<int, Iterator<_PageInfo>> iterators = {};
+
+  _PaginationWork(this.geometry, int chapterCount, int firstChapter)
+    : chapters = [
+        if (chapterCount > 0) firstChapter,
+        for (var chapter = 0; chapter < chapterCount; chapter++)
+          if (chapter != firstChapter) chapter,
+      ];
+
+  bool get isComplete => chapters.isEmpty;
+
+  void prioritize(int chapter) {
+    final index = chapters.indexOf(chapter);
+    if (index <= 0) return;
+    chapters.removeAt(index);
+    chapters.insert(0, chapter);
+  }
+}
+
 class _TableLayout {
   final double width;
   final double imageExtent;
@@ -437,6 +461,7 @@ class EpubNativeViewState extends State<EpubNativeView>
   // Parsed content per chapter (lazy, cached)
   final Map<int, List<ContentElement>> _parsedChapters = {};
   final Map<TableBlock, _TableLayout> _tableLayouts = {};
+  final Map<TextBlock, List<int>> _hyphenationOffsets = Map.identity();
   final Map<TextBlock, ReaderTextPresentation> _textPresentations =
       Map.identity();
   final Map<TextBlock, double> _presentationWidths = Map.identity();
@@ -460,6 +485,9 @@ class EpubNativeViewState extends State<EpubNativeView>
   int _currentPageIndex = 0;
   bool _isDualPage = false;
   (Size, EdgeInsets)? _lastPaginationGeometry;
+  _PaginationWork? _paginationWork;
+  int? _paginationFrameCallback;
+  bool? _queuedPageTurn;
   final GlobalKey _pageBoundaryKey = GlobalKey();
   final GlobalKey _destinationBoundaryKey = GlobalKey();
   late final AnimationController _pageTurnController;
@@ -577,6 +605,7 @@ class EpubNativeViewState extends State<EpubNativeView>
       _paintedText.clear();
     if (needsReparse) {
       _parsedChapters.clear();
+      _hyphenationOffsets.clear();
       _chapterAnchors.clear();
       _chapterLinks.clear();
     }
@@ -584,14 +613,14 @@ class EpubNativeViewState extends State<EpubNativeView>
       _clearPageTurn();
       _hasActiveSelection = false;
       _tableLayouts.clear();
-      _paginatedPages.clear();
-      _lastPaginationGeometry = null;
+      _invalidatePagination();
       _layoutGeneration++;
     }
   }
 
   @override
   void dispose() {
+    _cancelPaginationCallback();
     _pageTurnController.dispose();
     _pageTurnImage?.dispose();
     _pageTurnDestinationImage?.dispose();
@@ -1250,6 +1279,19 @@ class EpubNativeViewState extends State<EpubNativeView>
     _chapterLinks[index] = List.of(parser.links);
   }
 
+  List<int> _hyphenationFor(TextBlock block) {
+    if (!widget.settings.hyphenation ||
+        block.type == TextBlockType.pre ||
+        block.type == TextBlockType.code) {
+      return const [];
+    }
+    return block.hyphenationOffsets ??
+        _hyphenationOffsets.putIfAbsent(
+          block,
+          () => readerHyphenationOffsets(block.span),
+        );
+  }
+
   ReaderTextPresentation _presentationFor(TextBlock block, [double? width]) {
     final cached = _textPresentations[block];
     final maxWidth = widget.settings.hyphenation
@@ -1261,12 +1303,7 @@ class EpubNativeViewState extends State<EpubNativeView>
     }
     final presentation = ReaderTextPresentation(
       source: block.span,
-      hyphenationOffsets:
-          widget.settings.hyphenation &&
-              block.type != TextBlockType.pre &&
-              block.type != TextBlockType.code
-          ? block.hyphenationOffsets ?? readerHyphenationOffsets(block.span)
-          : const [],
+      hyphenationOffsets: _hyphenationFor(block),
       firstLineIndent:
           block.type == TextBlockType.paragraph && !block.isContinuation
           ? widget.settings.paragraphIndent * widget.settings.fontSize
@@ -1306,6 +1343,7 @@ class EpubNativeViewState extends State<EpubNativeView>
 
   void _jumpToLocation(EpubLocation location) {
     _clearPageTurn();
+    _queuedPageTurn = null;
     _pendingRestore = location;
     setState(() {
       _layoutGeneration++;
@@ -1315,6 +1353,7 @@ class EpubNativeViewState extends State<EpubNativeView>
 
   int? _pageIndexForLocation(EpubLocation location) {
     final offset = _locationCharOffset(location);
+    final completed = _paginationWork?.completedChapters ?? const <int>{};
     int? last;
     for (var index = 0; index < _paginatedPages.length; index++) {
       final page = _paginatedPages[index];
@@ -1322,12 +1361,50 @@ class EpubNativeViewState extends State<EpubNativeView>
       last = index;
       if (offset < page.charEnd || offset <= page.charStart) return index;
     }
+    if (!completed.contains(location.chapterIndex)) return null;
     if (last != null) return last;
-    final following = _paginatedPages.indexWhere(
-      (page) => page.chapterIndex > location.chapterIndex,
+    for (
+      var chapter = location.chapterIndex + 1;
+      chapter < widget.epub.chapters.length;
+      chapter++
+    ) {
+      final following = _paginatedPages.indexWhere(
+        (page) => page.chapterIndex == chapter,
+      );
+      if (following >= 0) return following;
+      if (!completed.contains(chapter)) return null;
+    }
+    for (var chapter = location.chapterIndex - 1; chapter >= 0; chapter--) {
+      if (!completed.contains(chapter)) return null;
+      final preceding = _paginatedPages.lastIndexWhere(
+        (page) => page.chapterIndex == chapter,
+      );
+      if (preceding >= 0) return preceding;
+    }
+    return null;
+  }
+
+  bool _paginationReadyFor(EpubLocation location) {
+    final work = _paginationWork;
+    if (work == null) return false;
+    final index = _pageIndexForLocation(location);
+    if (index == null) return work.isComplete;
+    if (!_isDualPage) return true;
+    // A spread's parity depends on every preceding chapter's page count.
+    // Do not show a provisional left/right pairing that later shifts.
+    for (
+      var chapter = 0;
+      chapter < _paginatedPages[index].chapterIndex;
+      chapter++
+    ) {
+      if (!work.completedChapters.contains(chapter)) return false;
+    }
+    final right = (index ~/ 2) * 2 + 1;
+    if (right >= _paginatedPages.length) return work.isComplete;
+    return _pagesAreAdjacent(
+      _paginatedPages[right - 1],
+      _paginatedPages[right],
     );
-    if (following >= 0) return following;
-    return _paginatedPages.isEmpty ? null : _paginatedPages.length - 1;
   }
 
   EpubLocation _restoreTarget(EpubLocation location) {
@@ -1359,6 +1436,11 @@ class EpubNativeViewState extends State<EpubNativeView>
 
   void _scheduleRestore() {
     if (_pendingRestore == null || _restoreScheduled) return;
+    if (widget.epub.chapters.isNotEmpty &&
+        widget.settings.readingMode == ReadingMode.horizontal &&
+        !_paginationReadyFor(_restoreTarget(_pendingRestore!))) {
+      return;
+    }
     _restoreScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _restoreScheduled = false;
@@ -1370,6 +1452,7 @@ class EpubNativeViewState extends State<EpubNativeView>
       }
       final target = _restoreTarget(location);
       if (widget.settings.readingMode == ReadingMode.horizontal) {
+        if (!_paginationReadyFor(target)) return;
         final page = _pageIndexForLocation(target);
         if (page == null) {
           _pendingRestore = null;
@@ -1461,14 +1544,78 @@ class EpubNativeViewState extends State<EpubNativeView>
   // Horizontal mode: page navigation
   // ---------------------------------------------------------------------------
 
-  int _adjacentPageIndex(bool forward) {
-    if (_paginatedPages.isEmpty) return _currentPageIndex;
+  int _adjacentPageIndex(bool forward, {int? fromIndex}) {
+    final current = fromIndex ?? _currentPageIndex;
+    if (_paginatedPages.isEmpty) return current;
     final step = _isDualPage ? 2 : 1;
-    final index = (_currentPageIndex + (forward ? step : -step)).clamp(
-      0,
+    final requested = current + (forward ? step : -step);
+    if (requested < 0 || requested >= _paginatedPages.length) {
+      return current;
+    }
+    final index = _isDualPage ? (requested ~/ 2) * 2 : requested;
+    final end = math.min(
+      math.max(index, current) + (_isDualPage ? 1 : 0),
       _paginatedPages.length - 1,
     );
-    return _isDualPage ? (index ~/ 2) * 2 : index;
+    for (var i = math.min(index, current); i < end; i++) {
+      if (!_pagesAreAdjacent(_paginatedPages[i], _paginatedPages[i + 1])) {
+        return current;
+      }
+    }
+    final target = _paginatedPages[index];
+    if (!_paginationReadyFor(
+      EpubLocation.fromPosition(
+        chapterIndex: target.chapterIndex,
+        charOffset: target.charStart,
+        hasExactCharOffset: true,
+      ),
+    )) {
+      return current;
+    }
+    return index;
+  }
+
+  bool _pagesAreAdjacent(_PageInfo left, _PageInfo right) {
+    if (left.chapterIndex == right.chapterIndex) {
+      return right.pageIndex == left.pageIndex + 1;
+    }
+    for (
+      var chapter = left.chapterIndex;
+      chapter < right.chapterIndex;
+      chapter++
+    ) {
+      if (!_paginationWork!.completedChapters.contains(chapter)) return false;
+    }
+    return right.pageIndex == 0;
+  }
+
+  int? _chapterForTurn(bool forward, {int? fromIndex}) {
+    final work = _paginationWork;
+    if (work == null || work.isComplete || _paginatedPages.isEmpty) return null;
+    final visible = math.min(
+      (fromIndex ?? _currentPageIndex) + (forward && _isDualPage ? 1 : 0),
+      _paginatedPages.length - 1,
+    );
+    final page = _paginatedPages[visible];
+    if (!forward && page.chapterIndex == 0 && page.pageIndex == 0) return null;
+    var chapter = page.chapterIndex;
+    if (!forward) chapter--;
+    while (chapter >= 0 &&
+        chapter < widget.epub.chapters.length &&
+        work.completedChapters.contains(chapter)) {
+      chapter += forward ? 1 : -1;
+    }
+    return chapter >= 0 && chapter < widget.epub.chapters.length
+        ? chapter
+        : null;
+  }
+
+  void _queuePageTurn(bool forward) {
+    final chapter = _chapterForTurn(forward);
+    _queuedPageTurn = chapter == null ? null : forward;
+    if (chapter == null) return;
+    _paginationWork!.prioritize(chapter);
+    _schedulePagination();
   }
 
   void _nextPage() => _requestPageTurn(true);
@@ -1493,7 +1640,11 @@ class EpubNativeViewState extends State<EpubNativeView>
       return;
     }
     final target = _adjacentPageIndex(forward);
-    if (target == _currentPageIndex) return;
+    if (target == _currentPageIndex) {
+      _queuePageTurn(forward);
+      return;
+    }
+    _queuedPageTurn = null;
     if (MediaQuery.disableAnimationsOf(context)) {
       setState(() => _commitPageIndex(target));
       _reportProgress();
@@ -1626,109 +1777,273 @@ class EpubNativeViewState extends State<EpubNativeView>
   // Pagination
   // ---------------------------------------------------------------------------
 
-  void _paginate(double pageWidth, double pageHeight, double paddingH) {
-    if (!pageWidth.isFinite ||
-        !pageHeight.isFinite ||
-        pageWidth <= 0 ||
-        pageHeight <= 0) {
-      _lastPaginationGeometry = null;
+  void _cancelPaginationCallback() {
+    final callback = _paginationFrameCallback;
+    if (callback != null) {
+      WidgetsBinding.instance.cancelFrameCallbackWithId(callback);
+      _paginationFrameCallback = null;
+    }
+  }
+
+  void _invalidatePagination() {
+    _cancelPaginationCallback();
+    _paginationWork = null;
+    _paginatedPages = [];
+    _lastPaginationGeometry = null;
+    _queuedPageTurn = null;
+  }
+
+  int? _paginationDemand(_PaginationWork work) {
+    if (work.isComplete || widget.epub.chapters.isEmpty) return null;
+    final target = _restoreTarget(
+      _pendingRestore ??
+          _logicalLocation ??
+          widget.initialLocation ??
+          EpubLocation.fromPosition(chapterIndex: 0, hasExactCharOffset: true),
+    );
+    final index = _pageIndexForLocation(target);
+    if (index != null && _queuedPageTurn != null) {
+      final direction = _queuedPageTurn!;
+      final current = _isDualPage ? (index ~/ 2) * 2 : index;
+      if (_adjacentPageIndex(direction, fromIndex: current) == current) {
+        final chapter = _chapterForTurn(direction, fromIndex: current);
+        if (chapter != null) return chapter;
+      }
+    }
+    if (index == null) {
+      if (!work.completedChapters.contains(target.chapterIndex)) {
+        return target.chapterIndex;
+      }
+      // Empty documents restore to the next readable chapter, or to the last
+      // preceding page at the end of the spine. Never skip an unmeasured gap.
+      for (
+        var chapter = target.chapterIndex + 1;
+        chapter < widget.epub.chapters.length;
+        chapter++
+      ) {
+        if (!work.completedChapters.contains(chapter)) return chapter;
+      }
+      for (var chapter = target.chapterIndex - 1; chapter >= 0; chapter--) {
+        if (!work.completedChapters.contains(chapter)) return chapter;
+      }
+      return null;
+    }
+    if (_isDualPage) {
+      for (
+        var chapter = 0;
+        chapter < _paginatedPages[index].chapterIndex;
+        chapter++
+      ) {
+        if (!work.completedChapters.contains(chapter)) return chapter;
+      }
+    }
+    // Keep two turns ahead, not an eagerly measured copy of the whole book.
+    // Further work resumes on navigation; already measured pages stay cached.
+    final pageCount = _isDualPage ? 6 : 3;
+    var cursor = _isDualPage ? (index ~/ 2) * 2 : index;
+    for (var page = 1; page < pageCount; page++) {
+      if (cursor + 1 < _paginatedPages.length &&
+          _pagesAreAdjacent(
+            _paginatedPages[cursor],
+            _paginatedPages[cursor + 1],
+          )) {
+        cursor++;
+        continue;
+      }
+      for (
+        var chapter = _paginatedPages[cursor].chapterIndex;
+        chapter < widget.epub.chapters.length;
+        chapter++
+      ) {
+        if (!work.completedChapters.contains(chapter)) return chapter;
+      }
+      return null;
+    }
+    return null;
+  }
+
+  void _schedulePagination() {
+    final work = _paginationWork;
+    if (_paginationFrameCallback != null ||
+        work == null ||
+        work.isComplete ||
+        !mounted ||
+        _pageTurnImage != null ||
+        widget.settings.readingMode != ReadingMode.horizontal ||
+        _paginationDemand(work) == null) {
       return;
     }
+    _paginationFrameCallback = WidgetsBinding.instance.scheduleFrameCallback((
+      _,
+    ) {
+      _paginationFrameCallback = null;
+      if (!mounted || !identical(work, _paginationWork)) return;
+      // Inserting earlier pages would invalidate an in-flight curl's indices.
+      if (_pageTurnImage == null) {
+        setState(() => _runPaginationSlice(work));
+        if (_queuedPageTurn case final direction?) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted &&
+                identical(work, _paginationWork) &&
+                _queuedPageTurn == direction) {
+              _requestPageTurn(direction);
+            }
+          });
+        }
+      }
+      _schedulePagination();
+    });
+  }
 
+  void _runPaginationSlice(_PaginationWork work) {
+    final watch = Stopwatch()..start();
+    final size = work.geometry.$1;
+    final insets = work.geometry.$2;
+    final contentWidth = size.width - insets.horizontal;
+    final contentHeight = size.height - insets.vertical;
+    final anchor = _pendingRestore ?? _logicalLocation;
+    // One native paragraph/table measurement cannot be interrupted, but a
+    // book's remaining pages must never monopolize an input/frame callback.
+    do {
+      final chapter = _paginationDemand(work);
+      if (chapter == null) break;
+      work.prioritize(chapter);
+      final iterator = work.iterators.putIfAbsent(
+        chapter,
+        () => _paginateChapter(chapter, contentWidth, contentHeight).iterator,
+      );
+      if (!iterator.moveNext()) {
+        work.completedChapters.add(chapter);
+        work.iterators.remove(chapter);
+        work.chapters.removeAt(0);
+        continue;
+      }
+      final page = iterator.current;
+      var low = 0;
+      var high = work.pages.length;
+      while (low < high) {
+        final middle = (low + high) ~/ 2;
+        final other = work.pages[middle];
+        if (other.chapterIndex < page.chapterIndex ||
+            (other.chapterIndex == page.chapterIndex &&
+                other.pageIndex < page.pageIndex)) {
+          low = middle + 1;
+        } else {
+          high = middle;
+        }
+      }
+      work.pages.insert(low, page);
+    } while (watch.elapsedMicroseconds < 4000);
+    if (anchor != null && widget.epub.chapters.isNotEmpty) {
+      final index = _pageIndexForLocation(_restoreTarget(anchor));
+      if (index != null) {
+        _currentPageIndex = _isDualPage ? (index ~/ 2) * 2 : index;
+      }
+    }
+  }
+
+  void _paginate(double pageWidth, double pageHeight, double paddingH) {
     final contentInsets = _contentInsets();
-    final geometry = (
-      Size(pageWidth, pageHeight),
-      EdgeInsets.fromLTRB(
-        paddingH,
-        contentInsets.top,
-        paddingH,
-        contentInsets.bottom,
-      ),
+    final insets = EdgeInsets.fromLTRB(
+      paddingH,
+      contentInsets.top,
+      paddingH,
+      contentInsets.bottom,
     );
-    if (_lastPaginationGeometry == geometry && _paginatedPages.isNotEmpty) {
+    final contentWidth = pageWidth - insets.horizontal;
+    final contentHeight = pageHeight - insets.vertical;
+    if (!contentWidth.isFinite ||
+        !contentHeight.isFinite ||
+        contentWidth <= 0 ||
+        contentHeight <= 0) {
+      _invalidatePagination();
+      return;
+    }
+    final geometry = (Size(pageWidth, pageHeight), insets);
+    if (_lastPaginationGeometry == geometry && _paginationWork != null) {
+      _schedulePagination();
       return;
     }
 
     _pendingRestore ??= _captureLocation(ReadingMode.horizontal);
     _hasActiveSelection = false;
-
-    _paginatedPages = [];
+    _invalidatePagination();
     _tableLayouts.clear();
     _textPresentations.clear();
     _presentationWidths.clear();
     _paintedText.clear();
-    final contentWidth = pageWidth - paddingH * 2;
-    final contentHeight = pageHeight - contentInsets.vertical;
-
-    if (!contentWidth.isFinite ||
-        !contentHeight.isFinite ||
-        contentWidth <= 0 ||
-        contentHeight <= 0) {
-      _lastPaginationGeometry = null;
-      return;
-    }
-
-    var pageIndexCounter = 0;
-    for (int ci = 0; ci < widget.epub.chapters.length; ci++) {
-      _parseChapter(ci);
-      final elements = _parsedChapters[ci] ?? [];
-
-      var currentElements = <ContentElement>[];
-      var currentHeight = 0.0;
-      var isFirst = true;
-
-      void flushPage() {
-        if (currentElements.isEmpty) return;
-        _paginatedPages.add(
-          _PageInfo(
-            chapterIndex: ci,
-            pageIndex: pageIndexCounter++,
-            elements: currentElements,
-            isChapterStart: isFirst,
-          ),
-        );
-        isFirst = false;
-        currentElements = <ContentElement>[];
-        currentHeight = 0;
-      }
-
-      for (final rawElement in elements) {
-        if (rawElement is TextBlock) {
-          for (final fragment in _textFragmentsForPagination(
-            rawElement,
-            contentWidth,
-            contentHeight,
-            firstPageHeight: contentHeight - currentHeight,
-            hasPageContent: currentElements.isNotEmpty,
-          )) {
-            if (fragment.startsNewPage) flushPage();
-            currentElements.add(fragment.block);
-            currentHeight += fragment.height;
-          }
-          continue;
-        }
-
-        final paginatedElements = rawElement is TableBlock
-            ? _splitTableForPagination(rawElement, contentWidth, contentHeight)
-            : [rawElement];
-        for (final element in paginatedElements) {
-          final height = _measureElementHeight(
-            element,
-            contentWidth,
-            contentHeight,
-          );
-          if (currentElements.isNotEmpty &&
-              currentHeight + height > contentHeight) {
-            flushPage();
-          }
-          currentElements.add(element);
-          currentHeight += height;
-        }
-      }
-      flushPage();
-    }
-
+    final chapter = widget.epub.chapters.isEmpty
+        ? 0
+        : _restoreTarget(_pendingRestore!).chapterIndex;
+    final work = _PaginationWork(
+      geometry,
+      widget.epub.chapters.length,
+      chapter,
+    );
+    _paginationWork = work;
+    _paginatedPages = work.pages;
     _lastPaginationGeometry = geometry;
+    _runPaginationSlice(work);
+    _schedulePagination();
+  }
+
+  Iterable<_PageInfo> _paginateChapter(
+    int chapter,
+    double contentWidth,
+    double contentHeight,
+  ) sync* {
+    _parseChapter(chapter);
+    final elements = _parsedChapters[chapter] ?? const <ContentElement>[];
+    var currentElements = <ContentElement>[];
+    var currentHeight = 0.0;
+    var pageIndex = 0;
+    _PageInfo flushPage() {
+      final page = _PageInfo(
+        chapterIndex: chapter,
+        pageIndex: pageIndex++,
+        elements: currentElements,
+        isChapterStart: pageIndex == 1,
+      );
+      currentElements = <ContentElement>[];
+      currentHeight = 0;
+      return page;
+    }
+
+    for (final rawElement in elements) {
+      if (rawElement is TextBlock) {
+        for (final fragment in _textFragmentsForPagination(
+          rawElement,
+          contentWidth,
+          contentHeight,
+          firstPageHeight: contentHeight - currentHeight,
+          hasPageContent: currentElements.isNotEmpty,
+        )) {
+          if (fragment.startsNewPage && currentElements.isNotEmpty) {
+            yield flushPage();
+          }
+          currentElements.add(fragment.block);
+          currentHeight += fragment.height;
+        }
+        continue;
+      }
+      final paginatedElements = rawElement is TableBlock
+          ? _splitTableForPagination(rawElement, contentWidth, contentHeight)
+          : [rawElement];
+      for (final element in paginatedElements) {
+        final height = _measureElementHeight(
+          element,
+          contentWidth,
+          contentHeight,
+        );
+        if (currentElements.isNotEmpty &&
+            currentHeight + height > contentHeight) {
+          yield flushPage();
+        }
+        currentElements.add(element);
+        currentHeight += height;
+      }
+    }
+    if (currentElements.isNotEmpty) yield flushPage();
   }
 
   double _measureElementHeight(
@@ -1756,9 +2071,16 @@ class EpubNativeViewState extends State<EpubNativeView>
     required double firstPageHeight,
     required bool hasPageContent,
   }) sync* {
-    final painter = _layoutTextBlock(block, contentWidth);
-    final insets = _textBlockInsets(block);
-    final height = painter.height + insets.vertical;
+    final sourceText = block.span.toPlainText(includeSemanticsLabels: false);
+    if (sourceText.isEmpty || block.span is! TextSpan) {
+      final height = _measureTextBlockHeight(block, contentWidth);
+      yield (
+        block: block,
+        height: height,
+        startsNewPage: hasPageContent && height > firstPageHeight,
+      );
+      return;
+    }
     final keepTogether = switch (block.type) {
       TextBlockType.h1 ||
       TextBlockType.h2 ||
@@ -1768,101 +2090,116 @@ class EpubNativeViewState extends State<EpubNativeView>
       TextBlockType.h6 => true,
       _ => false,
     };
-    if (height <= firstPageHeight ||
-        block.span is! TextSpan ||
-        (keepTogether && height <= pageHeight)) {
-      painter.dispose();
-      yield (
-        block: block,
-        height: height,
-        startsNewPage: hasPageContent && height > firstPageHeight,
-      );
-      return;
-    }
-
-    final plainText = _presentationFor(
-      block,
-    ).span.toPlainText(includeSemanticsLabels: false);
-    if (plainText.isEmpty) {
-      painter.dispose();
-      yield (
-        block: block,
-        height: height,
-        startsNewPage: hasPageContent && height > firstPageHeight,
-      );
-      return;
-    }
-    final presentation = _presentationFor(block);
-    final lines = <({int end, double bottom})>[];
-    for (final line in _textPaginationLines(painter, plainText)) {
-      final sourceEnd = presentation.toSource(line.end);
-      if (sourceEnd <= 0) continue;
-      if (lines.isNotEmpty &&
-          presentation.toSource(lines.last.end) == sourceEnd) {
-        lines[lines.length - 1] = line;
-      } else {
-        lines.add(line);
-      }
-    }
-    painter.dispose();
-
+    // Shape only enough source for the next page, with a line of lookahead.
+    // Measuring a chapter-sized paragraph first defeats time-sliced pagination:
+    // its hyphen selection alone can otherwise block the first frame for seconds.
+    final graphemes = sourceText.characters.iterator;
+    var windowEnd = 0;
     var localStart = 0;
-    var firstLine = 0;
     var availableHeight = firstPageHeight;
     var startsNewPage = false;
-    while (firstLine < lines.length) {
-      final precedingBottom = firstLine == 0
-          ? 0.0
-          : lines[firstLine - 1].bottom;
-      final topMargin = localStart == 0 ? insets.top : 0.0;
-      var lastLine = firstLine;
-      while (lastLine + 1 < lines.length) {
-        final next = lines[lastLine + 1];
-        final estimatedHeight =
-            next.bottom -
-            precedingBottom +
-            topMargin +
-            (next.end == plainText.length ? insets.bottom : 0.0);
-        if (estimatedHeight > availableHeight) break;
-        lastLine++;
-      }
-
-      var fragment = _textBlockFragment(
-        block,
-        localStart,
-        presentation.toSource(lines[lastLine].end),
-        presentation.sourceText.length,
-      );
-      var fragmentHeight = _measureTextBlockHeight(fragment, contentWidth);
-      // Retain every hard break in the source slice. A terminal newline adds
-      // an empty line when rendered independently, so verify actual height and
-      // retreat only along complete original lines, never through a word.
-      while (fragmentHeight > availableHeight && lastLine > firstLine) {
-        lastLine--;
-        fragment = _textBlockFragment(
+    while (localStart < sourceText.length) {
+      var requestedEnd = math.min(sourceText.length, localStart + 512);
+      late TextBlock window;
+      late ReaderTextPresentation presentation;
+      late EdgeInsets insets;
+      late double height;
+      late List<({int end, double bottom})> lines;
+      final measurementHeight = keepTogether && localStart == 0
+          ? pageHeight
+          : availableHeight;
+      while (true) {
+        while (windowEnd < requestedEnd && graphemes.moveNext()) {
+          windowEnd += graphemes.current.length;
+        }
+        window = _textBlockFragment(
           block,
           localStart,
-          presentation.toSource(lines[lastLine].end),
-          presentation.sourceText.length,
+          windowEnd,
+          sourceText.length,
         );
+        final painter = _layoutTextBlock(window, contentWidth);
+        presentation = _presentationFor(window);
+        insets = _textBlockInsets(window);
+        height = painter.height + insets.vertical;
+        final plainText = presentation.span.toPlainText(
+          includeSemanticsLabels: false,
+        );
+        lines = [];
+        for (final line in _textPaginationLines(painter, plainText)) {
+          final end = presentation.toSource(line.end);
+          if (end <= 0) continue;
+          final measured = (end: end, bottom: line.bottom);
+          if (lines.isNotEmpty && lines.last.end == end) {
+            lines[lines.length - 1] = measured;
+          } else {
+            lines.add(measured);
+          }
+        }
+        painter.dispose();
+        if (windowEnd == sourceText.length || height > measurementHeight) break;
+        if (!identical(window, block)) _forgetTextPresentation(window);
+        requestedEnd = math.min(
+          sourceText.length,
+          localStart + (windowEnd - localStart) * 2,
+        );
+      }
+      if (windowEnd == sourceText.length &&
+          (height <= availableHeight ||
+              (keepTogether && localStart == 0 && height <= pageHeight))) {
+        yield (
+          block: window,
+          height: height,
+          startsNewPage:
+              startsNewPage || (hasPageContent && height > availableHeight),
+        );
+        return;
+      }
+      // Lookahead maps are temporary; only actual page fragments stay cached.
+      if (!identical(window, block)) _forgetTextPresentation(window);
+      var lastLine = 0;
+      while (lastLine + 1 < lines.length) {
+        final next = lines[lastLine + 1];
+        final bottomMargin = localStart + next.end == sourceText.length
+            ? insets.bottom
+            : 0.0;
+        if (next.bottom + insets.top + bottomMargin > availableHeight) break;
+        lastLine++;
+      }
+      TextBlock fragmentAt(int line) {
+        final end = lines[line].end;
+        return _textBlockFragment(
+          block,
+          localStart,
+          localStart + end,
+          sourceText.length,
+          trailingHyphen: presentation.hasVisibleHyphenAt(end),
+        );
+      }
+
+      var fragment = fragmentAt(lastLine);
+      var fragmentHeight = _measureTextBlockHeight(fragment, contentWidth);
+      // A retained terminal newline adds an empty line when rendered alone.
+      // Retreat only along complete measured lines, never through a grapheme.
+      while (fragmentHeight > availableHeight && lastLine > 0) {
+        _forgetTextPresentation(fragment);
+        fragment = fragmentAt(--lastLine);
         fragmentHeight = _measureTextBlockHeight(fragment, contentWidth);
       }
       if (fragmentHeight > availableHeight && hasPageContent) {
+        _forgetTextPresentation(fragment);
         availableHeight = pageHeight;
         hasPageContent = false;
         startsNewPage = true;
         continue;
       }
-
-      // An oversized first line owns a page rather than retrying forever or
-      // cutting a grapheme. The page's existing scrolling handles its extent.
+      // An oversized line still owns a scrollable page and always advances.
       yield (
         block: fragment,
         height: fragmentHeight,
         startsNewPage: startsNewPage,
       );
-      localStart = presentation.toSource(lines[lastLine].end);
-      firstLine = lastLine + 1;
+      localStart += lines[lastLine].end;
       availableHeight = pageHeight;
       hasPageContent = false;
       startsNewPage = true;
@@ -1911,14 +2248,38 @@ class EpubNativeViewState extends State<EpubNativeView>
     return lines;
   }
 
+  void _forgetTextPresentation(TextBlock block) {
+    _textPresentations.remove(block);
+    _presentationWidths.remove(block);
+    _paintedText.remove(block);
+  }
+
   TextBlock _textBlockFragment(
     TextBlock block,
     int start,
     int end,
-    int totalLength,
-  ) {
+    int totalLength, {
+    bool trailingHyphen = false,
+  }) {
     if (start == 0 && end == totalLength) return block;
     final insets = _textBlockInsets(block);
+    final offsets = _hyphenationFor(block);
+    int firstAfter(int boundary) {
+      var low = 0;
+      var high = offsets.length;
+      while (low < high) {
+        final middle = (low + high) ~/ 2;
+        if (offsets[middle] <= boundary) {
+          low = middle + 1;
+        } else {
+          high = middle;
+        }
+      }
+      return low;
+    }
+
+    final first = firstAfter(start);
+    final last = firstAfter(end - 1);
     return TextBlock(
       span: _sliceInlineSpan(block.span, start, end)!,
       type: block.type,
@@ -1927,11 +2288,9 @@ class EpubNativeViewState extends State<EpubNativeView>
       textAlign: block.textAlign,
       isContinuation: block.isContinuation || start > 0,
       hyphenationOffsets: [
-        for (final offset in _presentationFor(block).hyphenationOffsets)
-          if (offset > start && offset < end) offset - start,
+        for (var index = first; index < last; index++) offsets[index] - start,
       ],
-      trailingHyphen:
-          end < totalLength && _presentationFor(block).hasVisibleHyphenAt(end),
+      trailingHyphen: end < totalLength && trailingHyphen,
       continuesOnNextPage: end < totalLength,
       margin: EdgeInsets.fromLTRB(
         insets.left - block.indent,
@@ -2463,16 +2822,23 @@ class EpubNativeViewState extends State<EpubNativeView>
     paddingH = _effectivePadding(pageWidth, paddingH);
 
     _paginate(pageWidth, availableHeight, paddingH);
-    _scheduleRestore();
-
-    if (_paginatedPages.isEmpty) return const SizedBox.shrink();
+    if (widget.epub.chapters.isEmpty) {
+      _scheduleRestore();
+      return const SizedBox.shrink();
+    }
     final restore = _pendingRestore;
     if (restore != null) {
-      final page = _pageIndexForLocation(_restoreTarget(restore));
+      final target = _restoreTarget(restore);
+      if (!_paginationReadyFor(target)) {
+        return Center(child: CircularProgressIndicator(color: _textColor));
+      }
+      final page = _pageIndexForLocation(target);
       if (page != null) {
         _currentPageIndex = _isDualPage ? (page ~/ 2) * 2 : page;
       }
+      _scheduleRestore();
     }
+    if (_paginatedPages.isEmpty) return const SizedBox.shrink();
 
     _currentPageIndex = _currentPageIndex.clamp(0, _paginatedPages.length - 1);
     if (_isDualPage) {
@@ -2564,7 +2930,11 @@ class EpubNativeViewState extends State<EpubNativeView>
       final dividerColor = _textColor.withAlpha(30);
 
       return SizedBox(
-        key: ValueKey('sel_spread_$leftIdx'),
+        key: ValueKey((
+          'spread',
+          _paginatedPages[leftIdx].chapterIndex,
+          _paginatedPages[leftIdx].pageIndex,
+        )),
         width: availableWidth,
         height: availableHeight,
         child: Row(
@@ -2593,7 +2963,11 @@ class EpubNativeViewState extends State<EpubNativeView>
       );
     } else {
       return Align(
-        key: ValueKey('sel_page_$index'),
+        key: ValueKey((
+          'page',
+          _paginatedPages[index].chapterIndex,
+          _paginatedPages[index].pageIndex,
+        )),
         alignment: Alignment.center,
         child: SizedBox(
           width: pageWidth,
@@ -2609,6 +2983,7 @@ class EpubNativeViewState extends State<EpubNativeView>
     return ClipRect(
       key: ValueKey((
         _layoutGeneration,
+        page.chapterIndex,
         page.pageIndex,
         _lastPaginationGeometry,
       )),
@@ -2881,6 +3256,7 @@ class EpubNativeViewState extends State<EpubNativeView>
           );
           return ReaderTextPresentation(
             reuseCoordinates: presentation,
+            baseStyle: _baseTextStyle,
             source: colored,
             hyphenationOffsets: presentation.hyphenationOffsets,
             firstLineIndent:
@@ -2969,8 +3345,7 @@ class EpubNativeViewState extends State<EpubNativeView>
       _clearPageTurn();
       setState(() {
         _tableLayouts.clear();
-        _paginatedPages.clear();
-        _lastPaginationGeometry = null;
+        _invalidatePagination();
         _hasActiveSelection = false;
         _layoutGeneration++;
       });
