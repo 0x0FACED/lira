@@ -224,23 +224,27 @@ class _ReaderAnnotationsPanelState
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              tooltip: highlight.note != null ? l10n.editNote : l10n.addNote,
-              icon: Icon(
-                highlight.note != null
-                    ? Icons.edit_note
-                    : Icons.note_add_outlined,
-                size: 20,
+              icon: Semantics(
+                label: highlight.note != null ? l10n.editNote : l10n.addNote,
+                child: Icon(
+                  highlight.note != null
+                      ? Icons.edit_note
+                      : Icons.note_add_outlined,
+                  size: 20,
+                ),
               ),
               onPressed: deleting ? null : () => _editNote(highlight),
             ),
             IconButton(
-              tooltip: l10n.delete,
-              icon: deleting
-                  ? const SizedBox.square(
-                      dimension: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.delete_outline, size: 20),
+              icon: Semantics(
+                label: l10n.delete,
+                child: deleting
+                    ? const SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.delete_outline, size: 20),
+              ),
               onPressed: deleting ? null : () => _deleteHighlight(highlight),
             ),
           ],
@@ -270,13 +274,15 @@ class _ReaderAnnotationsPanelState
         leading: Icon(Icons.bookmark, color: theme.colorScheme.primary),
         title: Text(l10n.bookmarkPosition(percentage)),
         trailing: IconButton(
-          tooltip: l10n.removeBookmark,
-          icon: deleting
-              ? const SizedBox.square(
-                  dimension: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.delete_outline, size: 20),
+          icon: Semantics(
+            label: l10n.removeBookmark,
+            child: deleting
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.delete_outline, size: 20),
+          ),
           onPressed: deleting ? null : () => _deleteBookmark(bookmark),
         ),
         onTap: deleting ? null : () => widget.onNavigate(bookmark.location),

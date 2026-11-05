@@ -251,7 +251,7 @@ void main() {
       panelSize: const Size(390, 420),
     );
     await _selectCategory(tester, 'Colors');
-    final backgroundEditor = find.byTooltip('Edit color: Page background');
+    final backgroundEditor = find.widgetWithText(TextButton, '#EAEAEA');
     await tester.ensureVisible(backgroundEditor);
     await tester.tap(backgroundEditor);
     await tester.pumpAndSettle();
@@ -261,7 +261,7 @@ void main() {
     expect(container.read(readerSettingsProvider).backgroundColor, 0xFFF3E7D8);
     expect(container.read(readerSettingsProvider).textColor, 0xFF202020);
 
-    final textEditor = find.byTooltip('Edit color: Text color');
+    final textEditor = find.widgetWithText(TextButton, '#202020');
     await tester.ensureVisible(textEditor);
     await tester.tap(textEditor);
     await tester.pumpAndSettle();

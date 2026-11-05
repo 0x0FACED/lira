@@ -157,7 +157,6 @@ void main() {
     expect(find.text('Saved passage'), findsNothing);
     expect(find.text('Position: 42.5%'), findsOneWidget);
     expect(find.text('Position: 99%'), findsNothing);
-    expect(find.byTooltip('Remove bookmark'), findsOneWidget);
     await tester.tap(find.text('Position: 42.5%'));
     expect(navigated.last, bookmarks.values['bookmark']!.location);
 
@@ -172,23 +171,17 @@ void main() {
     await _open(tester);
     await tester.tap(find.text('Bookmarks'));
     await tester.pumpAndSettle();
+    final removeBookmark = find.descendant(
+      of: find.widgetWithText(ListTile, 'Position: 42.5%'),
+      matching: find.byType(IconButton),
+    );
     bookmarks.deleteGate = Completer<void>();
     bookmarks.failDeletes = true;
-    await tester.tap(find.byTooltip('Remove bookmark'));
+    await tester.tap(removeBookmark);
     await tester.pump();
     expect(find.text('Position: 42.5%'), findsOneWidget);
     expect(bookmarks.values.containsKey('bookmark'), isTrue);
-    expect(
-      tester
-          .widget<IconButton>(
-            find.byWidgetPredicate(
-              (widget) =>
-                  widget is IconButton && widget.tooltip == 'Remove bookmark',
-            ),
-          )
-          .onPressed,
-      isNull,
-    );
+    expect(tester.widget<IconButton>(removeBookmark).onPressed, isNull);
 
     bookmarks.deleteGate!.complete();
     await tester.pumpAndSettle();
@@ -196,7 +189,7 @@ void main() {
     expect(find.text('Position: 42.5%'), findsOneWidget);
     bookmarks.failDeletes = false;
     bookmarks.deleteGate = null;
-    await tester.tap(find.byTooltip('Remove bookmark'));
+    await tester.tap(removeBookmark);
     await tester.pumpAndSettle();
     expect(find.text('Position: 42.5%'), findsNothing);
     expect(find.text('No bookmarks yet'), findsOneWidget);
@@ -209,13 +202,13 @@ void main() {
   ) async {
     highlights.failDeletes = true;
     await _open(tester);
-    await tester.tap(find.byTooltip('Delete'));
+    await tester.tap(find.byIcon(Icons.delete_outline));
     await tester.pumpAndSettle();
     expect(find.textContaining('Could not delete highlight:'), findsOneWidget);
     expect(find.text('Saved passage'), findsOneWidget);
     expect(find.text('Original note'), findsOneWidget);
     highlights.failDeletes = false;
-    await tester.tap(find.byTooltip('Delete'));
+    await tester.tap(find.byIcon(Icons.delete_outline));
     await tester.pumpAndSettle();
     expect(find.text('No highlights yet'), findsOneWidget);
     expect(highlights.values, isEmpty);
@@ -225,7 +218,7 @@ void main() {
     tester,
   ) async {
     await _open(tester);
-    await tester.tap(find.byTooltip('Edit note'));
+    await tester.tap(find.byIcon(Icons.edit_note));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'Changed note');
     highlights.noteWriteGate = Completer<void>();
@@ -266,7 +259,7 @@ void main() {
     'cancel leaves the saved note unchanged through route dismissal',
     (tester) async {
       await _open(tester);
-      await tester.tap(find.byTooltip('Edit note'));
+      await tester.tap(find.byIcon(Icons.edit_note));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'Discarded note');
       await tester.tap(find.text('Cancel'));

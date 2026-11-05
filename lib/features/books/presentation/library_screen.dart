@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +7,7 @@ import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../../l10n/app_localizations.dart';
 import '../domain/providers/books_provider.dart';
+import '../domain/providers/library_layout_provider.dart';
 import 'widgets/book_card.dart';
 import 'widgets/responsive_grid_delegate.dart';
 
@@ -32,7 +34,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final colors = Theme.of(context).colorScheme;
     final booksAsyncValue = ref.watch(booksControllerProvider);
     final controller = ref.read(booksControllerProvider.notifier);
-    final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+    final media = MediaQuery.of(context);
+    final isPhone =
+        (defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS) &&
+        media.size.shortestSide < 600;
+    final columns = ref.watch(libraryColumnsProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -48,9 +55,39 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   child: AppPageHeader(
                     title: l10n.library,
                     actions: [
+                      if (isPhone)
+                        PopupMenuButton<int>(
+                          tooltip: '',
+                          initialValue: columns,
+                          icon: Semantics(
+                            label: l10n.libraryBooksPerRow,
+                            child: Icon(
+                              columns == 2
+                                  ? Icons.grid_view_outlined
+                                  : Icons.view_module_outlined,
+                            ),
+                          ),
+                          onSelected: (value) => ref
+                              .read(libraryColumnsProvider.notifier)
+                              .setColumns(value),
+                          itemBuilder: (_) => [
+                            CheckedPopupMenuItem(
+                              value: 2,
+                              checked: columns == 2,
+                              child: Text(l10n.libraryTwoBooksPerRow),
+                            ),
+                            CheckedPopupMenuItem(
+                              value: 3,
+                              checked: columns == 3,
+                              child: Text(l10n.libraryThreeBooksPerRow),
+                            ),
+                          ],
+                        ),
                       IconButton.filledTonal(
-                        tooltip: l10n.importBook,
-                        icon: const Icon(Icons.add),
+                        icon: Semantics(
+                          label: l10n.importBook,
+                          child: const Icon(Icons.add),
+                        ),
                         onPressed: () async {
                           try {
                             await controller.importBook();
@@ -122,6 +159,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                         ),
                       );
                     }
+                    var maxPageCount = 0;
+                    for (final book in books) {
+                      if (book.pageCount > maxPageCount) {
+                        maxPageCount = book.pageCount;
+                      }
+                    }
+                    final pageCountDigits = maxPageCount.toString().length;
                     return SliverPadding(
                       padding: const EdgeInsets.fromLTRB(
                         AppSpacing.compact,
@@ -131,6 +175,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                       ),
                       sliver: SliverGrid(
                         gridDelegate: ResponsiveGridDelegate(
+                          crossAxisCount: isPhone ? columns : null,
+                          mainAxisExtraExtentForWidth: (width) =>
+                              BookCard.metadataExtent(
+                                media.textScaler,
+                                cardWidth: width,
+                                pageCountDigits: pageCountDigits,
+                              ),
                           minCrossAxisExtent:
                               MediaQuery.sizeOf(context).width >=
                                   AppLayout.desktopBreakpoint
@@ -139,8 +190,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                           maxCrossAxisExtent: 240,
                           crossAxisSpacing: AppSpacing.compact,
                           mainAxisSpacing: AppSpacing.compact,
-                          childAspectRatio:
-                              0.53 / (textScale < 1 ? 1 : textScale),
+                          childAspectRatio: BookCard.coverAspectRatio,
                         ),
                         delegate: SliverChildBuilderDelegate((context, index) {
                           final book = filteredBooks[index];

@@ -189,9 +189,8 @@ class _MaterialSaveButtonState extends ConsumerState<MaterialSaveButton> {
       );
     }
     return IconButton.filledTonal(
-      tooltip: label,
       onPressed: saved || _saving ? null : _save,
-      icon: icon,
+      icon: Semantics(label: label, child: icon),
     );
   }
 

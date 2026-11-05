@@ -143,7 +143,7 @@ class _BookSearchResultsState extends ConsumerState<BookSearchResults> {
                                 ),
                               PopupMenuButton<_SortOrder>(
                                 initialValue: _sort,
-                                tooltip: l10n.searchSort,
+                                tooltip: '',
                                 onSelected: (value) =>
                                     setState(() => _sort = value),
                                 itemBuilder: (_) => [
@@ -154,21 +154,24 @@ class _BookSearchResultsState extends ConsumerState<BookSearchResults> {
                                       child: Text(_sortLabel(l10n, sort)),
                                     ),
                                 ],
-                                child: ConstrainedBox(
-                                  constraints: const BoxConstraints(
-                                    minHeight: AppLayout.minTouchTarget,
-                                  ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(
-                                      AppSpacing.sm,
+                                child: Semantics(
+                                  label: l10n.searchSort,
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      minHeight: AppLayout.minTouchTarget,
                                     ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(Icons.sort_rounded),
-                                        const SizedBox(width: AppSpacing.xs),
-                                        Text(_sortLabel(l10n, _sort)),
-                                      ],
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(
+                                        AppSpacing.sm,
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.sort_rounded),
+                                          const SizedBox(width: AppSpacing.xs),
+                                          Text(_sortLabel(l10n, _sort)),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),

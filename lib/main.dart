@@ -11,6 +11,7 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/app_tokens.dart';
 import 'core/providers/preferences_provider.dart';
 import 'core/network/proxy_http_overrides.dart';
+import 'core/widgets/app_text_scaling.dart';
 import 'features/settings/data/reader_font_catalog.dart';
 import 'features/settings/data/settings_provider.dart' show sharedPrefs;
 
@@ -61,6 +62,9 @@ class LiraApp extends ConsumerWidget {
       themeAnimationCurve: AppMotion.curve,
       locale: locale,
       routerConfig: router,
+      builder: (context, child) => AppTextScaling(
+        child: TooltipVisibility(visible: false, child: child!),
+      ),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
     );

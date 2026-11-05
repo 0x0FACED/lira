@@ -16,6 +16,7 @@ import '../../search/domain/providers/book_source_clients.dart';
 import '../../search/presentation/zlibrary_mirrors_screen.dart';
 import '../../search/presentation/anna_access_screen.dart';
 
+import '../data/interface_font_scale_provider.dart';
 import 'reader_settings_workspace.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -50,6 +51,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final l10n = AppLocalizations.of(context)!;
     final themeMode = ref.watch(themeModeProvider);
     final locale = ref.watch(localeProvider);
+    final interfaceFontScale = ref.watch(interfaceFontScaleProvider);
     final zLibCredentials = ref.watch(zLibraryCredentialsProvider);
 
     return Scaffold(
@@ -203,6 +205,61 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       AppSection(
                         title: l10n.appearance,
                         children: [
+                          Padding(
+                            padding: const EdgeInsets.all(AppSpacing.compact),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.text_fields),
+                                    const SizedBox(width: AppSpacing.sm),
+                                    Expanded(
+                                      child: Text(
+                                        l10n.interfaceFontSize,
+                                        style: theme.textTheme.titleMedium,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: AppSpacing.xs),
+                                Text(
+                                  l10n.interfaceFontSizeHint,
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: Semantics(
+                                    label: l10n.interfaceFontSize,
+                                    child: DropdownButton<int>(
+                                      value: interfaceFontScale,
+                                      itemHeight: null,
+                                      underline: const SizedBox.shrink(),
+                                      onChanged: (value) {
+                                        if (value != null) {
+                                          ref
+                                              .read(
+                                                interfaceFontScaleProvider
+                                                    .notifier,
+                                              )
+                                              .setPercent(value);
+                                        }
+                                      },
+                                      items: [
+                                        for (final percent
+                                            in interfaceFontScaleOptions)
+                                          DropdownMenuItem(
+                                            value: percent,
+                                            child: Text('$percent%'),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Divider(),
                           ListTile(
                             leading: const Icon(Icons.menu_book_outlined),
                             title: Text(l10n.readerCustomize),

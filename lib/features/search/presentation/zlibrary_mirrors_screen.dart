@@ -127,7 +127,14 @@ class _ZLibraryMirrorsScreenState extends ConsumerState<ZLibraryMirrorsScreen> {
               children: [
                 AppPageHeader(
                   title: l10n.zLibraryMirrors,
-                  leading: const BackButton(),
+                  leading: MergeSemantics(
+                    child: Semantics(
+                      label: MaterialLocalizations.of(
+                        context,
+                      ).backButtonTooltip,
+                      child: const BackButton(),
+                    ),
+                  ),
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(

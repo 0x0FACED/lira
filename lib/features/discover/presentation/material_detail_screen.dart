@@ -56,7 +56,14 @@ class _MaterialDetailScreenState extends ConsumerState<MaterialDetailScreen> {
               children: [
                 AppPageHeader(
                   title: l10n.discoverMaterialDetails,
-                  leading: const BackButton(),
+                  leading: MergeSemantics(
+                    child: Semantics(
+                      label: MaterialLocalizations.of(
+                        context,
+                      ).backButtonTooltip,
+                      child: const BackButton(),
+                    ),
+                  ),
                 ),
                 if (item.imageUrl != null &&
                     widget.source.category != DiscoverCategory.documents)

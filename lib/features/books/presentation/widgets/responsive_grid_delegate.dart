@@ -7,6 +7,8 @@ class ResponsiveGridDelegate extends SliverGridDelegate {
   final double mainAxisSpacing;
   final double crossAxisSpacing;
   final double childAspectRatio;
+  final int? crossAxisCount;
+  final double Function(double width)? mainAxisExtraExtentForWidth;
 
   const ResponsiveGridDelegate({
     required this.minCrossAxisExtent,
@@ -14,22 +16,29 @@ class ResponsiveGridDelegate extends SliverGridDelegate {
     this.mainAxisSpacing = 16,
     this.crossAxisSpacing = 16,
     this.childAspectRatio = 0.55,
-  });
+    this.crossAxisCount,
+    this.mainAxisExtraExtentForWidth,
+  }) : assert(crossAxisCount == null || crossAxisCount > 0);
 
   @override
   SliverGridLayout getLayout(SliverConstraints constraints) {
     final availableWidth = constraints.crossAxisExtent;
-    final calculatedColumns =
-        ((availableWidth + crossAxisSpacing) /
-                (minCrossAxisExtent + crossAxisSpacing))
-            .floor();
-    final columns = calculatedColumns < 1 ? 1 : calculatedColumns;
+    var columns = crossAxisCount;
+    if (columns == null) {
+      final calculatedColumns =
+          ((availableWidth + crossAxisSpacing) /
+                  (minCrossAxisExtent + crossAxisSpacing))
+              .floor();
+      columns = calculatedColumns < 1 ? 1 : calculatedColumns;
+    }
     final cellWidth =
         ((availableWidth - crossAxisSpacing * (columns - 1)) / columns)
             .clamp(0.0, maxCrossAxisExtent)
             .toDouble();
     final contentWidth = cellWidth * columns + crossAxisSpacing * (columns - 1);
-    final cellHeight = cellWidth / childAspectRatio;
+    final cellHeight =
+        cellWidth / childAspectRatio +
+        (mainAxisExtraExtentForWidth?.call(cellWidth) ?? 0);
 
     return _CenteredSliverGridLayout(
       crossAxisCount: columns,
@@ -48,7 +57,9 @@ class ResponsiveGridDelegate extends SliverGridDelegate {
         oldDelegate.maxCrossAxisExtent != maxCrossAxisExtent ||
         oldDelegate.mainAxisSpacing != mainAxisSpacing ||
         oldDelegate.crossAxisSpacing != crossAxisSpacing ||
-        oldDelegate.childAspectRatio != childAspectRatio;
+        oldDelegate.childAspectRatio != childAspectRatio ||
+        oldDelegate.crossAxisCount != crossAxisCount ||
+        oldDelegate.mainAxisExtraExtentForWidth != mainAxisExtraExtentForWidth;
   }
 }
 

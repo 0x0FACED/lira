@@ -108,7 +108,14 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen> {
               SliverToBoxAdapter(
                 child: AppPageHeader(
                   title: l10n.discoverSources,
-                  leading: const BackButton(),
+                  leading: MergeSemantics(
+                    child: Semantics(
+                      label: MaterialLocalizations.of(
+                        context,
+                      ).backButtonTooltip,
+                      child: const BackButton(),
+                    ),
+                  ),
                   subtitle: l10n.discoverSelectedCount(enabled.length),
                 ),
               ),
@@ -408,7 +415,6 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen> {
                                         ),
                                       ),
                                       IconButton(
-                                        tooltip: l10n.discoverMoveUp,
                                         onPressed: _saving || position <= 0
                                             ? null
                                             : () => _persist(
@@ -423,12 +429,14 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen> {
                                                       ),
                                                 ),
                                               ),
-                                        icon: const Icon(
-                                          Icons.arrow_upward_rounded,
+                                        icon: Semantics(
+                                          label: l10n.discoverMoveUp,
+                                          child: const Icon(
+                                            Icons.arrow_upward_rounded,
+                                          ),
                                         ),
                                       ),
                                       IconButton(
-                                        tooltip: l10n.discoverMoveDown,
                                         onPressed:
                                             _saving ||
                                                 position < 0 ||
@@ -446,8 +454,11 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen> {
                                                       ),
                                                 ),
                                               ),
-                                        icon: const Icon(
-                                          Icons.arrow_downward_rounded,
+                                        icon: Semantics(
+                                          label: l10n.discoverMoveDown,
+                                          child: const Icon(
+                                            Icons.arrow_downward_rounded,
+                                          ),
                                         ),
                                       ),
                                     ],

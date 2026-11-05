@@ -512,7 +512,19 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
             if (snapshot.hasError) {
               return Scaffold(
-                appBar: AppBar(title: Text(widget.book.title)),
+                appBar: AppBar(
+                  leading: Navigator.canPop(context)
+                      ? MergeSemantics(
+                          child: Semantics(
+                            label: MaterialLocalizations.of(
+                              context,
+                            ).backButtonTooltip,
+                            child: const BackButton(),
+                          ),
+                        )
+                      : null,
+                  title: Text(widget.book.title),
+                ),
                 body: AppEmptyState(
                   icon: Icons.error_outline,
                   title: l10n.errorLoadingBook,
@@ -615,10 +627,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                                       child: Row(
                                         children: [
                                           IconButton(
-                                            tooltip: MaterialLocalizations.of(
-                                              context,
-                                            ).backButtonTooltip,
-                                            icon: const Icon(Icons.arrow_back),
+                                            icon: Semantics(
+                                              label: MaterialLocalizations.of(
+                                                context,
+                                              ).backButtonTooltip,
+                                              child: const Icon(
+                                                Icons.arrow_back,
+                                              ),
+                                            ),
                                             onPressed: _closeReader,
                                           ),
                                           const SizedBox(width: AppSpacing.sm),
@@ -633,8 +649,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                                           ),
                                           const SizedBox(width: AppSpacing.sm),
                                           IconButton(
-                                            tooltip: l10n.readerSearch,
-                                            icon: const Icon(Icons.search),
+                                            icon: Semantics(
+                                              label: l10n.readerSearch,
+                                              child: const Icon(Icons.search),
+                                            ),
                                             onPressed: _showSearch,
                                           ),
                                           _buildBookmarkAction(bookmarksAsync),
@@ -748,34 +766,40 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                                                   spacing: AppSpacing.compact,
                                                   children: [
                                                     IconButton(
-                                                      icon: const Icon(
-                                                        Icons
-                                                            .format_list_bulleted,
+                                                      icon: Semantics(
+                                                        label: l10n
+                                                            .tableOfContents,
+                                                        child: const Icon(
+                                                          Icons
+                                                              .format_list_bulleted,
+                                                        ),
                                                       ),
-                                                      tooltip:
-                                                          l10n.tableOfContents,
                                                       onPressed: () =>
                                                           _scaffoldKey
                                                               .currentState
                                                               ?.openDrawer(),
                                                     ),
                                                     IconButton(
-                                                      icon: const Icon(
-                                                        Icons
-                                                            .collections_bookmark_outlined,
+                                                      icon: Semantics(
+                                                        label: l10n.annotations,
+                                                        child: const Icon(
+                                                          Icons
+                                                              .collections_bookmark_outlined,
+                                                        ),
                                                       ),
-                                                      tooltip: l10n.annotations,
                                                       onPressed: () =>
                                                           _showAnnotationsPanel(
                                                             context,
                                                           ),
                                                     ),
                                                     IconButton(
-                                                      icon: const Icon(
-                                                        Icons.settings,
+                                                      icon: Semantics(
+                                                        label:
+                                                            l10n.readerSettings,
+                                                        child: const Icon(
+                                                          Icons.settings,
+                                                        ),
                                                       ),
-                                                      tooltip:
-                                                          l10n.readerSettings,
                                                       onPressed: () =>
                                                           _showSettings(
                                                             context,
@@ -953,9 +977,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         );
         final l10n = AppLocalizations.of(context)!;
         return IconButton(
-          tooltip: current == null ? l10n.addBookmark : l10n.removeBookmark,
-          icon: Icon(
-            current == null ? Icons.bookmark_add_outlined : Icons.bookmark,
+          icon: Semantics(
+            label: current == null ? l10n.addBookmark : l10n.removeBookmark,
+            child: Icon(
+              current == null ? Icons.bookmark_add_outlined : Icons.bookmark,
+            ),
           ),
           onPressed:
               location == null ||
@@ -1028,13 +1054,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                 _highlightSwatch(_parseColor(color)),
               const SizedBox(height: AppSpacing.xs),
               IconButton(
-                tooltip: l10n.addNote,
-                icon: const Icon(Icons.note_add_outlined),
+                icon: Semantics(
+                  label: l10n.addNote,
+                  child: const Icon(Icons.note_add_outlined),
+                ),
                 onPressed: _addNote,
               ),
               IconButton(
-                tooltip: l10n.copyText,
-                icon: const Icon(Icons.copy_outlined),
+                icon: Semantics(
+                  label: l10n.copyText,
+                  child: const Icon(Icons.copy_outlined),
+                ),
                 onPressed: _copySelection,
               ),
             ],
@@ -1048,15 +1078,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     return SizedBox.square(
       dimension: AppLayout.minTouchTarget,
       child: IconButton(
-        tooltip: AppLocalizations.of(context)!.highlightText,
         onPressed: () => _saveHighlight(_colorHex(color)),
-        icon: Container(
-          width: AppSpacing.lg,
-          height: AppSpacing.lg,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            border: Border.all(color: Theme.of(context).colorScheme.outline),
+        icon: Semantics(
+          label: AppLocalizations.of(context)!.highlightText,
+          child: Container(
+            width: AppSpacing.lg,
+            height: AppSpacing.lg,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: Border.all(color: Theme.of(context).colorScheme.outline),
+            ),
           ),
         ),
       ),
@@ -1342,14 +1374,16 @@ class _ExpandableTocItemState extends State<_ExpandableTocItem> {
             right: AppSpacing.compact,
           ),
           leading: IconButton(
-            tooltip: _expanded
-                ? MaterialLocalizations.of(context).expandedIconTapHint
-                : MaterialLocalizations.of(context).collapsedIconTapHint,
-            icon: Icon(
-              _expanded
-                  ? Icons.keyboard_arrow_down
-                  : Icons.keyboard_arrow_right,
-              size: 20,
+            icon: Semantics(
+              label: _expanded
+                  ? MaterialLocalizations.of(context).expandedIconTapHint
+                  : MaterialLocalizations.of(context).collapsedIconTapHint,
+              child: Icon(
+                _expanded
+                    ? Icons.keyboard_arrow_down
+                    : Icons.keyboard_arrow_right,
+                size: 20,
+              ),
             ),
             onPressed: () {
               setState(() {

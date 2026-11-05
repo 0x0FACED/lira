@@ -45,6 +45,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get library => 'Library';
 
   @override
+  String get interfaceFontSize => 'Interface font size';
+
+  @override
+  String get interfaceFontSizeHint =>
+      'Does not change book text size in the reader.';
+
+  @override
+  String get libraryBooksPerRow => 'Books per row';
+
+  @override
+  String get libraryTwoBooksPerRow => '2 books per row';
+
+  @override
+  String get libraryThreeBooksPerRow => '3 books per row';
+
+  @override
   String get search => 'Search';
 
   @override

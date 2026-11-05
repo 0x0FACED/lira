@@ -299,10 +299,12 @@ class AppSearchField extends StatelessWidget {
             children: [
               if (value.text.isNotEmpty)
                 IconButton(
-                  tooltip: MaterialLocalizations.of(
-                    context,
-                  ).deleteButtonTooltip,
-                  icon: const Icon(Icons.close_rounded, size: 18),
+                  icon: Semantics(
+                    label: MaterialLocalizations.of(
+                      context,
+                    ).deleteButtonTooltip,
+                    child: const Icon(Icons.close_rounded, size: 18),
+                  ),
                   onPressed: () {
                     controller.clear();
                     onChanged?.call('');
@@ -311,8 +313,10 @@ class AppSearchField extends StatelessWidget {
                 ),
               if (onSearch != null)
                 IconButton(
-                  tooltip: MaterialLocalizations.of(context).searchFieldLabel,
-                  icon: const Icon(Icons.arrow_forward_rounded, size: 20),
+                  icon: Semantics(
+                    label: MaterialLocalizations.of(context).searchFieldLabel,
+                    child: const Icon(Icons.arrow_forward_rounded, size: 20),
+                  ),
                   onPressed: value.text.trim().isEmpty ? null : onSearch,
                 ),
               const SizedBox(width: AppSpacing.xs),

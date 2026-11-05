@@ -95,7 +95,14 @@ class _DiscoverSearchScreenState extends ConsumerState<DiscoverSearchScreen> {
                         children: [
                           AppPageHeader(
                             title: widget.source?.name ?? l10n.search,
-                            leading: const BackButton(),
+                            leading: MergeSemantics(
+                              child: Semantics(
+                                label: MaterialLocalizations.of(
+                                  context,
+                                ).backButtonTooltip,
+                                child: const BackButton(),
+                              ),
+                            ),
                             subtitle: widget.source?.description(
                               Localizations.localeOf(context).languageCode,
                             ),

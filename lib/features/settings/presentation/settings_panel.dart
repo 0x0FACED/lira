@@ -479,15 +479,15 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
           spacing: AppSpacing.sm,
           children: [
             Text(title, style: theme.textTheme.labelLarge),
-            Tooltip(
-              message: '${l10n.readerEditColor}: $title',
-              child: TextButton.icon(
-                onPressed: () => _editColor(isText: isText),
-                icon: const Icon(Icons.edit_outlined, size: 18),
-                label: Text('#${_rgbHex(color)}'),
-                style: TextButton.styleFrom(
-                  minimumSize: const Size(0, AppLayout.minTouchTarget),
-                ),
+            TextButton.icon(
+              onPressed: () => _editColor(isText: isText),
+              icon: const Icon(Icons.edit_outlined, size: 18),
+              label: Semantics(
+                label: '${l10n.readerEditColor}: $title',
+                child: Text('#${_rgbHex(color)}'),
+              ),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(0, AppLayout.minTouchTarget),
               ),
             ),
           ],
@@ -638,42 +638,38 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
     final theme = Theme.of(context);
     final selected = selectedColor == colorValue;
     final color = Color(colorValue);
-    return Tooltip(
-      message: label,
-      excludeFromSemantics: true,
-      child: Semantics(
-        label: label,
-        selected: selected,
-        button: true,
-        child: SizedBox.square(
-          dimension: AppLayout.minTouchTarget,
-          child: InkResponse(
-            radius: AppSpacing.lg,
-            onTap: () => onSelected(colorValue),
-            child: Center(
-              child: Container(
-                width: AppSpacing.xl,
-                height: AppSpacing.xl,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: selected
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.outline,
-                    width: selected ? 3 : 1,
-                  ),
+    return Semantics(
+      label: label,
+      selected: selected,
+      button: true,
+      child: SizedBox.square(
+        dimension: AppLayout.minTouchTarget,
+        child: InkResponse(
+          radius: AppSpacing.lg,
+          onTap: () => onSelected(colorValue),
+          child: Center(
+            child: Container(
+              width: AppSpacing.xl,
+              height: AppSpacing.xl,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: selected
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.outline,
+                  width: selected ? 3 : 1,
                 ),
-                child: selected
-                    ? Icon(
-                        Icons.check,
-                        size: 18,
-                        color: color.computeLuminance() > 0.5
-                            ? Colors.black
-                            : Colors.white,
-                      )
-                    : null,
               ),
+              child: selected
+                  ? Icon(
+                      Icons.check,
+                      size: 18,
+                      color: color.computeLuminance() > 0.5
+                          ? Colors.black
+                          : Colors.white,
+                    )
+                  : null,
             ),
           ),
         ),

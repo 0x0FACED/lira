@@ -103,7 +103,14 @@ class _AnnaAccessScreenState extends ConsumerState<AnnaAccessScreen> {
               children: [
                 AppPageHeader(
                   title: l10n.annaSessionTitle,
-                  leading: const BackButton(),
+                  leading: MergeSemantics(
+                    child: Semantics(
+                      label: MaterialLocalizations.of(
+                        context,
+                      ).backButtonTooltip,
+                      child: const BackButton(),
+                    ),
+                  ),
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(
@@ -173,13 +180,15 @@ class _AnnaAccessScreenState extends ConsumerState<AnnaAccessScreen> {
                         decoration: InputDecoration(
                           labelText: 'Cookie',
                           suffixIcon: IconButton(
-                            tooltip: l10n.annaSessionToggleCookies,
                             onPressed: () =>
                                 setState(() => _showCookies = !_showCookies),
-                            icon: Icon(
-                              _showCookies
-                                  ? Icons.visibility_off_outlined
-                                  : Icons.visibility_outlined,
+                            icon: Semantics(
+                              label: l10n.annaSessionToggleCookies,
+                              child: Icon(
+                                _showCookies
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
+                              ),
                             ),
                           ),
                         ),

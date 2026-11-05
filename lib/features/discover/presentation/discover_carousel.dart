@@ -172,12 +172,14 @@ class _DiscoverCarouselState extends State<DiscoverCarousel> {
       },
       onPointerPanZoomUpdate: (event) => _jumpBy(-event.panDelta.dx),
       child: IconButton.filledTonal(
-        tooltip: previous ? l10n.previousPageTooltip : l10n.nextPageTooltip,
         onPressed: (previous ? _canScrollBack : _canScrollForward)
             ? () => _scrollPage(previous ? -1 : 1)
             : null,
-        icon: Icon(
-          previous ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
+        icon: Semantics(
+          label: previous ? l10n.previousPageTooltip : l10n.nextPageTooltip,
+          child: Icon(
+            previous ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
+          ),
         ),
       ),
     );

@@ -75,33 +75,44 @@ class _DiscoverSourceScreenState extends ConsumerState<DiscoverSourceScreen> {
             subtitle: source.description(
               Localizations.localeOf(context).languageCode,
             ),
-            leading: const BackButton(),
+            leading: MergeSemantics(
+              child: Semantics(
+                label: MaterialLocalizations.of(context).backButtonTooltip,
+                child: const BackButton(),
+              ),
+            ),
             actions: [
               if (source.kind == DiscoverSourceKind.anna)
                 IconButton(
-                  tooltip: l10n.annaSessionTitle,
                   onPressed: () => Navigator.of(context).push<void>(
                     MaterialPageRoute(builder: (_) => const AnnaAccessScreen()),
                   ),
-                  icon: const Icon(Icons.key_outlined),
+                  icon: Semantics(
+                    label: l10n.annaSessionTitle,
+                    child: const Icon(Icons.key_outlined),
+                  ),
                 ),
               if (source.kind == DiscoverSourceKind.zlibrary)
                 IconButton(
-                  tooltip: l10n.zLibraryMirrors,
                   onPressed: () => Navigator.of(context).push<void>(
                     MaterialPageRoute(
                       builder: (_) => const ZLibraryMirrorsScreen(),
                     ),
                   ),
-                  icon: const Icon(Icons.dns_outlined),
+                  icon: Semantics(
+                    label: l10n.zLibraryMirrors,
+                    child: const Icon(Icons.dns_outlined),
+                  ),
                 ),
               if (source.hasFeed)
                 IconButton(
-                  tooltip: l10n.discoverRefresh,
                   onPressed: _refreshing ? null : _refresh,
-                  icon: _refreshing
-                      ? const DiscoverProgress()
-                      : const Icon(Icons.refresh_rounded),
+                  icon: Semantics(
+                    label: l10n.discoverRefresh,
+                    child: _refreshing
+                        ? const DiscoverProgress()
+                        : const Icon(Icons.refresh_rounded),
+                  ),
                 ),
             ],
           ),

@@ -46,6 +46,21 @@ class AppLocalizationsRu extends AppLocalizations {
   String get library => 'Библиотека';
 
   @override
+  String get interfaceFontSize => 'Размер шрифта интерфейса';
+
+  @override
+  String get interfaceFontSizeHint => 'Не меняет размер текста книги в ридере.';
+
+  @override
+  String get libraryBooksPerRow => 'Книг в ряд';
+
+  @override
+  String get libraryTwoBooksPerRow => '2 книги в ряд';
+
+  @override
+  String get libraryThreeBooksPerRow => '3 книги в ряд';
+
+  @override
   String get search => 'Поиск';
 
   @override

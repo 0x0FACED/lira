@@ -235,8 +235,7 @@ Future<void> _showControls(WidgetTester tester) async {
 }
 
 Future<void> _openAnnotations(WidgetTester tester) async {
-  final l10n = AppLocalizations.of(tester.element(find.byType(ReaderScreen)))!;
-  await tester.tap(find.byTooltip(l10n.annotations));
+  await tester.tap(find.byIcon(Icons.collections_bookmark_outlined));
   await tester.pumpAndSettle();
 }
 
@@ -331,7 +330,7 @@ void main() {
         final saved = EpubLocation.fromJson(progress.persisted!.location)!;
         final fullViewport = tester.getRect(find.byType(EpubNativeView));
         await _showControls(tester);
-        await tester.tap(find.byTooltip('Reader Settings'));
+        await tester.tap(find.widgetWithIcon(IconButton, Icons.settings));
         await tester.pumpAndSettle();
         final panel = tester.getRect(
           find.byKey(const ValueKey('reader-settings-surface')),
@@ -358,22 +357,24 @@ void main() {
           find.textContaining('A Quiet Page', findRichText: true),
           findsWidgets,
         );
-        await tester.tap(find.byTooltip('Close reader settings'));
+        await tester.tap(find.widgetWithIcon(IconButton, Icons.close));
         await tester.pumpAndSettle();
         expect(
-          tester.getRect(find.byTooltip('Reader Settings')).bottom,
+          tester
+              .getRect(find.widgetWithIcon(IconButton, Icons.settings))
+              .bottom,
           lessThanOrEqualTo(tester.getRect(find.byType(EpubNativeView)).top),
         );
         final sampleBeforeScroll = _visibleParagraphs(tester);
         await tester.drag(find.byType(EpubNativeView), const Offset(0, -500));
         await tester.pumpAndSettle();
         expect(_visibleParagraphs(tester), isNot(sampleBeforeScroll));
-        await tester.tap(find.byTooltip('Reader Settings'));
+        await tester.tap(find.widgetWithIcon(IconButton, Icons.settings));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Current book'));
         await tester.pumpAndSettle();
         _expectSavedTextVisible(tester, saved);
-        await tester.tap(find.byTooltip('Close reader settings'));
+        await tester.tap(find.widgetWithIcon(IconButton, Icons.close));
         await tester.pumpAndSettle();
         await _showControls(tester);
         _expectSavedTextVisible(tester, saved);
@@ -434,7 +435,7 @@ void main() {
         await tester.tap(
           find.descendant(
             of: find.byType(ReaderAnnotationsPanel),
-            matching: find.byTooltip('Add note'),
+            matching: find.byIcon(Icons.note_add_outlined),
           ),
         );
         await tester.pumpAndSettle();
@@ -520,7 +521,7 @@ void main() {
         ).any((paragraph) => paragraph.$1.startsWith('Paragraph 4.')),
         isTrue,
       );
-      await tester.tap(find.byTooltip('Next match'));
+      await tester.tap(find.byIcon(Icons.keyboard_arrow_down));
       await tester.pumpAndSettle();
       expect(
         _visibleParagraphs(
@@ -578,7 +579,7 @@ void main() {
       await tester.drag(find.byType(EpubNativeView), const Offset(0, -800));
       await tester.pumpAndSettle();
       await _showControls(tester);
-      await tester.tap(find.byTooltip('Add bookmark'));
+      await tester.tap(find.byIcon(Icons.bookmark_add_outlined));
       await tester.pumpAndSettle();
       final bookmark = bookmarks.values.values.single;
       final saved = EpubLocation.fromJson(bookmark.location)!;
@@ -607,7 +608,7 @@ void main() {
       await tester.tap(find.text('Bookmarks'));
       await tester.pumpAndSettle();
       await tester.tap(
-        find.descendant(of: panel, matching: find.byTooltip('Remove bookmark')),
+        find.descendant(of: panel, matching: find.byIcon(Icons.delete_outline)),
       );
       await tester.pumpAndSettle();
       expect(bookmarks.values, isEmpty);
@@ -624,7 +625,7 @@ void main() {
   ) async {
     await _open(tester, readable);
     await _showControls(tester);
-    await tester.tap(find.byTooltip('Add bookmark'));
+    await tester.tap(find.byIcon(Icons.bookmark_add_outlined));
     await tester.pumpAndSettle();
     final saved = bookmarks.values.values.single;
     final savedLocation = saved.location;
@@ -637,13 +638,12 @@ void main() {
     final nearby = EpubLocation.fromJson(progress.persisted!.location)!;
     expect(nearby.charOffset, inInclusiveRange(1, 400));
     expect(bookmarks.values.values.single.location, savedLocation);
-    expect(find.byTooltip('Remove bookmark'), findsOneWidget);
     expect(find.byIcon(Icons.bookmark), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Remove bookmark'));
+    await tester.tap(find.byIcon(Icons.bookmark));
     await tester.pumpAndSettle();
     expect(bookmarks.values, isEmpty);
-    expect(find.byTooltip('Add bookmark'), findsOneWidget);
+    expect(find.byIcon(Icons.bookmark_add_outlined), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -660,7 +660,7 @@ void main() {
     await _open(tester, corrupt);
     expect(find.byType(EpubNativeView), findsNothing);
     expect(progress.persisted, existing);
-    await tester.tap(find.byTooltip('Back'));
+    await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
     expect(find.text('Open reader'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());

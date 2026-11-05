@@ -28,7 +28,12 @@ class BookDetailScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.details),
-        leading: BackButton(onPressed: () => context.pop()),
+        leading: MergeSemantics(
+          child: Semantics(
+            label: MaterialLocalizations.of(context).backButtonTooltip,
+            child: BackButton(onPressed: () => context.pop()),
+          ),
+        ),
       ),
       body: SafeArea(
         top: false,
@@ -46,8 +51,10 @@ class BookDetailScreen extends ConsumerWidget {
                     subtitle: currentBook.author,
                     actions: [
                       IconButton(
-                        icon: const Icon(Icons.edit_outlined),
-                        tooltip: l10n.editBook,
+                        icon: Semantics(
+                          label: l10n.editBook,
+                          child: const Icon(Icons.edit_outlined),
+                        ),
                         onPressed: () =>
                             _showEditDialog(context, ref, l10n, currentBook),
                       ),

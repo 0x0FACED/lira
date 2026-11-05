@@ -50,12 +50,14 @@ class SearchBookCard extends ConsumerWidget {
                 ),
                 const SizedBox(width: AppSpacing.xs),
                 IconButton(
-                  tooltip: l10n.cancelDownload,
                   style: IconButton.styleFrom(
                     foregroundColor: colors.error,
                     minimumSize: const Size.square(AppLayout.minTouchTarget),
                   ),
-                  icon: const Icon(Icons.close_rounded),
+                  icon: Semantics(
+                    label: l10n.cancelDownload,
+                    child: const Icon(Icons.close_rounded),
+                  ),
                   onPressed: () => ref
                       .read(downloadNotifierProvider.notifier)
                       .cancelDownload(book.id),
@@ -66,11 +68,13 @@ class SearchBookCard extends ConsumerWidget {
               key: ValueKey('download-${book.id}'),
               alignment: Alignment.centerRight,
               child: IconButton.filledTonal(
-                tooltip: l10n.downloadBook,
                 style: IconButton.styleFrom(
                   minimumSize: const Size.square(AppLayout.minTouchTarget),
                 ),
-                icon: const Icon(Icons.download_rounded),
+                icon: Semantics(
+                  label: l10n.downloadBook,
+                  child: const Icon(Icons.download_rounded),
+                ),
                 onPressed: () => _handleDownload(context, ref),
               ),
             ),

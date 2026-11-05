@@ -170,6 +170,36 @@ abstract class AppLocalizations {
   /// **'Library'**
   String get library;
 
+  /// No description provided for @interfaceFontSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Interface font size'**
+  String get interfaceFontSize;
+
+  /// No description provided for @interfaceFontSizeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Does not change book text size in the reader.'**
+  String get interfaceFontSizeHint;
+
+  /// No description provided for @libraryBooksPerRow.
+  ///
+  /// In en, this message translates to:
+  /// **'Books per row'**
+  String get libraryBooksPerRow;
+
+  /// No description provided for @libraryTwoBooksPerRow.
+  ///
+  /// In en, this message translates to:
+  /// **'2 books per row'**
+  String get libraryTwoBooksPerRow;
+
+  /// No description provided for @libraryThreeBooksPerRow.
+  ///
+  /// In en, this message translates to:
+  /// **'3 books per row'**
+  String get libraryThreeBooksPerRow;
+
   /// No description provided for @search.
   ///
   /// In en, this message translates to:

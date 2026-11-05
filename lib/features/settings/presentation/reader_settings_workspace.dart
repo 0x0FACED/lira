@@ -154,14 +154,18 @@ class _ReaderSettingsWorkspaceState extends State<ReaderSettingsWorkspace> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton.filledTonal(
-                            tooltip: l10n.readerCurrentBook,
-                            icon: const Icon(Icons.arrow_back),
+                            icon: Semantics(
+                              label: l10n.readerCurrentBook,
+                              child: const Icon(Icons.arrow_back),
+                            ),
                             onPressed: _backToBook,
                           ),
                           const SizedBox(width: AppSpacing.sm),
                           IconButton.filledTonal(
-                            tooltip: l10n.readerSettings,
-                            icon: const Icon(Icons.settings),
+                            icon: Semantics(
+                              label: l10n.readerSettings,
+                              child: const Icon(Icons.settings),
+                            ),
                             onPressed: widget.onOpen,
                           ),
                         ],
@@ -237,8 +241,10 @@ class _ReaderSettingsWorkspaceState extends State<ReaderSettingsWorkspace> {
                                           ),
                                         ),
                                         IconButton(
-                                          tooltip: l10n.readerCloseSettings,
-                                          icon: const Icon(Icons.close),
+                                          icon: Semantics(
+                                            label: l10n.readerCloseSettings,
+                                            child: const Icon(Icons.close),
+                                          ),
                                           onPressed: widget.onClose,
                                         ),
                                       ],
@@ -314,12 +320,22 @@ class _ReaderCustomizationScreenState
     return Scaffold(
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
+        leading: Navigator.canPop(context)
+            ? MergeSemantics(
+                child: Semantics(
+                  label: MaterialLocalizations.of(context).backButtonTooltip,
+                  child: const BackButton(),
+                ),
+              )
+            : null,
         title: Text(l10n.readerCustomize),
         actions: [
           if (!_settingsOpen)
             IconButton(
-              tooltip: l10n.readerSettings,
-              icon: const Icon(Icons.settings),
+              icon: Semantics(
+                label: l10n.readerSettings,
+                child: const Icon(Icons.settings),
+              ),
               onPressed: () => setState(() => _settingsOpen = true),
             ),
         ],

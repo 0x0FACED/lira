@@ -143,7 +143,7 @@ void main() {
         } else {
           expect(openPanel.bottom, size.height);
         }
-        await tester.tap(find.byTooltip('Close reader settings'));
+        await tester.tap(find.widgetWithIcon(IconButton, Icons.close));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 90));
         final closing = tester.getRect(_panel);
@@ -160,7 +160,9 @@ void main() {
         final fullBook = tester.getRect(find.byType(EpubNativeView));
         expect(fullBook.width, size.width);
         expect(
-          tester.getRect(find.byTooltip('Reader Settings')).bottom,
+          tester
+              .getRect(find.widgetWithIcon(IconButton, Icons.settings))
+              .bottom,
           lessThanOrEqualTo(fullBook.top),
           reason:
               'Reopening controls must not cover the first line of the page',
@@ -171,7 +173,7 @@ void main() {
         final after = _pageText(tester);
         expect(after, isNot(before));
         final passage = after.trim().substring(0, 20);
-        await tester.tap(find.byTooltip('Reader Settings'));
+        await tester.tap(find.widgetWithIcon(IconButton, Icons.settings));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 100));
         final opening = tester.getRect(_panel);
@@ -194,7 +196,7 @@ void main() {
       (tester) async {
         await _openPreview(tester, size, reducedMotion: true);
         final openPanel = tester.getRect(_panel);
-        await tester.tap(find.byTooltip('Close reader settings'));
+        await tester.tap(find.widgetWithIcon(IconButton, Icons.close));
         await tester.pump();
         final closedPanel = tester.getRect(_panel);
         if (wide) {
@@ -203,7 +205,7 @@ void main() {
           expect(closedPanel.top, greaterThanOrEqualTo(size.height));
         }
         expect(find.byType(EpubNativeView), findsOneWidget);
-        await tester.tap(find.byTooltip('Reader Settings'));
+        await tester.tap(find.widgetWithIcon(IconButton, Icons.settings));
         await tester.pump();
         expect(tester.getRect(_panel), openPanel);
         await tester.pumpWidget(const SizedBox.shrink());

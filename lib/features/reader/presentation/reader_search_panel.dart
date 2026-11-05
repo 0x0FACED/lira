@@ -53,11 +53,13 @@ class ReaderSearchPanel extends StatelessWidget {
                       ),
                     ),
                     IconButton(
-                      tooltip: MaterialLocalizations.of(
-                        context,
-                      ).closeButtonTooltip,
                       onPressed: onClose,
-                      icon: const Icon(Icons.close),
+                      icon: Semantics(
+                        label: MaterialLocalizations.of(
+                          context,
+                        ).closeButtonTooltip,
+                        child: const Icon(Icons.close),
+                      ),
                     ),
                   ],
                 ),
@@ -243,19 +245,25 @@ class ReaderSearchNavigation extends StatelessWidget {
               ),
             ),
             IconButton(
-              tooltip: l10n.readerSearchPrevious,
               onPressed: canMove ? () => onMove(-1) : null,
-              icon: const Icon(Icons.keyboard_arrow_up),
+              icon: Semantics(
+                label: l10n.readerSearchPrevious,
+                child: const Icon(Icons.keyboard_arrow_up),
+              ),
             ),
             IconButton(
-              tooltip: l10n.readerSearchNext,
               onPressed: canMove ? () => onMove(1) : null,
-              icon: const Icon(Icons.keyboard_arrow_down),
+              icon: Semantics(
+                label: l10n.readerSearchNext,
+                child: const Icon(Icons.keyboard_arrow_down),
+              ),
             ),
             IconButton(
-              tooltip: l10n.readerSearchFinish,
               onPressed: onFinish,
-              icon: const Icon(Icons.close),
+              icon: Semantics(
+                label: l10n.readerSearchFinish,
+                child: const Icon(Icons.close),
+              ),
             ),
           ],
         ),
