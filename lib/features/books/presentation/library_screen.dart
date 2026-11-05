@@ -41,6 +41,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             defaultTargetPlatform == TargetPlatform.iOS) &&
         media.size.shortestSide < 600;
     final columns = ref.watch(libraryColumnsProvider);
+    final wide = media.size.width >= AppLayout.desktopBreakpoint;
+    final gutter = wide ? AppSpacing.xl : AppSpacing.md;
+    final shelfGap = wide ? AppSpacing.lg : AppSpacing.md;
 
     return Scaffold(
       body: SafeArea(
@@ -53,70 +56,78 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             child: CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(
-                  child: AppPageHeader(
-                    title: l10n.library,
-                    actions: [
-                      if (isPhone)
-                        PopupMenuButton<int>(
-                          tooltip: '',
-                          initialValue: columns,
-                          icon: Semantics(
-                            label: l10n.libraryBooksPerRow,
-                            child: Icon(
-                              columns == 2
-                                  ? Icons.grid_view_outlined
-                                  : Icons.view_module_outlined,
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      gutter - AppSpacing.compact,
+                      AppSpacing.md,
+                      gutter - AppSpacing.compact,
+                      AppSpacing.sm,
+                    ),
+                    child: AppPageHeader(
+                      title: l10n.library,
+                      actions: [
+                        if (isPhone)
+                          PopupMenuButton<int>(
+                            tooltip: '',
+                            initialValue: columns,
+                            icon: Semantics(
+                              label: l10n.libraryBooksPerRow,
+                              child: Icon(
+                                columns == 2
+                                    ? Icons.grid_view_outlined
+                                    : Icons.view_module_outlined,
+                              ),
                             ),
+                            onSelected: (value) => ref
+                                .read(libraryColumnsProvider.notifier)
+                                .setColumns(value),
+                            itemBuilder: (_) => [
+                              CheckedPopupMenuItem(
+                                value: 2,
+                                checked: columns == 2,
+                                child: Text(l10n.libraryTwoBooksPerRow),
+                              ),
+                              CheckedPopupMenuItem(
+                                value: 3,
+                                checked: columns == 3,
+                                child: Text(l10n.libraryThreeBooksPerRow),
+                              ),
+                            ],
                           ),
-                          onSelected: (value) => ref
-                              .read(libraryColumnsProvider.notifier)
-                              .setColumns(value),
-                          itemBuilder: (_) => [
-                            CheckedPopupMenuItem(
-                              value: 2,
-                              checked: columns == 2,
-                              child: Text(l10n.libraryTwoBooksPerRow),
-                            ),
-                            CheckedPopupMenuItem(
-                              value: 3,
-                              checked: columns == 3,
-                              child: Text(l10n.libraryThreeBooksPerRow),
-                            ),
-                          ],
-                        ),
-                      IconButton.filledTonal(
-                        icon: Semantics(
-                          label: l10n.importBook,
-                          child: const Icon(Icons.add),
-                        ),
-                        onPressed: () async {
-                          try {
-                            await controller.importBook();
-                          } catch (error) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    '$error',
-                                    style: TextStyle(color: colors.onError),
+                        IconButton(
+                          icon: Semantics(
+                            label: l10n.importBook,
+                            child: const Icon(Icons.add),
+                          ),
+                          onPressed: () async {
+                            try {
+                              await controller.importBook();
+                            } catch (error) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      '$error',
+                                      style: TextStyle(color: colors.onError),
+                                    ),
+                                    backgroundColor: colors.error,
                                   ),
-                                  backgroundColor: colors.error,
-                                ),
-                              );
+                                );
+                              }
                             }
-                          }
-                        },
-                      ),
-                    ],
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.compact,
+                    padding: EdgeInsets.fromLTRB(
+                      gutter,
                       0,
-                      AppSpacing.compact,
-                      AppSpacing.md,
+                      gutter,
+                      AppSpacing.lg,
                     ),
                     child: AppSearchField(
                       controller: _searchController,
@@ -168,11 +179,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     }
                     final pageCountDigits = maxPageCount.toString().length;
                     return SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.compact,
+                      padding: EdgeInsets.fromLTRB(
+                        gutter,
                         0,
-                        AppSpacing.compact,
-                        AppSpacing.md,
+                        gutter,
+                        AppSpacing.xl,
                       ),
                       sliver: SliverGrid(
                         gridDelegate: ResponsiveGridDelegate(
@@ -189,8 +200,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                               ? 180
                               : 148,
                           maxCrossAxisExtent: 240,
-                          crossAxisSpacing: AppSpacing.compact,
-                          mainAxisSpacing: AppSpacing.compact,
+                          crossAxisSpacing: shelfGap,
+                          mainAxisSpacing: wide ? AppSpacing.xl : AppSpacing.lg,
                           childAspectRatio: BookCard.coverAspectRatio,
                         ),
                         delegate: SliverChildBuilderDelegate((context, index) {

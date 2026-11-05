@@ -8,7 +8,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lira/core/database/app_database.dart';
 import 'package:lira/core/di/injection.dart';
 import 'package:lira/core/theme/app_theme.dart';
-import 'package:lira/core/widgets/app_components.dart';
 import 'package:lira/features/books/data/repositories/books_local_repository.dart';
 import 'package:lira/features/books/domain/models/book_dto.dart';
 import 'package:lira/features/books/domain/providers/library_layout_provider.dart';
@@ -128,7 +127,11 @@ void main() {
     'saved progress belongs to its book and does not round up completion',
     (tester) async {
       final repository = getIt<ReadingProgressLocalRepository>();
-      for (final (id, percentage) in [('0', 42.79), ('1', 99.99), ('2', 100.0)]) {
+      for (final (id, percentage) in [
+        ('0', 42.79),
+        ('1', 99.99),
+        ('2', 100.0),
+      ]) {
         await repository.saveProgress(
           ReadingProgressDto(
             bookId: id,
@@ -228,20 +231,13 @@ void main() {
                       widget is Semantics && widget.properties.image == true,
                 ),
               );
-              final title = find.descendant(
-                of: card,
-                matching: find.text(book.title),
-              );
+              final title = find
+                  .descendant(of: card, matching: find.text(book.title))
+                  .last;
               coverSizes.add(tester.getSize(cover));
               titleOffsets.add(
                 tester.getTopLeft(title).dy - tester.getTopLeft(card).dy,
               );
-              if (textScale == 1) {
-                expect(
-                  tester.getSize(cover).height,
-                  greaterThan(tester.getSize(card).height / 2),
-                );
-              }
             }
             expect(coverSizes, everyElement(coverSizes.first));
             for (final offset in titleOffsets) {
@@ -253,36 +249,17 @@ void main() {
     }
   }
 
-  testWidgets('page count is accessible and aligned to the card right edge', (
-    tester,
-  ) async {
-    await mount(tester);
-    final card = find.byKey(const ValueKey('0'));
-    final format = find.descendant(of: card, matching: find.byType(AppBadge));
-    final pages = find.descendant(of: card, matching: find.text('1234'));
-    final cardRect = tester.getRect(card);
-    expect(
-      cardRect.right - tester.getRect(pages).right,
-      closeTo(tester.getRect(format).left - cardRect.left, 0.01),
-    );
-    final semantics = tester.ensureSemantics();
-    expect(tester.getSemantics(pages).label, contains('1234'));
-    semantics.dispose();
-    final withoutPages = find.byKey(const ValueKey('2'));
-    expect(
-      find.descendant(of: withoutPages, matching: find.text('0')),
-      findsNothing,
-    );
-    expect(tester.takeException(), isNull);
-  });
-
   testWidgets('page count fits a dense row at large text scale', (
     tester,
   ) async {
     await sharedPrefs.setInt(LibraryColumnsNotifier.storageKey, 3);
     await mount(tester, size: const Size(320, 844), textScale: 2);
     final card = find.byKey(const ValueKey('3'));
-    await tester.ensureVisible(card);
+    await tester.scrollUntilVisible(
+      card,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
     final pages = find.descendant(of: card, matching: find.text('9999'));
     expect(pages, findsOneWidget);

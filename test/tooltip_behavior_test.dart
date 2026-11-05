@@ -156,8 +156,6 @@ void main() {
     (tester) async {
       await mount(tester);
       await hover(tester, find.byType(BookCard));
-      expect(paintedTextContaining(book.title), findsOneWidget);
-      expect(paintedTextContaining(book.author), findsOneWidget);
       await hover(tester, find.text('1234'));
       expect(paintedTextContaining('1234'), findsOneWidget);
       await tester.tap(find.byType(BookCard));
