@@ -282,6 +282,37 @@ void main() {
     expect(fixture.locations.map((location) => location.chapterIndex), [1]);
   });
 
+  for (final dualPage in [false, true]) {
+    testWidgets(
+      'final ${dualPage ? 'spread' : 'page'} reaches 100 without moving its restore position',
+      (tester) async {
+        final fixture = await _pumpReader(
+          tester,
+          size: dualPage ? const Size(1200, 700) : const Size(600, 400),
+          dualPage: dualPage,
+          reducedMotion: true,
+        );
+        await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+        await tester.pumpAndSettle();
+        if (!dualPage) {
+          expect(fixture.percentages.last, lessThan(100));
+          await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+          await tester.pumpAndSettle();
+        }
+        expect(fixture.percentages.last, 100);
+        expect(fixture.latest!.charOffset, 0);
+        final saved = fixture.latest!;
+        fixture.readerKey.currentState!.goToLocation(saved);
+        await tester.pumpAndSettle();
+        expect(fixture.percentages.last, 100);
+        expect(fixture.latest!.charOffset, saved.charOffset);
+        await tester.sendKeyEvent(LogicalKeyboardKey.pageUp);
+        await tester.pumpAndSettle();
+        expect(fixture.percentages.last, lessThan(100));
+      },
+    );
+  }
+
   testWidgets('first and last page boundaries do not publish extra progress', (
     tester,
   ) async {

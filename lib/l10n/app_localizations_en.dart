@@ -244,6 +244,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchLibrary => 'Search library...';
 
   @override
+  String get libraryReadingProgress => 'Reading progress';
+
+  @override
   String get downloadCancelled => 'Download cancelled';
 
   @override

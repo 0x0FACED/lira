@@ -245,6 +245,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get searchLibrary => 'Поиск по библиотеке...';
 
   @override
+  String get libraryReadingProgress => 'Прогресс чтения';
+
+  @override
   String get downloadCancelled => 'Загрузка отменена';
 
   @override

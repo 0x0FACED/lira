@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../progress/domain/providers/reading_progress_provider.dart';
 import '../domain/providers/books_provider.dart';
 import '../domain/providers/library_layout_provider.dart';
 import 'widgets/book_card.dart';
@@ -194,12 +195,21 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                         ),
                         delegate: SliverChildBuilderDelegate((context, index) {
                           final book = filteredBooks[index];
-                          return BookCard(
-                            key: ValueKey(book.id),
-                            book: book,
-                            onTap: () =>
-                                context.push('/book-detail', extra: book),
-                            onDelete: () => controller.removeBook(book.id),
+                          return Consumer(
+                            builder: (context, ref, _) {
+                              final progress = ref.watch(
+                                readingProgressControllerProvider(book.id),
+                              );
+                              return BookCard(
+                                key: ValueKey(book.id),
+                                book: book,
+                                readingPercentage:
+                                    progress.valueOrNull?.percentage,
+                                onTap: () =>
+                                    context.push('/book-detail', extra: book),
+                                onDelete: () => controller.removeBook(book.id),
+                              );
+                            },
                           );
                         }, childCount: filteredBooks.length),
                       ),

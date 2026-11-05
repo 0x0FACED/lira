@@ -278,6 +278,130 @@ Future<void> _selectTextRange(
 }
 
 void main() {
+  for (final mode in ReadingMode.values) {
+    testWidgets('end of long book reaches 100 in $mode', (tester) async {
+      final book = _book();
+      final key = GlobalKey<EpubNativeViewState>();
+      EpubLocation? latest;
+      double? percentage;
+      await tester.pumpWidget(
+        _frame(
+          EpubNativeView(
+            key: key,
+            epub: book,
+            initialLocation: EpubLocation.fromPosition(
+              chapterIndex: 2,
+              hasExactCharOffset: true,
+            ),
+            settings: ReaderSettings(
+              readingMode: mode,
+              enableDualPageSpread: false,
+            ),
+            theme: ThemeData.dark(),
+            onLocationChanged: (location, value) {
+              latest = location;
+              percentage = value;
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(percentage, lessThan(100));
+      for (var step = 0; step < 40 && percentage != 100; step++) {
+        if (mode == ReadingMode.horizontal) {
+          await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+        } else {
+          await tester.dragFrom(const Offset(300, 320), const Offset(0, -280));
+        }
+        await tester.pumpAndSettle();
+      }
+      expect(percentage, 100);
+      final saved = latest!;
+      final end = XhtmlParser(
+        html: book.chapters.last.htmlContent,
+        images: const {},
+        baseStyle: const TextStyle(fontSize: 18),
+      ).parse().last.charEnd;
+      expect(saved.charOffset, lessThan(end));
+      key.currentState!.goToLocation(saved);
+      await tester.pumpAndSettle();
+      expect(percentage, 100);
+      expect(latest!.charOffset, saved.charOffset);
+      if (mode == ReadingMode.horizontal) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.pageUp);
+      } else {
+        await tester.dragFrom(const Offset(300, 80), const Offset(0, 300));
+      }
+      await tester.pumpAndSettle();
+      expect(percentage, lessThan(100));
+    });
+
+    testWidgets('short book ignores empty trailing chapters in $mode', (
+      tester,
+    ) async {
+      double? percentage;
+      final book = _htmlBook('<p>THE END</p>');
+      await tester.pumpWidget(
+        _frame(
+          EpubNativeView(
+            epub: ParsedEpub(
+              title: book.title,
+              author: book.author,
+              toc: book.toc,
+              images: book.images,
+              chapters: [
+                ...book.chapters,
+                EpubChapter(
+                  title: 'Empty',
+                  fileName: 'empty.xhtml',
+                  htmlContent: '',
+                ),
+              ],
+            ),
+            settings: ReaderSettings(readingMode: mode),
+            theme: ThemeData.dark(),
+            onLocationChanged: (_, value) => percentage = value,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(percentage, 100);
+    });
+  }
+
+  testWidgets('an oversized final table must be scrolled before completion', (
+    tester,
+  ) async {
+    double? percentage;
+    await tester.pumpWidget(
+      _frame(
+        EpubNativeView(
+          epub: _htmlBook(
+            '<table><tr><td>'
+            '${List.generate(20, (i) => '<p>OVERSIZED $i. ${'Readable content. ' * 8}</p>').join()}'
+            '</td></tr></table>',
+          ),
+          settings: const ReaderSettings(
+            readingMode: ReadingMode.horizontal,
+            enableDualPageSpread: false,
+          ),
+          theme: ThemeData.dark(),
+          onLocationChanged: (_, value) => percentage = value,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(percentage, lessThan(100));
+    for (var step = 0; step < 40 && percentage != 100; step++) {
+      await tester.dragFrom(const Offset(300, 320), const Offset(0, -280));
+      await tester.pumpAndSettle();
+    }
+    expect(percentage, 100);
+    final last = tester.getRect(find.textContaining('OVERSIZED 19.').first);
+    expect(last.bottom, lessThanOrEqualTo(376.5));
+    expect(last.bottom, greaterThan(24));
+  });
+
   testWidgets('overlapping highlights preserve the original text exactly', (
     tester,
   ) async {

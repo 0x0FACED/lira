@@ -560,6 +560,12 @@ abstract class AppLocalizations {
   /// **'Search library...'**
   String get searchLibrary;
 
+  /// No description provided for @libraryReadingProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading progress'**
+  String get libraryReadingProgress;
+
   /// No description provided for @downloadCancelled.
   ///
   /// In en, this message translates to:

@@ -114,6 +114,7 @@
   "failedToInitReader": "Failed to initialize reader engine.",
   "noChapters": "This EPUB has no readable chapters.",
   "searchLibrary": "Search library...",
+  "libraryReadingProgress": "Reading progress",
   "downloadCancelled": "Download cancelled",
   "zLibrary": "Z-Library",
   "zLibraryLogin": "Z-Library Login",

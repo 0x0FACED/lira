@@ -14,6 +14,9 @@ import 'package:lira/features/books/domain/models/book_dto.dart';
 import 'package:lira/features/books/domain/providers/library_layout_provider.dart';
 import 'package:lira/features/books/presentation/library_screen.dart';
 import 'package:lira/features/books/presentation/widgets/book_card.dart';
+import 'package:lira/features/progress/data/repositories/reading_progress_local_repository.dart';
+import 'package:lira/features/progress/domain/models/reading_progress_dto.dart';
+import 'package:lira/features/progress/domain/providers/reading_progress_provider.dart';
 import 'package:lira/features/settings/data/settings_provider.dart';
 import 'package:lira/l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -49,6 +52,9 @@ void main() {
     final database = AppDatabase.forTesting(NativeDatabase.memory());
     final repository = BooksLocalRepository(database);
     getIt.registerSingleton<BooksLocalRepository>(repository);
+    getIt.registerSingleton<ReadingProgressLocalRepository>(
+      ReadingProgressLocalRepository(database),
+    );
     addTearDown(() async {
       await getIt.reset();
       await database.close();
@@ -117,6 +123,54 @@ void main() {
     });
     expect(row.length, columns);
   }
+
+  testWidgets(
+    'saved progress belongs to its book and does not round up completion',
+    (tester) async {
+      final repository = getIt<ReadingProgressLocalRepository>();
+      for (final (id, percentage) in [('0', 42.79), ('1', 99.99), ('2', 100.0)]) {
+        await repository.saveProgress(
+          ReadingProgressDto(
+            bookId: id,
+            percentage: percentage,
+            location: 'saved-$id',
+            updatedAt: DateTime(2026),
+          ),
+        );
+      }
+      await mount(tester);
+      Finder progressFor(String id, String text) => find.descendant(
+        of: find.byKey(ValueKey(id)),
+        matching: find.text(text),
+      );
+      expect(progressFor('0', '42.7%'), findsOneWidget);
+      expect(progressFor('1', '99.9%'), findsOneWidget);
+      expect(progressFor('2', '100.0%'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('3')),
+          matching: find.byType(LinearProgressIndicator),
+        ),
+        findsNothing,
+      );
+
+      final context = tester.element(find.byType(LibraryScreen));
+      final container = ProviderScope.containerOf(context);
+      final controller = container.read(
+        readingProgressControllerProvider('0').notifier,
+      );
+      await tester.runAsync(() async {
+        await controller.saveProgress(location: 'finished', percentage: 100);
+        await controller.flush();
+      });
+      await tester.pumpAndSettle();
+      expect(progressFor('0', '100.0%'), findsOneWidget);
+      expect(progressFor('1', '99.9%'), findsOneWidget);
+      await mount(tester);
+      expect(progressFor('0', '100.0%'), findsOneWidget);
+      expect(progressFor('1', '99.9%'), findsOneWidget);
+    },
+  );
 
   testWidgets('density changes preserve search and survive reopening', (
     tester,

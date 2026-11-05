@@ -114,6 +114,7 @@
   "failedToInitReader": "Не удалось инициализировать движок чтения.",
   "noChapters": "В этом EPUB нет доступных глав.",
   "searchLibrary": "Поиск по библиотеке...",
+  "libraryReadingProgress": "Прогресс чтения",
   "downloadCancelled": "Загрузка отменена",
   "zLibrary": "Z-Library",
   "zLibraryLogin": "Вход в Z-Library",

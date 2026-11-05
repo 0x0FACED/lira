@@ -327,6 +327,7 @@ class _SourceOrderRegistrar implements SelectionRegistrar {
 class _SelectionScopeData {
   int chapterIndex;
   List<ContentElement> elements;
+  final contentKey = GlobalKey();
   final Map<int, GlobalKey> textKeys = {};
   final Map<int, GlobalKey> imageKeys = {};
   final Map<int, GlobalKey> elementKeys = {};
@@ -1161,8 +1162,51 @@ class EpubNativeViewState extends State<EpubNativeView>
         : 0.0;
     widget.onLocationChanged?.call(
       location.copyWith(scrollFraction: fraction),
-      _computeBookFraction(location.chapterIndex, fraction) * 100,
+      _isBookEndVisible()
+          ? 100.0
+          : _computeBookFraction(location.chapterIndex, fraction) * 100,
     );
+  }
+
+  bool _isBookEndVisible() {
+    final offsets = _contentBookOffsets;
+    if (offsets.last == 0) return false;
+    final viewport = _viewportKey.currentContext?.findRenderObject();
+    if (viewport is! RenderBox || !viewport.hasSize) return false;
+    final insets = _contentInsets();
+    final top = viewport.localToGlobal(Offset.zero).dy + insets.top;
+    final bottom =
+        viewport.localToGlobal(Offset.zero).dy +
+        viewport.size.height -
+        (widget.settings.readingMode == ReadingMode.horizontal
+            ? insets.bottom
+            : 0);
+    for (final scope in _selectionScopes) {
+      if (scope.elements.isEmpty ||
+          offsets[scope.chapterIndex] + scope.elements.last.charEnd !=
+              offsets.last) {
+        continue;
+      }
+      final content = scope.contentKey.currentContext?.findRenderObject();
+      if (content is! RenderBox || !content.hasSize) continue;
+      // Paragraph spacing is not unread content. In vertical mode the list
+      // can also paint text into its bottom padding before reaching the bound.
+      final last = scope.elements.last;
+      final trailingSpace = last is TextBlock
+          ? _textBlockInsets(last).bottom
+          : 0.0;
+      final end = content
+          .localToGlobal(Offset(0, content.size.height - trailingSpace))
+          .dy;
+      if (end > top && end <= bottom + 0.5) return true;
+    }
+    return false;
+  }
+
+  void _reportProgressAfterLayout() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _pendingRestore == null) _reportProgress();
+    });
   }
 
   int _chapterWeight(int chapterIndex) {
@@ -1647,7 +1691,7 @@ class EpubNativeViewState extends State<EpubNativeView>
     _queuedPageTurn = null;
     if (MediaQuery.disableAnimationsOf(context)) {
       setState(() => _commitPageIndex(target));
-      _reportProgress();
+      _reportProgressAfterLayout();
     } else if (_beginPageTurn(forward)) {
       _settlePageTurn(true);
     }
@@ -1731,7 +1775,7 @@ class EpubNativeViewState extends State<EpubNativeView>
       _clearPageTurn();
       if (complete) _commitPageIndex(target);
     });
-    if (complete) _reportProgress();
+    if (complete) _reportProgressAfterLayout();
   }
 
   // Also called by reflow/navigation: an interrupted preview never saves a
@@ -3128,6 +3172,7 @@ class EpubNativeViewState extends State<EpubNativeView>
     }
 
     return SelectionContainer(
+      key: scope.contentKey,
       delegate: scope.selectionDelegate,
       child: _buildElements(elements, chapterIndex, scope),
     );

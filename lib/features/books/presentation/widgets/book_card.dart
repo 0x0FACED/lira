@@ -11,12 +11,14 @@ class BookCard extends StatelessWidget {
   final BookDto book;
   final VoidCallback onTap;
   final VoidCallback onDelete;
+  final double? readingPercentage;
 
   const BookCard({
     super.key,
     required this.book,
     required this.onTap,
     required this.onDelete,
+    this.readingPercentage,
   });
 
   static const coverAspectRatio = 2 / 3;
@@ -86,10 +88,17 @@ class BookCard extends StatelessWidget {
         children: [
           AspectRatio(
             aspectRatio: coverAspectRatio,
-            child: Semantics(
-              image: true,
-              label: book.title,
-              child: _buildCover(context),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Semantics(
+                  image: true,
+                  label: book.title,
+                  child: _buildCover(context),
+                ),
+                if (readingPercentage case final percentage?)
+                  ..._buildProgress(context, percentage),
+              ],
             ),
           ),
           Expanded(
@@ -132,6 +141,51 @@ class BookCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  List<Widget> _buildProgress(BuildContext context, double percentage) {
+    final colors = Theme.of(context).colorScheme;
+    final bounded = percentage.clamp(0.0, 100.0);
+    // Only an actual end-of-book event may display 100%.
+    final displayed = (bounded * 10).floor() / 10;
+    final label = '${displayed.toStringAsFixed(1)}%';
+    return [
+      PositionedDirectional(
+        end: AppSpacing.sm,
+        bottom: AppSpacing.sm + AppSpacing.xs,
+        child: Semantics(
+          label: AppLocalizations.of(context)!.libraryReadingProgress,
+          value: label,
+          excludeSemantics: true,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: colors.inverseSurface,
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xs,
+                vertical: AppSpacing.xs,
+              ),
+              child: Text(
+                label,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: colors.onInverseSurface,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      Positioned(
+        left: 0,
+        right: 0,
+        bottom: 0,
+        child: ExcludeSemantics(
+          child: LinearProgressIndicator(value: bounded / 100, minHeight: 4),
+        ),
+      ),
+    ];
   }
 
   Widget _buildFooter(BuildContext context) {
