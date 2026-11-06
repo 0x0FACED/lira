@@ -119,10 +119,10 @@ class _DiscoverSourceScreenState extends ConsumerState<DiscoverSourceScreen> {
         ),
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.compact,
+            padding: EdgeInsets.fromLTRB(
+              AppLayout.pageGutter(context),
               0,
-              AppSpacing.compact,
+              AppLayout.pageGutter(context),
               AppSpacing.md,
             ),
             child: Column(
@@ -167,10 +167,10 @@ class _DiscoverSourceScreenState extends ConsumerState<DiscoverSourceScreen> {
               delegate: SliverChildBuilderDelegate((context, index) {
                 if (index == 0) {
                   return Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.compact,
+                    padding: EdgeInsets.fromLTRB(
+                      AppLayout.pageGutter(context),
                       0,
-                      AppSpacing.compact,
+                      AppLayout.pageGutter(context),
                       AppSpacing.compact,
                     ),
                     child: Text(
@@ -191,11 +191,11 @@ class _DiscoverSourceScreenState extends ConsumerState<DiscoverSourceScreen> {
                 }
                 final item = value.items[index - 1];
                 return Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.compact,
+                  padding: EdgeInsets.fromLTRB(
+                    AppLayout.pageGutter(context),
                     0,
-                    AppSpacing.compact,
-                    AppSpacing.sm,
+                    AppLayout.pageGutter(context),
+                    AppSpacing.md,
                   ),
                   child: DiscoverItemTile(
                     key: ValueKey(item.id),

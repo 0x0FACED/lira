@@ -137,8 +137,8 @@ class _ZLibraryMirrorsScreenState extends ConsumerState<ZLibraryMirrorsScreen> {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.compact,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppLayout.pageGutter(context),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -149,11 +149,11 @@ class _ZLibraryMirrorsScreenState extends ConsumerState<ZLibraryMirrorsScreen> {
                       ),
                       const SizedBox(height: AppSpacing.md),
                       AppSurface(
-                        color: theme.colorScheme.secondaryContainer,
+                        color: theme.colorScheme.surfaceContainerLow,
                         child: Text(
                           l10n.zLibraryMirrorsTrustWarning,
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSecondaryContainer,
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ),
@@ -169,7 +169,7 @@ class _ZLibraryMirrorsScreenState extends ConsumerState<ZLibraryMirrorsScreen> {
                         decoration: InputDecoration(
                           labelText: l10n.zLibraryMirrorsField,
                           helperText: l10n.zLibraryMirrorsFieldHint,
-                          helperMaxLines: 3,
+                          helperMaxLines: 6,
                         ),
                         onChanged: (_) {
                           if (_error != null) setState(() => _error = null);

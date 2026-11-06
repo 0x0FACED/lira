@@ -69,9 +69,9 @@ DropdownButton<String> _fontSelector(WidgetTester tester) =>
     tester.widget<DropdownButton<String>>(find.byType(DropdownButton<String>));
 
 Future<void> _selectCategory(WidgetTester tester, String label) async {
-  final chip = find.widgetWithText(ChoiceChip, label);
-  await tester.ensureVisible(chip);
-  await tester.tap(chip);
+  final category = find.text(label);
+  await tester.ensureVisible(category);
+  await tester.tap(category);
   await tester.pumpAndSettle();
 }
 
@@ -223,7 +223,7 @@ void main() {
     const labels = ['Day', 'Paper', 'Readable dark', 'Warm evening'];
     for (var index = 0; index < readerThemePalettes.length; index++) {
       final palette = readerThemePalettes[index];
-      await tester.tap(find.widgetWithText(OutlinedButton, labels[index]));
+      await tester.tap(find.text(labels[index]));
       await tester.pumpAndSettle();
       final settings = container.read(readerSettingsProvider);
       expect(settings.backgroundColor, palette.backgroundColor);

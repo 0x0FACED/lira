@@ -6,10 +6,10 @@ class AppSurface extends StatelessWidget {
   const AppSurface({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(AppSpacing.compact),
+    this.padding = const EdgeInsets.all(AppSpacing.md),
     this.margin = EdgeInsets.zero,
     this.color,
-    this.radius = AppRadius.lg,
+    this.radius = AppRadius.sm,
     this.onTap,
     this.onLongPress,
   });
@@ -32,7 +32,6 @@ class AppSurface extends StatelessWidget {
         color: color ?? colors.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(radius),
-          side: BorderSide(color: colors.outlineVariant),
         ),
         clipBehavior: Clip.antiAlias,
         child: onTap == null && onLongPress == null
@@ -60,12 +59,13 @@ class AppPageHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final gutter = AppLayout.pageGutter(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.compact,
-        AppSpacing.compact,
-        AppSpacing.compact,
-        AppSpacing.compact,
+      padding: EdgeInsets.fromLTRB(
+        gutter,
+        AppSpacing.lg + AppSpacing.xs,
+        gutter,
+        AppSpacing.md + AppSpacing.xs,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -117,17 +117,12 @@ class AppSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      padding: const EdgeInsets.only(bottom: AppSpacing.xl),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.xs,
-              0,
-              AppSpacing.xs,
-              AppSpacing.sm,
-            ),
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
             child: Text(title, style: theme.textTheme.titleMedium),
           ),
           if (subtitle != null)
@@ -140,10 +135,7 @@ class AppSection extends StatelessWidget {
                 ),
               ),
             ),
-          AppSurface(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-            child: Column(mainAxisSize: MainAxisSize.min, children: children),
-          ),
+          Column(mainAxisSize: MainAxisSize.min, children: children),
         ],
       ),
     );
@@ -172,21 +164,13 @@ class AppEmptyState extends StatelessWidget {
     final colors = theme.colorScheme;
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.compact),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 380),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                decoration: BoxDecoration(
-                  color: colors.surfaceContainer,
-                  borderRadius: BorderRadius.circular(AppRadius.xl),
-                  border: Border.all(color: colors.outlineVariant),
-                ),
-                child: Icon(icon, size: 32, color: iconColor ?? colors.primary),
-              ),
+              Icon(icon, size: 32, color: iconColor ?? colors.onSurfaceVariant),
               const SizedBox(height: AppSpacing.md),
               Text(
                 title,
@@ -216,8 +200,8 @@ class AppEmptyState extends StatelessWidget {
   }
 }
 
-class AppBadge extends StatelessWidget {
-  const AppBadge({super.key, required this.label, this.color, this.icon});
+class AppMetadata extends StatelessWidget {
+  const AppMetadata({super.key, required this.label, this.color, this.icon});
 
   final String label;
   final Color? color;
@@ -227,33 +211,22 @@ class AppBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final foreground = color ?? theme.colorScheme.onSurfaceVariant;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xs,
-      ),
-      decoration: BoxDecoration(
-        color:
-            color?.withValues(alpha: 0.1) ?? theme.colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 12, color: foreground),
-            const SizedBox(width: AppSpacing.xs),
-          ],
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelSmall?.copyWith(color: foreground),
-            ),
-          ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 12, color: foreground),
+          const SizedBox(width: AppSpacing.xs),
         ],
-      ),
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelSmall?.copyWith(color: foreground),
+          ),
+        ),
+      ],
     );
   }
 }

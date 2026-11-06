@@ -68,11 +68,11 @@ class _MaterialDetailScreenState extends ConsumerState<MaterialDetailScreen> {
                 if (item.imageUrl != null &&
                     widget.source.category != DiscoverCategory.documents)
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.compact,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppLayout.pageGutter(context),
                     ),
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
                       child: SizedBox(
                         height: AppLayout.discoverDetailImageHeight,
                         child: DiscoverImage(item: item, source: widget.source),
@@ -80,7 +80,12 @@ class _MaterialDetailScreenState extends ConsumerState<MaterialDetailScreen> {
                     ),
                   ),
                 Padding(
-                  padding: const EdgeInsets.all(AppSpacing.compact),
+                  padding: EdgeInsets.fromLTRB(
+                    AppLayout.pageGutter(context),
+                    AppSpacing.lg,
+                    AppLayout.pageGutter(context),
+                    AppSpacing.lg,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -88,11 +93,11 @@ class _MaterialDetailScreenState extends ConsumerState<MaterialDetailScreen> {
                         spacing: AppSpacing.sm,
                         runSpacing: AppSpacing.sm,
                         children: [
-                          AppBadge(label: widget.source.name),
+                          AppMetadata(label: widget.source.name),
                           if (item.documentNumber != null)
-                            AppBadge(label: 'RFC ${item.documentNumber}'),
+                            AppMetadata(label: 'RFC ${item.documentNumber}'),
                           if (item.status != null)
-                            AppBadge(label: item.status!),
+                            AppMetadata(label: item.status!),
                         ],
                       ),
                       const SizedBox(height: AppSpacing.md),

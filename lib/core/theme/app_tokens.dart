@@ -38,6 +38,11 @@ abstract final class AppLayout {
   static const int discoverSummaryLines = 4;
   static const double discoverMaxCardTextScale = 1.5;
   static const double discoverSearchControlsFraction = 0.5;
+
+  static double pageGutter(BuildContext context) =>
+      MediaQuery.sizeOf(context).width >= desktopBreakpoint
+      ? AppSpacing.xl
+      : AppSpacing.md;
 }
 
 abstract final class AppMotion {

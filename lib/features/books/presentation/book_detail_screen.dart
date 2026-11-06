@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +7,7 @@ import '../../../core/widgets/app_components.dart';
 import '../../../l10n/app_localizations.dart';
 import '../domain/models/book_dto.dart';
 import '../domain/providers/books_provider.dart';
+import 'widgets/book_cover.dart';
 
 class BookDetailScreen extends ConsumerWidget {
   final BookDto book;
@@ -43,71 +42,45 @@ class BookDetailScreen extends ConsumerWidget {
               constraints: const BoxConstraints(
                 maxWidth: AppLayout.contentMaxWidth,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  AppPageHeader(
-                    title: currentBook.title,
-                    subtitle: currentBook.author,
-                    actions: [
-                      IconButton(
-                        icon: Semantics(
-                          label: l10n.editBook,
-                          child: const Icon(Icons.edit_outlined),
-                        ),
-                        onPressed: () =>
-                            _showEditDialog(context, ref, l10n, currentBook),
-                      ),
-                    ],
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.compact,
-                      0,
-                      AppSpacing.compact,
-                      AppSpacing.md,
-                    ),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final cover = SizedBox(
-                          width: 240,
-                          child: AppSurface(
-                            padding: EdgeInsets.zero,
-                            radius: AppRadius.md,
-                            child: AspectRatio(
-                              aspectRatio: 3 / 4,
-                              child: _buildCover(context, currentBook),
-                            ),
-                          ),
-                        );
-                        final details = _buildDetails(
-                          context,
-                          ref,
-                          l10n,
-                          currentBook,
-                        );
-                        if (constraints.maxWidth >= 720) {
-                          return Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              cover,
-                              const SizedBox(width: AppSpacing.lg),
-                              Expanded(child: details),
-                            ],
-                          );
-                        }
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Center(child: cover),
-                            const SizedBox(height: AppSpacing.md),
-                            details,
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                ],
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  AppLayout.pageGutter(context),
+                  28,
+                  AppLayout.pageGutter(context),
+                  AppSpacing.lg,
+                ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final cover = SizedBox(
+                      width: 240,
+                      child: BookCover(book: currentBook),
+                    );
+                    final details = _buildDetails(
+                      context,
+                      ref,
+                      l10n,
+                      currentBook,
+                    );
+                    if (constraints.maxWidth >= 720) {
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          cover,
+                          const SizedBox(width: AppSpacing.lg),
+                          Expanded(child: details),
+                        ],
+                      );
+                    }
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Center(child: cover),
+                        const SizedBox(height: AppSpacing.lg),
+                        details,
+                      ],
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -123,45 +96,32 @@ class BookDetailScreen extends ConsumerWidget {
     BookDto currentBook,
   ) {
     final colors = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: AppBadge(label: currentBook.format.toUpperCase()),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                currentBook.title,
+                style: theme.textTheme.headlineMedium,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            IconButton(
+              tooltip: l10n.editBook,
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: () => _showEditDialog(context, ref, l10n, currentBook),
+            ),
+          ],
         ),
-        const SizedBox(height: AppSpacing.md),
-        AppSurface(
-          child: Column(
-            children: [
-              _buildDetailRow(
-                context,
-                Icons.pages_outlined,
-                l10n.pages,
-                currentBook.pageCount > 0
-                    ? '${currentBook.pageCount}'
-                    : l10n.unknown,
-              ),
-              const Divider(height: AppSpacing.md),
-              _buildDetailRow(
-                context,
-                Icons.sd_storage_outlined,
-                l10n.size,
-                currentBook.fileSizeBytes > 0
-                    ? _formatBytes(currentBook.fileSizeBytes)
-                    : l10n.unknown,
-              ),
-              const Divider(height: AppSpacing.md),
-              _buildDetailRow(
-                context,
-                Icons.calendar_today_outlined,
-                l10n.added,
-                '${currentBook.createdAt.year}-${currentBook.createdAt.month.toString().padLeft(2, '0')}-${currentBook.createdAt.day.toString().padLeft(2, '0')}',
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
+        const SizedBox(height: AppSpacing.sm),
+        Text(currentBook.author, style: theme.textTheme.bodyLarge),
+        const SizedBox(height: AppSpacing.compact),
+        AppMetadata(label: currentBook.format.toUpperCase()),
+        const SizedBox(height: AppSpacing.lg),
         FilledButton.icon(
           onPressed: () => context.push('/reader', extra: currentBook),
           icon: const Icon(Icons.menu_book_outlined),
@@ -170,9 +130,29 @@ class BookDetailScreen extends ConsumerWidget {
             textAlign: TextAlign.center,
           ),
         ),
-        const SizedBox(height: AppSpacing.compact),
-        OutlinedButton.icon(
-          style: OutlinedButton.styleFrom(foregroundColor: colors.error),
+        const SizedBox(height: AppSpacing.lg),
+        _buildDetailRow(
+          context,
+          l10n.pages,
+          currentBook.pageCount > 0 ? '${currentBook.pageCount}' : l10n.unknown,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _buildDetailRow(
+          context,
+          l10n.size,
+          currentBook.fileSizeBytes > 0
+              ? _formatBytes(currentBook.fileSizeBytes)
+              : l10n.unknown,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _buildDetailRow(
+          context,
+          l10n.added,
+          '${currentBook.createdAt.year}-${currentBook.createdAt.month.toString().padLeft(2, '0')}-${currentBook.createdAt.day.toString().padLeft(2, '0')}',
+        ),
+        const SizedBox(height: AppSpacing.md),
+        TextButton.icon(
+          style: TextButton.styleFrom(foregroundColor: colors.error),
           onPressed: () => showAppDialog<void>(
             context: context,
             builder: (dialogContext) => AlertDialog(
@@ -204,36 +184,8 @@ class BookDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildDetailRow(
-    BuildContext context,
-    IconData icon,
-    String label,
-    String value,
-  ) {
-    final theme = Theme.of(context);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 20, color: theme.colorScheme.onSurfaceVariant),
-        const SizedBox(width: AppSpacing.compact),
-        Expanded(
-          child: Text(
-            label,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ),
-        const SizedBox(width: AppSpacing.compact),
-        Flexible(
-          child: Text(
-            value,
-            textAlign: TextAlign.end,
-            style: theme.textTheme.bodyMedium,
-          ),
-        ),
-      ],
-    );
+  Widget _buildDetailRow(BuildContext context, String label, String value) {
+    return Text('$label: $value', style: Theme.of(context).textTheme.bodySmall);
   }
 
   String _formatBytes(int bytes) {
@@ -303,61 +255,6 @@ class BookDetailScreen extends ConsumerWidget {
             child: Text(l10n.save),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildCover(BuildContext context, BookDto currentBook) {
-    final path = currentBook.coverUrl;
-    if (path != null && path.isNotEmpty) {
-      return Image.file(
-        File(path),
-        fit: BoxFit.cover,
-        alignment: Alignment.topCenter,
-        errorBuilder: (context, error, stackTrace) =>
-            _buildFormatFallback(context, currentBook),
-      );
-    }
-    return _buildFormatFallback(context, currentBook);
-  }
-
-  Widget _buildFormatFallback(BuildContext context, BookDto currentBook) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    return ColoredBox(
-      color: colors.surfaceContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border(
-              left: BorderSide(color: colors.outlineVariant, width: 3),
-              top: BorderSide(color: colors.outlineVariant),
-              bottom: BorderSide(color: colors.outlineVariant),
-            ),
-          ),
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  currentBook.format.toLowerCase() == 'epub'
-                      ? Icons.auto_stories_outlined
-                      : Icons.description_outlined,
-                  size: 64,
-                  color: colors.secondary,
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Text(
-                  currentBook.format.toUpperCase(),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

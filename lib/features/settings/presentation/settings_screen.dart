@@ -65,8 +65,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               children: [
                 AppPageHeader(title: l10n.settings),
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.compact,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppLayout.pageGutter(context),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -75,18 +75,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         title: l10n.profile,
                         children: [
                           ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: auth.isLoggedIn
-                                  ? colors.primaryContainer
-                                  : colors.surfaceContainerHighest,
-                              foregroundColor: auth.isLoggedIn
-                                  ? colors.onPrimaryContainer
-                                  : colors.onSurfaceVariant,
-                              child: auth.isLoggedIn
-                                  ? Text(
-                                      (auth.username ?? 'U')[0].toUpperCase(),
-                                    )
-                                  : const Icon(Icons.person_outline),
+                            leading: Icon(
+                              Icons.person_outline,
+                              color: colors.onSurfaceVariant,
                             ),
                             title: Text(
                               auth.isLoggedIn
@@ -159,7 +150,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             leading: Icon(
                               Icons.library_books_outlined,
                               color: zLibCredentials != null
-                                  ? colors.secondary
+                                  ? colors.primary
                                   : colors.onSurfaceVariant,
                             ),
                             title: Text(
@@ -169,11 +160,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             ),
                           ),
                           Padding(
-                            padding: const EdgeInsets.fromLTRB(
-                              AppSpacing.compact,
-                              AppSpacing.sm,
-                              AppSpacing.compact,
-                              AppSpacing.sm,
+                            padding: const EdgeInsets.symmetric(
+                              vertical: AppSpacing.sm,
                             ),
                             child: SizedBox(
                               width: double.infinity,
@@ -206,7 +194,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         title: l10n.appearance,
                         children: [
                           Padding(
-                            padding: const EdgeInsets.all(AppSpacing.compact),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: AppSpacing.compact,
+                            ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
@@ -259,7 +249,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ],
                             ),
                           ),
-                          const Divider(),
+                          const SizedBox(height: AppSpacing.sm),
                           ListTile(
                             leading: const Icon(Icons.menu_book_outlined),
                             title: Text(l10n.readerCustomize),
@@ -271,7 +261,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                             ),
                           ),
-                          const Divider(),
                           SwitchListTile(
                             secondary: Icon(
                               themeMode == ThemeMode.dark
@@ -289,7 +278,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ref.read(themeModeProvider.notifier).toggle();
                             },
                           ),
-                          const Divider(),
                           ListTile(
                             leading: const Icon(Icons.language),
                             title: Text(l10n.language),
@@ -303,10 +291,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               context: context,
                               builder: (dialogContext) => SimpleDialog(
                                 title: Text(l10n.language),
-                                insetPadding: const EdgeInsets.symmetric(
-                                  horizontal: AppSpacing.compact,
-                                  vertical: AppSpacing.md,
-                                ),
                                 children: [
                                   for (final language in const [
                                     ('en', 'English'),
@@ -342,7 +326,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             builder: (context, snapshot) => ListTile(
                               leading: const Icon(Icons.info_outline),
                               title: Text(l10n.version),
-                              subtitle: Text(snapshot.data?.version ?? '—'),
+                              subtitle: AppMetadata(
+                                label: snapshot.data?.version ?? '—',
+                              ),
                             ),
                           ),
                         ],
@@ -370,7 +356,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           secondary: Icon(
             Icons.vpn_lock_outlined,
             color: proxyConfig.enabled
-                ? colors.secondary
+                ? colors.primary
                 : colors.onSurfaceVariant,
           ),
           title: const Text('SOCKS5 Proxy'),
@@ -388,12 +374,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           child: proxyConfig.enabled
               ? Padding(
                   key: const ValueKey('proxy-fields'),
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.compact,
-                    AppSpacing.sm,
-                    AppSpacing.compact,
-                    AppSpacing.sm,
-                  ),
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -490,10 +471,6 @@ class _ZLibraryLoginDialogState extends ConsumerState<_ZLibraryLoginDialog> {
 
     return AlertDialog(
       scrollable: true,
-      insetPadding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.compact,
-        vertical: AppSpacing.md,
-      ),
       title: Text(l10n.zLibraryLogin),
       content: SizedBox(
         width: AppLayout.formMaxWidth,

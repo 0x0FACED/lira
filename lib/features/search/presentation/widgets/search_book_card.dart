@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -5,6 +7,7 @@ import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/widgets/app_components.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../books/domain/providers/books_provider.dart';
+import '../../../books/presentation/widgets/book_cover.dart';
 import '../../domain/models/search_result_item.dart';
 import '../../domain/providers/download_provider.dart';
 
@@ -12,6 +15,48 @@ class SearchBookCard extends ConsumerWidget {
   final SearchResultItem book;
 
   const SearchBookCard({super.key, required this.book});
+
+  static String _sourceName(SearchResultItem book) =>
+      book.source == SearchResultSource.anna ? "Anna's" : 'Z-Lib';
+
+  static int metadataCharacterCount(SearchResultItem book) =>
+      book.format.length +
+      _sourceName(book).length +
+      3 +
+      (book.size.isEmpty ? 0 : book.size.length + 3);
+
+  static String _metadata(SearchResultItem book) => [
+    book.format.toUpperCase(),
+    _sourceName(book),
+    if (book.size.isNotEmpty) book.size,
+  ].join(' · ');
+
+  static double captionExtent(
+    BuildContext context,
+    double width,
+    int maxMetadataCharacters,
+  ) {
+    final text = Theme.of(context).textTheme;
+    final scaler = MediaQuery.textScalerOf(context);
+    double lineHeight(TextStyle style) =>
+        scaler.scale(style.fontSize!) * (style.height ?? 1.2);
+    final metadataCharactersPerLine = math.max(
+      1,
+      (width / scaler.scale(text.bodySmall!.fontSize!)).floor(),
+    );
+    final metadataLines =
+        (maxMetadataCharacters / metadataCharactersPerLine).ceil() + 1;
+    return (AppSpacing.compact +
+            lineHeight(text.titleSmall!) * 2 +
+            AppSpacing.xs +
+            lineHeight(text.bodySmall!) * (2 + metadataLines) +
+            AppSpacing.sm * 2 +
+            math.max(
+              AppLayout.minTouchTarget,
+              lineHeight(text.labelMedium!) + AppSpacing.xs + 4,
+            ))
+        .ceilToDouble();
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -50,10 +95,7 @@ class SearchBookCard extends ConsumerWidget {
                 ),
                 const SizedBox(width: AppSpacing.xs),
                 IconButton(
-                  style: IconButton.styleFrom(
-                    foregroundColor: colors.error,
-                    minimumSize: const Size.square(AppLayout.minTouchTarget),
-                  ),
+                  color: colors.error,
                   icon: Semantics(
                     label: l10n.cancelDownload,
                     child: const Icon(Icons.close_rounded),
@@ -67,10 +109,7 @@ class SearchBookCard extends ConsumerWidget {
           : Align(
               key: ValueKey('download-${book.id}'),
               alignment: Alignment.centerRight,
-              child: IconButton.filledTonal(
-                style: IconButton.styleFrom(
-                  minimumSize: const Size.square(AppLayout.minTouchTarget),
-                ),
+              child: IconButton(
                 icon: Semantics(
                   label: l10n.downloadBook,
                   child: const Icon(Icons.download_rounded),
@@ -80,87 +119,69 @@ class SearchBookCard extends ConsumerWidget {
             ),
     );
 
-    return AppSurface(
-      margin: EdgeInsets.zero,
-      padding: EdgeInsets.zero,
-      radius: AppRadius.md,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: ColoredBox(
-              color: colors.surfaceContainer,
-              child: book.imgUrl.isNotEmpty
-                  ? Image.network(
-                      book.imgUrl,
-                      fit: BoxFit.cover,
-                      alignment: Alignment.topCenter,
-                      headers: isAnna
-                          ? const {
-                              'User-Agent':
-                                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                            }
-                          : null,
-                      errorBuilder: (context, error, stackTrace) =>
-                          _buildFallbackCover(theme),
-                    )
-                  : _buildFallbackCover(theme),
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AspectRatio(
+          aspectRatio: 2 / 3,
+          child: ColoredBox(
+            color: colors.surfaceContainer,
+            child: book.imgUrl.isNotEmpty
+                ? Image.network(
+                    book.imgUrl,
+                    fit: BoxFit.cover,
+                    alignment: Alignment.topCenter,
+                    headers: isAnna
+                        ? const {
+                            'User-Agent':
+                                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                          }
+                        : null,
+                    errorBuilder: (context, error, stackTrace) =>
+                        _buildFallbackCover(),
+                  )
+                : _buildFallbackCover(),
           ),
-          Padding(
-            padding: const EdgeInsets.all(AppSpacing.sm),
+        ),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.compact),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
                   book.title,
-                  style: theme.textTheme.titleMedium,
+                  style: theme.textTheme.titleSmall,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  book.author,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: colors.onSurfaceVariant,
+                if (book.author.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    book.author,
+                    style: theme.textTheme.bodySmall,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                ],
                 const SizedBox(height: AppSpacing.sm),
-                Wrap(
-                  spacing: AppSpacing.xs,
-                  runSpacing: AppSpacing.xs,
-                  children: [
-                    AppBadge(label: book.format.toUpperCase()),
-                    AppBadge(
-                      label: isAnna ? "Anna's" : 'Z-Lib',
-                      color: isAnna ? colors.tertiary : colors.secondary,
-                    ),
-                    if (book.size.isNotEmpty)
-                      AppBadge(label: book.size, icon: Icons.storage_outlined),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.xs),
+                Text(_metadata(book), style: theme.textTheme.bodySmall),
+                const Spacer(),
+                const SizedBox(height: AppSpacing.sm),
                 action,
               ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _buildFallbackCover(ThemeData theme) {
-    return Center(
-      child: Icon(
-        Icons.menu_book_outlined,
-        size: 32,
-        color: theme.colorScheme.secondary,
-      ),
-    );
-  }
+  Widget _buildFallbackCover() => TypographicBookCover(
+    title: book.title,
+    author: book.author,
+    format: book.format,
+  );
 
   Future<void> _handleDownload(BuildContext context, WidgetRef ref) async {
     final l10n = AppLocalizations.of(context)!;

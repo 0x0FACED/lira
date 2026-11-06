@@ -94,7 +94,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.compact),
+            padding: EdgeInsets.symmetric(
+              horizontal: AppLayout.pageGutter(context),
+              vertical: AppSpacing.lg,
+            ),
             child: ConstrainedBox(
               constraints: const BoxConstraints(
                 maxWidth: AppLayout.formMaxWidth,
@@ -102,19 +105,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(AppSpacing.compact),
-                    decoration: BoxDecoration(
-                      color: colors.primaryContainer,
-                      borderRadius: BorderRadius.circular(AppRadius.lg),
-                    ),
-                    child: Icon(
-                      Icons.auto_stories_outlined,
-                      size: 32,
-                      color: colors.onPrimaryContainer,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
                   Text(l10n.appTitle, style: theme.textTheme.displaySmall),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
@@ -123,108 +113,99 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       color: colors.onSurfaceVariant,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.md),
-                  AppSurface(
-                    child: AutofillGroup(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          AppStateTransition(
-                            child: Align(
-                              key: ValueKey(_isLogin ? 'login' : 'register'),
-                              alignment: AlignmentDirectional.centerStart,
-                              child: Text(
-                                _isLogin ? l10n.signIn : l10n.register,
-                                style: theme.textTheme.headlineSmall,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                          TextField(
-                            controller: _usernameController,
-                            autofillHints: const [AutofillHints.username],
-                            textInputAction: TextInputAction.next,
-                            decoration: InputDecoration(
-                              labelText: l10n.username,
-                              prefixIcon: const Icon(Icons.person_outline),
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.compact),
-                          TextField(
-                            controller: _passwordController,
-                            autofillHints: [
-                              _isLogin
-                                  ? AutofillHints.password
-                                  : AutofillHints.newPassword,
-                            ],
-                            obscureText: true,
-                            textInputAction: TextInputAction.done,
-                            decoration: InputDecoration(
-                              labelText: l10n.password,
-                              prefixIcon: const Icon(Icons.lock_outline),
-                            ),
-                            onSubmitted: (_) => _handleAuth(),
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                          FilledButton(
-                            onPressed: _isLoading ? null : _handleAuth,
-                            child: AppStateTransition(
-                              child: _isLoading
-                                  ? SizedBox(
-                                      key: const ValueKey('auth-loading'),
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        semanticsLabel: _isLogin
-                                            ? l10n.signIn
-                                            : l10n.register,
-                                      ),
-                                    )
-                                  : Text(
-                                      key: ValueKey(
-                                        _isLogin ? 'sign-in' : 'register',
-                                      ),
-                                      _isLogin ? l10n.signIn : l10n.register,
-                                      textAlign: TextAlign.center,
-                                    ),
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.sm),
-                          TextButton(
-                            onPressed: () =>
-                                setState(() => _isLogin = !_isLogin),
+                  const SizedBox(height: AppSpacing.lg),
+                  AutofillGroup(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        AppStateTransition(
+                          child: Align(
+                            key: ValueKey(_isLogin ? 'login' : 'register'),
+                            alignment: AlignmentDirectional.centerStart,
                             child: Text(
-                              _isLogin
-                                  ? l10n.noAccountRegister
-                                  : l10n.haveAccountSignIn,
-                              textAlign: TextAlign.center,
+                              _isLogin ? l10n.signIn : l10n.register,
+                              style: theme.textTheme.headlineSmall,
                             ),
                           ),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(
-                              vertical: AppSpacing.sm,
-                            ),
-                            child: Divider(),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        TextField(
+                          controller: _usernameController,
+                          autofillHints: const [AutofillHints.username],
+                          textInputAction: TextInputAction.next,
+                          decoration: InputDecoration(labelText: l10n.username),
+                        ),
+                        const SizedBox(height: AppSpacing.compact),
+                        TextField(
+                          controller: _passwordController,
+                          autofillHints: [
+                            _isLogin
+                                ? AutofillHints.password
+                                : AutofillHints.newPassword,
+                          ],
+                          obscureText: true,
+                          textInputAction: TextInputAction.done,
+                          decoration: InputDecoration(labelText: l10n.password),
+                          onSubmitted: (_) => _handleAuth(),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        FilledButton(
+                          onPressed: _isLoading ? null : _handleAuth,
+                          child: AppStateTransition(
+                            child: _isLoading
+                                ? SizedBox(
+                                    key: const ValueKey('auth-loading'),
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      semanticsLabel: _isLogin
+                                          ? l10n.signIn
+                                          : l10n.register,
+                                    ),
+                                  )
+                                : Text(
+                                    key: ValueKey(
+                                      _isLogin ? 'sign-in' : 'register',
+                                    ),
+                                    _isLogin ? l10n.signIn : l10n.register,
+                                    textAlign: TextAlign.center,
+                                  ),
                           ),
-                          OutlinedButton.icon(
-                            onPressed: _handleGuest,
-                            icon: const Icon(Icons.visibility_off_outlined),
-                            label: Text(
-                              l10n.continueAsGuest,
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.compact),
-                          Text(
-                            l10n.guestLocalOnly,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colors.onSurfaceVariant,
-                            ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        TextButton(
+                          onPressed: () => setState(() => _isLogin = !_isLogin),
+                          child: Text(
+                            _isLogin
+                                ? l10n.noAccountRegister
+                                : l10n.haveAccountSignIn,
                             textAlign: TextAlign.center,
                           ),
-                        ],
-                      ),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(
+                            vertical: AppSpacing.sm,
+                          ),
+                          child: Divider(),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: _handleGuest,
+                          icon: const Icon(Icons.visibility_off_outlined),
+                          label: Text(
+                            l10n.continueAsGuest,
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.compact),
+                        Text(
+                          l10n.guestLocalOnly,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colors.onSurfaceVariant,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                     ),
                   ),
                 ],

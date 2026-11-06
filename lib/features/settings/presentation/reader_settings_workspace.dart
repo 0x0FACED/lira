@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/app_components.dart';
 import '../../../l10n/app_localizations.dart';
 import '../data/settings_provider.dart';
 import 'reader_page_dimming.dart';
@@ -150,25 +151,29 @@ class _ReaderSettingsWorkspaceState extends State<ReaderSettingsWorkspace> {
                     right: 0,
                     child: SafeArea(
                       minimum: const EdgeInsets.all(AppSpacing.sm),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton.filledTonal(
-                            icon: Semantics(
-                              label: l10n.readerCurrentBook,
-                              child: const Icon(Icons.arrow_back),
+                      child: AppSurface(
+                        padding: EdgeInsets.zero,
+                        radius: AppRadius.sm,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: Semantics(
+                                label: l10n.readerCurrentBook,
+                                child: const Icon(Icons.arrow_back),
+                              ),
+                              onPressed: _backToBook,
                             ),
-                            onPressed: _backToBook,
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          IconButton.filledTonal(
-                            icon: Semantics(
-                              label: l10n.readerSettings,
-                              child: const Icon(Icons.settings),
+                            const SizedBox(width: AppSpacing.sm),
+                            IconButton(
+                              icon: Semantics(
+                                label: l10n.readerSettings,
+                                child: const Icon(Icons.settings),
+                              ),
+                              onPressed: widget.onOpen,
                             ),
-                            onPressed: widget.onOpen,
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -202,19 +207,16 @@ class _ReaderSettingsWorkspaceState extends State<ReaderSettingsWorkspace> {
                           child: Material(
                             key: const ValueKey('reader-settings-surface'),
                             color: colors.surface,
-                            elevation: sideBySide ? 0 : 12,
+                            surfaceTintColor: Colors.transparent,
+                            elevation: 0,
                             clipBehavior: Clip.antiAlias,
-                            shape: sideBySide
-                                ? Border(
-                                    right: BorderSide(
-                                      color: colors.outlineVariant,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: sideBySide
+                                  ? BorderRadius.zero
+                                  : const BorderRadius.vertical(
+                                      top: Radius.circular(AppRadius.sm),
                                     ),
-                                  )
-                                : const RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.vertical(
-                                      top: Radius.circular(AppSpacing.md),
-                                    ),
-                                  ),
+                            ),
                             child: SafeArea(
                               right: !sideBySide,
                               top: sideBySide,
@@ -237,7 +239,7 @@ class _ReaderSettingsWorkspaceState extends State<ReaderSettingsWorkspace> {
                                                 : l10n.readerSettings,
                                             style: Theme.of(
                                               context,
-                                            ).textTheme.titleMedium,
+                                            ).textTheme.titleLarge,
                                           ),
                                         ),
                                         IconButton(

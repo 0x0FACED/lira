@@ -42,7 +42,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         media.size.shortestSide < 600;
     final columns = ref.watch(libraryColumnsProvider);
     final wide = media.size.width >= AppLayout.desktopBreakpoint;
-    final gutter = wide ? AppSpacing.xl : AppSpacing.md;
+    final gutter = AppLayout.pageGutter(context);
     final shelfGap = wide ? AppSpacing.lg : AppSpacing.md;
 
     return Scaffold(
@@ -56,69 +56,61 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             child: CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      gutter - AppSpacing.compact,
-                      AppSpacing.md,
-                      gutter - AppSpacing.compact,
-                      AppSpacing.sm,
-                    ),
-                    child: AppPageHeader(
-                      title: l10n.library,
-                      actions: [
-                        if (isPhone)
-                          PopupMenuButton<int>(
-                            tooltip: '',
-                            initialValue: columns,
-                            icon: Semantics(
-                              label: l10n.libraryBooksPerRow,
-                              child: Icon(
-                                columns == 2
-                                    ? Icons.grid_view_outlined
-                                    : Icons.view_module_outlined,
-                              ),
-                            ),
-                            onSelected: (value) => ref
-                                .read(libraryColumnsProvider.notifier)
-                                .setColumns(value),
-                            itemBuilder: (_) => [
-                              CheckedPopupMenuItem(
-                                value: 2,
-                                checked: columns == 2,
-                                child: Text(l10n.libraryTwoBooksPerRow),
-                              ),
-                              CheckedPopupMenuItem(
-                                value: 3,
-                                checked: columns == 3,
-                                child: Text(l10n.libraryThreeBooksPerRow),
-                              ),
-                            ],
-                          ),
-                        IconButton(
+                  child: AppPageHeader(
+                    title: l10n.library,
+                    actions: [
+                      if (isPhone)
+                        PopupMenuButton<int>(
+                          tooltip: '',
+                          initialValue: columns,
                           icon: Semantics(
-                            label: l10n.importBook,
-                            child: const Icon(Icons.add),
+                            label: l10n.libraryBooksPerRow,
+                            child: Icon(
+                              columns == 2
+                                  ? Icons.grid_view_outlined
+                                  : Icons.view_module_outlined,
+                            ),
                           ),
-                          onPressed: () async {
-                            try {
-                              await controller.importBook();
-                            } catch (error) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      '$error',
-                                      style: TextStyle(color: colors.onError),
-                                    ),
-                                    backgroundColor: colors.error,
-                                  ),
-                                );
-                              }
-                            }
-                          },
+                          onSelected: (value) => ref
+                              .read(libraryColumnsProvider.notifier)
+                              .setColumns(value),
+                          itemBuilder: (_) => [
+                            CheckedPopupMenuItem(
+                              value: 2,
+                              checked: columns == 2,
+                              child: Text(l10n.libraryTwoBooksPerRow),
+                            ),
+                            CheckedPopupMenuItem(
+                              value: 3,
+                              checked: columns == 3,
+                              child: Text(l10n.libraryThreeBooksPerRow),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      IconButton(
+                        icon: Semantics(
+                          label: l10n.importBook,
+                          child: const Icon(Icons.add),
+                        ),
+                        onPressed: () async {
+                          try {
+                            await controller.importBook();
+                          } catch (error) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    '$error',
+                                    style: TextStyle(color: colors.onError),
+                                  ),
+                                  backgroundColor: colors.error,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                      ),
+                    ],
                   ),
                 ),
                 SliverToBoxAdapter(

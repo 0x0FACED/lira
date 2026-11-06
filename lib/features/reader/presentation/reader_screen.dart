@@ -621,8 +621,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                                       minHeight: AppLayout.minTouchTarget,
                                     ),
                                     child: Padding(
-                                      padding: const EdgeInsets.all(
-                                        AppSpacing.xs,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: AppSpacing.md,
+                                        vertical: AppSpacing.xs,
                                       ),
                                       child: Row(
                                         children: [
@@ -700,9 +701,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                                       builder: (context, progressState, _) {
                                         return Padding(
                                           padding: const EdgeInsets.fromLTRB(
-                                            AppSpacing.compact,
+                                            AppSpacing.md,
                                             AppSpacing.sm,
-                                            AppSpacing.compact,
+                                            AppSpacing.md,
                                             AppSpacing.xs,
                                           ),
                                           child: Column(
@@ -745,7 +746,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                                                       progressState.label,
                                                       style: theme
                                                           .textTheme
-                                                          .labelMedium
+                                                          .bodySmall
                                                           ?.copyWith(
                                                             color: colors
                                                                 .onSurfaceVariant,
@@ -1042,7 +1043,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         horizontal: AppSpacing.sm,
         vertical: AppSpacing.xs,
       ),
-      radius: AppRadius.md,
+      radius: AppRadius.sm,
       child: SizedBox(
         width: AppLayout.minTouchTarget,
         child: SingleChildScrollView(
@@ -1084,11 +1085,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
           child: Container(
             width: AppSpacing.lg,
             height: AppSpacing.lg,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-              border: Border.all(color: Theme.of(context).colorScheme.outline),
-            ),
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
         ),
       ),
@@ -1256,12 +1253,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     final l10n = AppLocalizations.of(context)!;
 
     return Drawer(
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             AppPageHeader(title: l10n.tableOfContents),
-            const Divider(),
             Expanded(
               child: toc.isEmpty
                   ? SingleChildScrollView(
@@ -1287,14 +1286,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   }
 
   Widget _buildTocItem(TOCItem item, {int depth = 0}) {
-    final padding = AppSpacing.compact + (depth * AppSpacing.md);
+    final padding = AppSpacing.md + (depth * AppSpacing.md);
 
     if (item.subItems.isEmpty) {
       return ListTile(
-        contentPadding: EdgeInsets.only(
-          left: padding,
-          right: AppSpacing.compact,
-        ),
+        contentPadding: EdgeInsets.only(left: padding, right: AppSpacing.md),
         title: Text(item.title, style: Theme.of(context).textTheme.bodyLarge),
         onTap: () {
           _engine?.goToLocation(BookLocation(locator: item.fileName));
@@ -1371,7 +1367,7 @@ class _ExpandableTocItemState extends State<_ExpandableTocItem> {
         ListTile(
           contentPadding: EdgeInsets.only(
             left: widget.padding,
-            right: AppSpacing.compact,
+            right: AppSpacing.md,
           ),
           leading: IconButton(
             icon: Semantics(
@@ -1408,7 +1404,7 @@ class _ExpandableTocItemState extends State<_ExpandableTocItem> {
         return ListTile(
           contentPadding: EdgeInsets.only(
             left: widget.padding + AppSpacing.md,
-            right: AppSpacing.compact,
+            right: AppSpacing.md,
           ),
           title: Text(item.title, style: Theme.of(context).textTheme.bodyLarge),
           onTap: () => widget.onNavigate(item.fileName),

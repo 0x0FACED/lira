@@ -1,11 +1,10 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/widgets/app_components.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/models/book_dto.dart';
+import 'book_cover.dart';
 
 class BookCard extends StatelessWidget {
   final BookDto book;
@@ -21,7 +20,7 @@ class BookCard extends StatelessWidget {
     this.readingPercentage,
   });
 
-  static const coverAspectRatio = 2 / 3;
+  static const coverAspectRatio = BookCover.aspectRatio;
   static const _titleSize = 14.0;
   static const _authorSize = 12.0;
   static const _lineHeight = 1.3;
@@ -65,17 +64,7 @@ class BookCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            AspectRatio(
-              aspectRatio: coverAspectRatio,
-              child: Semantics(
-                image: true,
-                label: book.title,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
-                  child: _buildCover(context),
-                ),
-              ),
-            ),
+            BookCover(book: book),
             const SizedBox(height: AppSpacing.compact),
             SizedBox(
               height: _textLineExtent(textScaler, _titleSize) * 2,
@@ -220,93 +209,6 @@ class BookCard extends StatelessWidget {
           ],
         );
       },
-    );
-  }
-
-  Widget _buildCover(BuildContext context) {
-    final path = book.coverUrl;
-    if (path != null && path.isNotEmpty) {
-      return Image.file(
-        File(path),
-        fit: BoxFit.cover,
-        alignment: Alignment.topCenter,
-        excludeFromSemantics: true,
-        errorBuilder: (context, error, stackTrace) =>
-            _buildTypographicCover(context),
-      );
-    }
-    return _buildTypographicCover(context);
-  }
-
-  Widget _buildTypographicCover(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final paper = switch (book.title.hashCode.abs() % 3) {
-      0 => colors.surfaceContainer,
-      1 => colors.surfaceContainerHigh,
-      _ => colors.surfaceContainerHighest,
-    };
-    // Generated artwork behaves like an image; accessible text below the
-    // cover retains the full title/author and follows interface text scaling.
-    return ExcludeSemantics(
-      child: MediaQuery.withNoTextScaling(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final inset = (constraints.maxWidth * 0.1).clamp(8.0, 24.0);
-            return ColoredBox(
-              color: paper,
-              child: Padding(
-                padding: EdgeInsets.all(inset),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      book.author.trim(),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontSize: (constraints.maxWidth * 0.055).clamp(
-                          9.0,
-                          12.0,
-                        ),
-                        height: 1.4,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Expanded(
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          book.title.trim(),
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            fontSize: (constraints.maxWidth * 0.12).clamp(
-                              12.0,
-                              26.0,
-                            ),
-                            height: 1.2,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          maxLines: 5,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      book.format.toUpperCase(),
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w400,
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-      ),
     );
   }
 }

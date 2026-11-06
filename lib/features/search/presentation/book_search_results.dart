@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -97,9 +99,11 @@ class _BookSearchResultsState extends ConsumerState<BookSearchResults> {
             }
             final books = _filter(result.books);
             final theme = Theme.of(context);
-            final bodySize = theme.textTheme.bodyMedium!.fontSize!;
-            final textScale =
-                MediaQuery.textScalerOf(context).scale(bodySize) / bodySize;
+            final maxMetadataCharacters = books.fold<int>(
+              0,
+              (length, book) =>
+                  math.max(length, SearchBookCard.metadataCharacterCount(book)),
+            );
             return CustomScrollView(
               key: PageStorageKey(
                 'book-search-${widget.sourceId}-${widget.query}',
@@ -108,12 +112,15 @@ class _BookSearchResultsState extends ConsumerState<BookSearchResults> {
                 if (result.errors.isNotEmpty)
                   SliverToBoxAdapter(
                     child: AppSurface(
-                      margin: const EdgeInsets.all(AppSpacing.compact),
-                      color: theme.colorScheme.secondaryContainer,
+                      margin: EdgeInsets.symmetric(
+                        horizontal: AppLayout.pageGutter(context),
+                        vertical: AppSpacing.compact,
+                      ),
+                      color: theme.colorScheme.surfaceContainerLow,
                       child: Text(
                         '${l10n.searchSourcesPartialFailure}\n${result.errors.join('\n')}',
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSecondaryContainer,
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ),
@@ -121,7 +128,10 @@ class _BookSearchResultsState extends ConsumerState<BookSearchResults> {
                 if (result.books.isNotEmpty)
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.compact),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: AppLayout.pageGutter(context),
+                        vertical: AppSpacing.compact,
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -143,7 +153,7 @@ class _BookSearchResultsState extends ConsumerState<BookSearchResults> {
                                 ),
                               PopupMenuButton<_SortOrder>(
                                 initialValue: _sort,
-                                tooltip: '',
+                                tooltip: l10n.searchSort,
                                 onSelected: (value) =>
                                     setState(() => _sort = value),
                                 itemBuilder: (_) => [
@@ -169,7 +179,11 @@ class _BookSearchResultsState extends ConsumerState<BookSearchResults> {
                                         children: [
                                           const Icon(Icons.sort_rounded),
                                           const SizedBox(width: AppSpacing.xs),
-                                          Text(_sortLabel(l10n, _sort)),
+                                          Flexible(
+                                            child: Text(
+                                              _sortLabel(l10n, _sort),
+                                            ),
+                                          ),
                                         ],
                                       ),
                                     ),
@@ -210,7 +224,12 @@ class _BookSearchResultsState extends ConsumerState<BookSearchResults> {
                   )
                 else
                   SliverPadding(
-                    padding: const EdgeInsets.all(AppSpacing.compact),
+                    padding: EdgeInsets.fromLTRB(
+                      AppLayout.pageGutter(context),
+                      AppSpacing.compact,
+                      AppLayout.pageGutter(context),
+                      AppSpacing.lg,
+                    ),
                     sliver: SliverGrid(
                       gridDelegate: ResponsiveGridDelegate(
                         minCrossAxisExtent:
@@ -219,11 +238,15 @@ class _BookSearchResultsState extends ConsumerState<BookSearchResults> {
                             ? AppLayout.bookCardMinWidthDesktop
                             : AppLayout.bookCardMinWidth,
                         maxCrossAxisExtent: AppLayout.bookCardMaxWidth,
-                        crossAxisSpacing: AppSpacing.compact,
-                        mainAxisSpacing: AppSpacing.compact,
-                        childAspectRatio:
-                            AppLayout.bookCardAspectRatio /
-                            (textScale < 1 ? 1 : textScale),
+                        crossAxisSpacing: AppSpacing.md,
+                        mainAxisSpacing: AppSpacing.lg,
+                        childAspectRatio: 2 / 3,
+                        mainAxisExtraExtentForWidth: (width) =>
+                            SearchBookCard.captionExtent(
+                              context,
+                              width,
+                              maxMetadataCharacters,
+                            ),
                       ),
                       delegate: SliverChildBuilderDelegate(
                         (context, index) => SearchBookCard(book: books[index]),

@@ -37,7 +37,7 @@ class _DiscoverCarouselState extends State<DiscoverCarousel> {
 
   int get _itemCount =>
       math.min(widget.items.length, AppLayout.discoverShelfItemLimit);
-  double get _stride => widget.cardWidth + AppSpacing.sm;
+  double get _stride => widget.cardWidth + AppSpacing.md;
 
   @override
   void initState() {
@@ -221,12 +221,12 @@ class _DiscoverCarouselState extends State<DiscoverCarousel> {
                     key: PageStorageKey('discover-shelf-${widget.source.id}'),
                     controller: _scrollController,
                     scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.compact,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppLayout.pageGutter(context),
                     ),
                     itemCount: _itemCount,
                     separatorBuilder: (_, __) =>
-                        const SizedBox(width: AppSpacing.sm),
+                        const SizedBox(width: AppSpacing.md),
                     itemBuilder: (context, index) {
                       final item = widget.items[index];
                       return Focus(
@@ -249,7 +249,7 @@ class _DiscoverCarouselState extends State<DiscoverCarousel> {
                           foregroundDecoration: _cardFocusNodes[index].hasFocus
                               ? BoxDecoration(
                                   borderRadius: BorderRadius.circular(
-                                    AppRadius.md,
+                                    AppRadius.sm,
                                   ),
                                   border: Border.all(
                                     color: Theme.of(

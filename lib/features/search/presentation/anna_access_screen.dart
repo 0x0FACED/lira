@@ -113,8 +113,8 @@ class _AnnaAccessScreenState extends ConsumerState<AnnaAccessScreen> {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.compact,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppLayout.pageGutter(context),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -127,6 +127,8 @@ class _AnnaAccessScreenState extends ConsumerState<AnnaAccessScreen> {
                       DropdownButtonFormField<String>(
                         initialValue: _origin,
                         isExpanded: true,
+                        isDense: false,
+                        itemHeight: null,
                         decoration: InputDecoration(
                           labelText: l10n.annaSessionDomain,
                         ),
@@ -156,11 +158,11 @@ class _AnnaAccessScreenState extends ConsumerState<AnnaAccessScreen> {
                       ),
                       const SizedBox(height: AppSpacing.md),
                       AppSurface(
-                        color: theme.colorScheme.secondaryContainer,
+                        color: theme.colorScheme.surfaceContainerLow,
                         child: Text(
                           l10n.annaSessionConnectionWarning,
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSecondaryContainer,
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ),

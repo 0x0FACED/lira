@@ -84,11 +84,11 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
             SliverToBoxAdapter(
               child: DiscoverContent(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.compact,
+                  padding: EdgeInsets.fromLTRB(
+                    AppLayout.pageGutter(context),
                     0,
-                    AppSpacing.compact,
-                    AppSpacing.sm,
+                    AppLayout.pageGutter(context),
+                    AppSpacing.md,
                   ),
                   child: AppSearchField(
                     controller: _searchController,
@@ -176,7 +176,7 @@ class _SourceShelfState extends ConsumerState<_SourceShelf>
     }
     final feed = _lastFeed ?? const AsyncLoading<DiscoverFeed>();
     return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -195,7 +195,10 @@ class _SourceShelfState extends ConsumerState<_SourceShelf>
             data: (value) {
               if (value.items.isEmpty) {
                 return Padding(
-                  padding: const EdgeInsets.all(AppSpacing.compact),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppLayout.pageGutter(context),
+                    vertical: AppSpacing.compact,
+                  ),
                   child: Text(
                     l10n.discoverNoMaterials,
                     style: Theme.of(context).textTheme.bodyMedium,
@@ -207,10 +210,10 @@ class _SourceShelfState extends ConsumerState<_SourceShelf>
                 children: [
                   if (value.isStale)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.compact,
+                      padding: EdgeInsets.fromLTRB(
+                        AppLayout.pageGutter(context),
                         0,
-                        AppSpacing.compact,
+                        AppLayout.pageGutter(context),
                         AppSpacing.sm,
                       ),
                       child: Text(
@@ -226,7 +229,8 @@ class _SourceShelfState extends ConsumerState<_SourceShelf>
                           scaler.scale(text.bodyMedium!.fontSize!) /
                           text.bodyMedium!.fontSize!;
                       final cardWidth = math.min(
-                        constraints.maxWidth - AppSpacing.compact * 2,
+                        constraints.maxWidth -
+                            AppLayout.pageGutter(context) * 2,
                         AppLayout.discoverCardWidth *
                             scale.clamp(1, AppLayout.discoverMaxCardTextScale),
                       );
@@ -234,24 +238,49 @@ class _SourceShelfState extends ConsumerState<_SourceShelf>
                           scaler.scale(style.fontSize!) *
                           (style.height ?? 1) *
                           count;
-                      final textFirst =
-                          source.category == DiscoverCategory.documents ||
-                          !value.items.any((item) => item.imageUrl != null);
+                      var contentHeight = 0.0;
+                      for (final item in value.items.take(
+                        AppLayout.discoverShelfItemLimit,
+                      )) {
+                        final textFirst =
+                            source.category == DiscoverCategory.documents ||
+                            item.imageUrl == null;
+                        final headingHeight =
+                            lines(
+                              text.titleSmall!,
+                              AppLayout.discoverTitleLines,
+                            ) +
+                            AppSpacing.xs +
+                            (item.documentNumber == null
+                                ? 0
+                                : lines(text.bodySmall!, 1) + AppSpacing.xs) +
+                            (item.author.isEmpty
+                                ? 0
+                                : lines(text.bodySmall!, 1)) +
+                            (item.publishedAt == null
+                                ? 0
+                                : lines(text.bodySmall!, 1));
+                        final branchHeight = textFirst
+                            ? headingHeight +
+                                  (item.summary.isEmpty
+                                      ? 0
+                                      : AppSpacing.sm +
+                                            lines(
+                                              text.bodyMedium!,
+                                              AppLayout.discoverSummaryLines,
+                                            ))
+                            : cardWidth / AppLayout.discoverImageAspectRatio +
+                                  headingHeight;
+                        contentHeight = math.max(contentHeight, branchHeight);
+                      }
                       final height =
-                          lines(
-                            text.titleSmall!,
-                            AppLayout.discoverTitleLines,
-                          ) +
-                          lines(text.bodySmall!, 2) +
-                          lines(text.labelLarge!, 1) +
-                          AppLayout.minTouchTarget +
-                          AppSpacing.sm * 4 +
-                          (textFirst
-                              ? lines(
-                                  text.bodyMedium!,
-                                  AppLayout.discoverSummaryLines,
-                                )
-                              : cardWidth / AppLayout.discoverImageAspectRatio);
+                          contentHeight +
+                          AppSpacing.compact +
+                          AppSpacing.sm +
+                          math.max(
+                            AppLayout.minTouchTarget,
+                            lines(text.bodySmall!, 1),
+                          );
                       return DiscoverCarousel(
                         source: source,
                         items: value.items,

@@ -86,20 +86,19 @@ class _AppUpdateSettingsSectionState
         ListTile(
           leading: const Icon(Icons.system_update_outlined),
           title: Text(l10n.updateCheckAction),
-          subtitle: Text(l10n.updateSource),
+          subtitle: AppMetadata(label: l10n.updateSource),
           trailing: const Icon(Icons.refresh),
           enabled: !controller.busy,
           onTap: controller.busy ? null : controller.check,
         ),
-        const Divider(),
         Padding(
-          padding: const EdgeInsets.all(AppSpacing.compact),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.compact),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Semantics(
                 liveRegion: status != AppUpdateStatus.downloading,
-                child: Text(message, style: theme.textTheme.bodyLarge),
+                child: Text(message, style: theme.textTheme.bodyMedium),
               ),
               if (error != null) ...[
                 const SizedBox(height: AppSpacing.sm),
@@ -123,6 +122,7 @@ class _AppUpdateSettingsSectionState
                   value: status == AppUpdateStatus.downloading
                       ? controller.progress
                       : null,
+                  minHeight: 2,
                   semanticsLabel: message,
                 ),
               ],
@@ -136,6 +136,7 @@ class _AppUpdateSettingsSectionState
                       l10n.updateDownloadAction(
                         decimal.format(release.apk!.sizeBytes / (1024 * 1024)),
                       ),
+                      textAlign: TextAlign.center,
                     ),
                   )
                 else
@@ -160,7 +161,10 @@ class _AppUpdateSettingsSectionState
                 FilledButton.icon(
                   onPressed: controller.install,
                   icon: const Icon(Icons.install_mobile_outlined),
-                  label: Text(l10n.updateInstallAction),
+                  label: Text(
+                    l10n.updateInstallAction,
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               ],
               if (release != null) ...[
@@ -168,7 +172,10 @@ class _AppUpdateSettingsSectionState
                 OutlinedButton.icon(
                   onPressed: () => _openRelease(release.releaseUrl),
                   icon: const Icon(Icons.open_in_new),
-                  label: Text(l10n.updateReleaseAction),
+                  label: Text(
+                    l10n.updateReleaseAction,
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               ],
             ],

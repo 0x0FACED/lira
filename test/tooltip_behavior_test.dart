@@ -108,10 +108,16 @@ void main() {
                     onTap: () => router.push('/article'),
                   ),
                 ),
-                const SizedBox(
+                SizedBox(
                   width: 210,
-                  height: 480,
-                  child: SearchBookCard(book: searchBook),
+                  height:
+                      210 / BookCard.coverAspectRatio +
+                      SearchBookCard.captionExtent(
+                        context,
+                        210,
+                        SearchBookCard.metadataCharacterCount(searchBook),
+                      ),
+                  child: const SearchBookCard(book: searchBook),
                 ),
               ],
             ),

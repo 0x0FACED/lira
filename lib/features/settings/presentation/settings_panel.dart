@@ -59,11 +59,22 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
                   for (final category in _SettingsCategory.values) ...[
                     if (category != _SettingsCategory.values.first)
                       const SizedBox(width: AppSpacing.sm),
-                    ChoiceChip(
-                      label: Text(_categoryLabel(category, l10n)),
+                    Semantics(
                       selected: _category == category,
-                      showCheckmark: false,
-                      onSelected: (_) => setState(() => _category = category),
+                      child: TextButton(
+                        onPressed: () => setState(() => _category = category),
+                        child: Text(
+                          _categoryLabel(category, l10n),
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(
+                                color: _category == category
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                      ),
                     ),
                   ],
                 ],
@@ -221,22 +232,40 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
           spacing: AppSpacing.sm,
           runSpacing: AppSpacing.xs,
           children: [
-            ChoiceChip(
-              avatar: const Icon(Icons.swap_vert, size: 18),
-              label: Text(l10n.readerVertical),
+            Semantics(
               selected: settings.readingMode == ReadingMode.vertical,
-              onSelected: (_) => _updateSettings(
-                (current) =>
-                    current.copyWith(readingMode: ReadingMode.vertical),
+              child: TextButton.icon(
+                icon: const Icon(Icons.swap_vert, size: 18),
+                label: Text(
+                  l10n.readerVertical,
+                  style: TextStyle(
+                    color: settings.readingMode == ReadingMode.vertical
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                onPressed: () => _updateSettings(
+                  (current) =>
+                      current.copyWith(readingMode: ReadingMode.vertical),
+                ),
               ),
             ),
-            ChoiceChip(
-              avatar: const Icon(Icons.swap_horiz, size: 18),
-              label: Text(l10n.readerHorizontal),
+            Semantics(
               selected: settings.readingMode == ReadingMode.horizontal,
-              onSelected: (_) => _updateSettings(
-                (current) =>
-                    current.copyWith(readingMode: ReadingMode.horizontal),
+              child: TextButton.icon(
+                icon: const Icon(Icons.swap_horiz, size: 18),
+                label: Text(
+                  l10n.readerHorizontal,
+                  style: TextStyle(
+                    color: settings.readingMode == ReadingMode.horizontal
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                onPressed: () => _updateSettings(
+                  (current) =>
+                      current.copyWith(readingMode: ReadingMode.horizontal),
+                ),
               ),
             ),
           ],
@@ -419,25 +448,7 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
     final textColor = Color(palette.textColor);
     return Semantics(
       selected: selected,
-      child: OutlinedButton(
-        style: OutlinedButton.styleFrom(
-          backgroundColor: Color(palette.backgroundColor),
-          foregroundColor: textColor,
-          minimumSize: const Size(0, AppLayout.minTouchTarget),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm,
-            vertical: AppSpacing.sm,
-          ),
-          side: BorderSide(
-            color: selected
-                ? theme.colorScheme.primary
-                : theme.colorScheme.outline,
-            width: selected ? 3 : 1,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
-          ),
-        ),
+      child: TextButton(
         onPressed: () => _updateSettings(
           (current) => current.copyWith(
             backgroundColor: palette.backgroundColor,
@@ -450,13 +461,30 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
         child: Row(
           children: [
             ExcludeSemantics(
-              child: Text(
-                'Aa',
-                style: TextStyle(fontSize: 20, color: textColor),
+              child: Container(
+                alignment: Alignment.center,
+                width: AppSpacing.xl,
+                height: AppSpacing.xl,
+                color: Color(palette.backgroundColor),
+                child: Text(
+                  'Aa',
+                  style: TextStyle(fontSize: 20, color: textColor),
+                ),
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
             Expanded(child: Text(_paletteLabel(palette.kind, l10n))),
+            const SizedBox(width: AppSpacing.xs),
+            SizedBox(
+              width: 18,
+              child: selected
+                  ? Icon(
+                      Icons.check,
+                      size: 18,
+                      color: theme.colorScheme.primary,
+                    )
+                  : null,
+            ),
           ],
         ),
       ),
@@ -485,9 +513,6 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
               label: Semantics(
                 label: '${l10n.readerEditColor}: $title',
                 child: Text('#${_rgbHex(color)}'),
-              ),
-              style: TextButton.styleFrom(
-                minimumSize: const Size(0, AppLayout.minTouchTarget),
               ),
             ),
           ],
@@ -603,7 +628,7 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
             const SizedBox(width: AppSpacing.sm),
             Text(
               label,
-              style: theme.textTheme.labelMedium?.copyWith(
+              style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
@@ -644,22 +669,16 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
       button: true,
       child: SizedBox.square(
         dimension: AppLayout.minTouchTarget,
-        child: InkResponse(
-          radius: AppSpacing.lg,
-          onTap: () => onSelected(colorValue),
-          child: Center(
+        child: IconButton(
+          onPressed: () => onSelected(colorValue),
+          icon: Center(
             child: Container(
               width: AppSpacing.xl,
               height: AppSpacing.xl,
               decoration: BoxDecoration(
                 color: color,
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: selected
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.outline,
-                  width: selected ? 3 : 1,
-                ),
+                border: Border.all(color: theme.colorScheme.outline),
               ),
               child: selected
                   ? Icon(

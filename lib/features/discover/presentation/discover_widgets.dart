@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_tokens.dart';
-import '../../../core/widgets/app_components.dart';
 import '../../../l10n/app_localizations.dart';
 import '../domain/discover_item.dart';
 import '../domain/discover_source.dart';
@@ -111,7 +110,10 @@ class DiscoverSectionHeading extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.compact),
+          padding: EdgeInsets.symmetric(
+            horizontal: AppLayout.pageGutter(context),
+            vertical: AppSpacing.compact,
+          ),
           child: Row(
             children: [
               Expanded(
@@ -188,7 +190,7 @@ class _MaterialSaveButtonState extends ConsumerState<MaterialSaveButton> {
         label: Text(label),
       );
     }
-    return IconButton.filledTonal(
+    return IconButton(
       onPressed: saved || _saving ? null : _save,
       icon: Semantics(label: label, child: icon),
     );
@@ -231,9 +233,7 @@ class DiscoverItemCard extends StatelessWidget {
     final theme = Theme.of(context);
     final textFirst =
         source.category == DiscoverCategory.documents || item.imageUrl == null;
-    return AppSurface(
-      padding: EdgeInsets.zero,
-      radius: AppRadius.md,
+    return InkWell(
       onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -245,14 +245,14 @@ class DiscoverItemCard extends StatelessWidget {
             ),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.sm),
+              padding: const EdgeInsets.only(top: AppSpacing.compact),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (item.documentNumber != null) ...[
                     Text(
                       'RFC ${item.documentNumber}',
-                      style: theme.textTheme.labelLarge,
+                      style: theme.textTheme.bodySmall,
                     ),
                     const SizedBox(height: AppSpacing.xs),
                   ],
@@ -293,6 +293,7 @@ class DiscoverItemCard extends StatelessWidget {
                     ),
                   ] else
                     const Spacer(),
+                  const SizedBox(height: AppSpacing.sm),
                   Row(
                     children: [
                       Expanded(
@@ -300,7 +301,7 @@ class DiscoverItemCard extends StatelessWidget {
                           item.status ?? source.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelMedium,
+                          style: theme.textTheme.bodySmall,
                         ),
                       ),
                       const SizedBox(width: AppSpacing.xs),
@@ -365,56 +366,58 @@ class DiscoverItemTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return AppSurface(
+    return InkWell(
       onTap: onTap,
-      radius: AppRadius.md,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (item.documentNumber != null) ...[
-            Text(
-              'RFC ${item.documentNumber}',
-              style: theme.textTheme.labelLarge,
-            ),
-            const SizedBox(height: AppSpacing.xs),
-          ],
-          Text(item.title, style: theme.textTheme.titleMedium),
-          if (item.author.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.xs),
-            Text(item.author, style: theme.textTheme.bodySmall),
-          ],
-          if (item.summary.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              item.summary,
-              maxLines: AppLayout.discoverSummaryLines,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodyMedium,
-            ),
-          ],
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  [
-                    source.name,
-                    if (item.publishedAt != null)
-                      discoverDate(
-                        context,
-                        item.publishedAt!,
-                        monthOnly: item.documentNumber != null,
-                      ),
-                    if (item.status != null) item.status!,
-                  ].join(' · '),
-                  style: theme.textTheme.bodySmall,
-                ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.compact),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (item.documentNumber != null) ...[
+              Text(
+                'RFC ${item.documentNumber}',
+                style: theme.textTheme.bodySmall,
               ),
-              const SizedBox(width: AppSpacing.sm),
-              MaterialSaveButton(item: item),
+              const SizedBox(height: AppSpacing.xs),
             ],
-          ),
-        ],
+            Text(item.title, style: theme.textTheme.titleMedium),
+            if (item.author.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Text(item.author, style: theme.textTheme.bodySmall),
+            ],
+            if (item.summary.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                item.summary,
+                maxLines: AppLayout.discoverSummaryLines,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium,
+              ),
+            ],
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    [
+                      source.name,
+                      if (item.publishedAt != null)
+                        discoverDate(
+                          context,
+                          item.publishedAt!,
+                          monthOnly: item.documentNumber != null,
+                        ),
+                      if (item.status != null) item.status!,
+                    ].join(' · '),
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                MaterialSaveButton(item: item),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -431,7 +434,10 @@ class DiscoverFailure extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.all(AppSpacing.compact),
+    padding: EdgeInsets.symmetric(
+      horizontal: AppLayout.pageGutter(context),
+      vertical: AppSpacing.md,
+    ),
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [

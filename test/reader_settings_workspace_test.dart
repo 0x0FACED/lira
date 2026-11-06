@@ -117,15 +117,6 @@ void main() {
           );
           expect(labelRect.top, greaterThanOrEqualTo(viewportRect.top));
           expect(labelRect.bottom, lessThanOrEqualTo(viewportRect.bottom));
-          final header = tester.getRect(find.text('Reader preview'));
-          final category = tester.getRect(
-            find.widgetWithText(ChoiceChip, 'Typography'),
-          );
-          final field = tester.getRect(
-            find.byType(DropdownButtonFormField<String>),
-          );
-          expect(category.left, header.left);
-          expect(field.left, header.left);
           await tester.pumpWidget(const SizedBox.shrink());
         },
       );

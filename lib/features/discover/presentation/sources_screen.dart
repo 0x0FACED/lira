@@ -121,11 +121,11 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen> {
               ),
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.compact,
+                  padding: EdgeInsets.fromLTRB(
+                    AppLayout.pageGutter(context),
                     0,
-                    AppSpacing.compact,
-                    AppSpacing.compact,
+                    AppLayout.pageGutter(context),
+                    AppSpacing.md,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -282,8 +282,8 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen> {
                 )
               else
                 SliverPadding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.compact,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppLayout.pageGutter(context),
                   ),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate((context, index) {
@@ -306,166 +306,151 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen> {
                       final isEnabled = selected.contains(source.id);
                       return Padding(
                         key: ValueKey(source.id),
-                        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                        child: AppSurface(
-                          padding: EdgeInsets.zero,
-                          radius: AppRadius.md,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: InkWell(
-                                      onTap: () =>
-                                          Navigator.of(context).push<void>(
-                                            MaterialPageRoute(
-                                              builder: (_) =>
-                                                  DiscoverSourceScreen(
-                                                    source: source,
-                                                  ),
-                                            ),
-                                          ),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(
-                                          AppSpacing.compact,
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              source.name,
-                                              style:
-                                                  theme.textTheme.titleMedium,
-                                            ),
-                                            const SizedBox(
-                                              height: AppSpacing.xs,
-                                            ),
-                                            Text(
-                                              source.description(languageCode),
-                                              style: theme.textTheme.bodySmall,
-                                            ),
-                                            const SizedBox(
-                                              height: AppSpacing.xs,
-                                            ),
-                                            Text(
-                                              l10n.discoverSourceTopics(
-                                                source.topics
-                                                    .map(
-                                                      (topic) =>
-                                                          discoverTopicLabel(
-                                                            l10n,
-                                                            topic,
-                                                          ),
-                                                    )
-                                                    .join(', '),
-                                              ),
-                                              style: theme.textTheme.bodySmall,
-                                            ),
-                                            Text(
-                                              l10n.discoverSourceContentLanguage(
-                                                discoverSourceLanguageLabel(
-                                                  l10n,
-                                                  source.language,
+                        padding: const EdgeInsets.only(
+                          top: AppSpacing.sm,
+                          bottom: AppSpacing.lg,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: InkWell(
+                                    onTap: () =>
+                                        Navigator.of(context).push<void>(
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                DiscoverSourceScreen(
+                                                  source: source,
                                                 ),
-                                              ),
-                                              style: theme.textTheme.bodySmall,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.only(
-                                      right: AppSpacing.sm,
-                                    ),
-                                    child: Semantics(
-                                      label: source.name,
-                                      child: Switch(
-                                        value: isEnabled,
-                                        onChanged: _saving
-                                            ? null
-                                            : (value) => _persist(
-                                                () => notifier.setEnabled(
-                                                  source.id,
-                                                  value,
-                                                ),
-                                              ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              if (isEnabled)
-                                Padding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    AppSpacing.compact,
-                                    0,
-                                    AppSpacing.sm,
-                                    AppSpacing.xs,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          '${discoverCategoryLabel(l10n, source.category)} · ${l10n.discoverSourcePosition(position + 1)}',
-                                          style: theme.textTheme.labelMedium,
-                                        ),
-                                      ),
-                                      IconButton(
-                                        onPressed: _saving || position <= 0
-                                            ? null
-                                            : () => _persist(
-                                                () => notifier.move(
-                                                  source.id,
-                                                  selected.indexOf(
-                                                        enabled[position - 1]
-                                                            .id,
-                                                      ) -
-                                                      selected.indexOf(
-                                                        source.id,
-                                                      ),
-                                                ),
-                                              ),
-                                        icon: Semantics(
-                                          label: l10n.discoverMoveUp,
-                                          child: const Icon(
-                                            Icons.arrow_upward_rounded,
                                           ),
                                         ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: AppSpacing.sm,
                                       ),
-                                      IconButton(
-                                        onPressed:
-                                            _saving ||
-                                                position < 0 ||
-                                                position >= enabled.length - 1
-                                            ? null
-                                            : () => _persist(
-                                                () => notifier.move(
-                                                  source.id,
-                                                  selected.indexOf(
-                                                        enabled[position + 1]
-                                                            .id,
-                                                      ) -
-                                                      selected.indexOf(
-                                                        source.id,
-                                                      ),
-                                                ),
-                                              ),
-                                        icon: Semantics(
-                                          label: l10n.discoverMoveDown,
-                                          child: const Icon(
-                                            Icons.arrow_downward_rounded,
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            source.name,
+                                            style: theme.textTheme.titleMedium,
                                           ),
-                                        ),
+                                          const SizedBox(height: AppSpacing.xs),
+                                          Text(
+                                            source.description(languageCode),
+                                            style: theme.textTheme.bodySmall,
+                                          ),
+                                          const SizedBox(height: AppSpacing.xs),
+                                          Text(
+                                            l10n.discoverSourceTopics(
+                                              source.topics
+                                                  .map(
+                                                    (topic) =>
+                                                        discoverTopicLabel(
+                                                          l10n,
+                                                          topic,
+                                                        ),
+                                                  )
+                                                  .join(', '),
+                                            ),
+                                            style: theme.textTheme.bodySmall,
+                                          ),
+                                          Text(
+                                            l10n.discoverSourceContentLanguage(
+                                              discoverSourceLanguageLabel(
+                                                l10n,
+                                                source.language,
+                                              ),
+                                            ),
+                                            style: theme.textTheme.bodySmall,
+                                          ),
+                                        ],
                                       ),
-                                    ],
+                                    ),
                                   ),
                                 ),
-                            ],
-                          ),
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    right: AppSpacing.sm,
+                                  ),
+                                  child: Semantics(
+                                    label: source.name,
+                                    child: Switch(
+                                      value: isEnabled,
+                                      onChanged: _saving
+                                          ? null
+                                          : (value) => _persist(
+                                              () => notifier.setEnabled(
+                                                source.id,
+                                                value,
+                                              ),
+                                            ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (isEnabled)
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  bottom: AppSpacing.xs,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        '${discoverCategoryLabel(l10n, source.category)} · ${l10n.discoverSourcePosition(position + 1)}',
+                                        style: theme.textTheme.bodySmall,
+                                      ),
+                                    ),
+                                    IconButton(
+                                      onPressed: _saving || position <= 0
+                                          ? null
+                                          : () => _persist(
+                                              () => notifier.move(
+                                                source.id,
+                                                selected.indexOf(
+                                                      enabled[position - 1].id,
+                                                    ) -
+                                                    selected.indexOf(source.id),
+                                              ),
+                                            ),
+                                      icon: Semantics(
+                                        label: l10n.discoverMoveUp,
+                                        child: const Icon(
+                                          Icons.arrow_upward_rounded,
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      onPressed:
+                                          _saving ||
+                                              position < 0 ||
+                                              position >= enabled.length - 1
+                                          ? null
+                                          : () => _persist(
+                                              () => notifier.move(
+                                                source.id,
+                                                selected.indexOf(
+                                                      enabled[position + 1].id,
+                                                    ) -
+                                                    selected.indexOf(source.id),
+                                              ),
+                                            ),
+                                      icon: Semantics(
+                                        label: l10n.discoverMoveDown,
+                                        child: const Icon(
+                                          Icons.arrow_downward_rounded,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
                         ),
                       );
                     }, childCount: rows.length),

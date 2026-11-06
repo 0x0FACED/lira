@@ -108,11 +108,11 @@ class _DiscoverSearchScreenState extends ConsumerState<DiscoverSearchScreen> {
                             ),
                           ),
                           Padding(
-                            padding: const EdgeInsets.fromLTRB(
-                              AppSpacing.compact,
+                            padding: EdgeInsets.fromLTRB(
+                              AppLayout.pageGutter(context),
                               0,
-                              AppSpacing.compact,
-                              AppSpacing.compact,
+                              AppLayout.pageGutter(context),
+                              AppSpacing.md,
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -266,7 +266,10 @@ class _SourceSearchSlivers extends ConsumerWidget {
             if (items.isEmpty) {
               return SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.compact),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppLayout.pageGutter(context),
+                    vertical: AppSpacing.compact,
+                  ),
                   child: Text(
                     l10n.discoverNoMaterials,
                     style: Theme.of(context).textTheme.bodyMedium,
@@ -275,14 +278,14 @@ class _SourceSearchSlivers extends ConsumerWidget {
               );
             }
             return SliverPadding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.compact,
+              padding: EdgeInsets.symmetric(
+                horizontal: AppLayout.pageGutter(context),
               ),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate((context, index) {
                   final item = items[index];
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    padding: const EdgeInsets.only(bottom: AppSpacing.md),
                     child: DiscoverItemTile(
                       key: ValueKey(item.id),
                       item: item,

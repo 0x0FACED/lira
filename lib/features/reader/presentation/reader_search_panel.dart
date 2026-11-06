@@ -40,7 +40,9 @@ class ReaderSearchPanel extends StatelessWidget {
             math.min(620, media.size.height * .78 - media.viewInsets.bottom),
           ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.compact),
+            padding: EdgeInsets.symmetric(
+              horizontal: AppLayout.pageGutter(context),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -63,6 +65,7 @@ class ReaderSearchPanel extends StatelessWidget {
                     ),
                   ],
                 ),
+                const SizedBox(height: AppSpacing.sm),
                 AppSearchField(
                   controller: textController,
                   autofocus: true,
@@ -71,7 +74,7 @@ class ReaderSearchPanel extends StatelessWidget {
                   onSubmitted: (_) => onSubmit(),
                   onSearch: onSubmit,
                 ),
-                const SizedBox(height: AppSpacing.sm),
+                const SizedBox(height: AppSpacing.md),
                 Expanded(
                   child: ListenableBuilder(
                     listenable: search,
@@ -140,7 +143,9 @@ class ReaderSearchPanel extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
             child: Text(
               l10n.readerSearchCount(search.matches.length),
-              style: Theme.of(context).textTheme.labelMedium,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
         ),
@@ -152,16 +157,18 @@ class ReaderSearchPanel extends StatelessWidget {
               final match = search.matches[index];
               return ListTile(
                 selected: search.activeIndex == index,
-                selectedTileColor: Theme.of(
-                  context,
-                ).colorScheme.secondaryContainer,
+                selectedTileColor: Colors.transparent,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.sm,
                   vertical: AppSpacing.xs,
                 ),
                 title: Text(
                   _sectionLabel(l10n, match),
-                  style: Theme.of(context).textTheme.labelMedium,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: search.activeIndex == index
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
                 subtitle: Padding(
                   padding: const EdgeInsets.only(top: AppSpacing.xs),
@@ -172,13 +179,8 @@ class ReaderSearchPanel extends StatelessWidget {
                         TextSpan(
                           text: match.excerpt.text,
                           style: TextStyle(
-                            backgroundColor: Theme.of(
-                              context,
-                            ).colorScheme.tertiaryContainer,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onTertiaryContainer,
-                            fontWeight: FontWeight.w700,
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                         TextSpan(text: match.excerpt.after),
@@ -281,7 +283,9 @@ class ReaderSearchNavigation extends StatelessWidget {
                         search.activeIndex + 1,
                         search.matches.length,
                       ),
-                style: Theme.of(context).textTheme.labelMedium,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
             if (canReturn)

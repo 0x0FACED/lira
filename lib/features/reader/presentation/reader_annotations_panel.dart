@@ -55,9 +55,11 @@ class _ReaderAnnotationsPanelState
         slivers: [
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.compact,
-                vertical: AppSpacing.sm,
+              padding: EdgeInsets.fromLTRB(
+                AppLayout.pageGutter(context),
+                AppSpacing.md,
+                AppLayout.pageGutter(context),
+                AppSpacing.sm,
               ),
               child: Row(
                 children: [
@@ -69,7 +71,7 @@ class _ReaderAnnotationsPanelState
                   ),
                   if (count != null) ...[
                     const SizedBox(width: AppSpacing.sm),
-                    AppBadge(label: '$count'),
+                    AppMetadata(label: '$count'),
                   ],
                 ],
               ),
@@ -77,8 +79,8 @@ class _ReaderAnnotationsPanelState
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.compact,
+              padding: EdgeInsets.symmetric(
+                horizontal: AppLayout.pageGutter(context),
                 vertical: AppSpacing.sm,
               ),
               child: SegmentedButton<_AnnotationsTab>(
@@ -102,7 +104,7 @@ class _ReaderAnnotationsPanelState
               ),
             ),
           ),
-          const SliverToBoxAdapter(child: Divider()),
+          const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.sm)),
           if (_tab == _AnnotationsTab.highlights)
             highlights.when(
               loading: () => const SliverFillRemaining(
@@ -192,9 +194,9 @@ class _ReaderAnnotationsPanelState
       key: ValueKey(highlight.id),
       error: _highlightDeleteErrors[highlight.id],
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.compact,
-          vertical: AppSpacing.xs,
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: AppLayout.pageGutter(context),
+          vertical: AppSpacing.sm,
         ),
         leading: Container(
           width: AppSpacing.xs,
@@ -267,11 +269,14 @@ class _ReaderAnnotationsPanelState
       key: ValueKey(bookmark.id),
       error: _bookmarkDeleteErrors[bookmark.id],
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.compact,
-          vertical: AppSpacing.xs,
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: AppLayout.pageGutter(context),
+          vertical: AppSpacing.sm,
         ),
-        leading: Icon(Icons.bookmark, color: theme.colorScheme.primary),
+        leading: Icon(
+          Icons.bookmark_border,
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
         title: Text(l10n.bookmarkPosition(percentage)),
         trailing: IconButton(
           icon: Semantics(
@@ -367,8 +372,8 @@ class _AnnotationRow extends StatelessWidget {
       child,
       if (error != null)
         Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.compact,
+          padding: EdgeInsets.symmetric(
+            horizontal: AppLayout.pageGutter(context),
             vertical: AppSpacing.xs,
           ),
           child: _AnnotationError(message: error!),
@@ -476,28 +481,22 @@ class _AnnotationError extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     return Semantics(
       liveRegion: true,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: colors.errorContainer,
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.compact),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.error_outline, color: colors.onErrorContainer),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Text(
-                  message,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: colors.onErrorContainer,
-                  ),
-                ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.compact),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.error_outline, color: colors.error),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                message,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: colors.error),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
