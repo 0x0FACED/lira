@@ -17,11 +17,11 @@ final bookmarksControllerProvider =
 
 class BookmarksController
     extends FamilyAsyncNotifier<List<BookmarkDto>, String> {
-  late final BookmarksLocalRepository _repository;
+  late final BookmarksLocalRepository _repository =
+      getIt<BookmarksLocalRepository>();
 
   @override
   FutureOr<List<BookmarkDto>> build(String arg) async {
-    _repository = getIt<BookmarksLocalRepository>();
     return _repository.getBookmarksForBook(arg);
   }
 

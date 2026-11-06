@@ -1810,6 +1810,890 @@ class BookmarksCompanion extends UpdateCompanion<BookmarkEntity> {
   }
 }
 
+class $SyncRevisionsTable extends SyncRevisions
+    with TableInfo<$SyncRevisionsTable, SyncRevisionEntity> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SyncRevisionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _entityIdMeta = const VerificationMeta(
+    'entityId',
+  );
+  @override
+  late final GeneratedColumn<String> entityId = GeneratedColumn<String>(
+    'entity_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _bookIdMeta = const VerificationMeta('bookId');
+  @override
+  late final GeneratedColumn<String> bookId = GeneratedColumn<String>(
+    'book_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _modifiedAtMeta = const VerificationMeta(
+    'modifiedAt',
+  );
+  @override
+  late final GeneratedColumn<int> modifiedAt = GeneratedColumn<int>(
+    'modified_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedMeta = const VerificationMeta(
+    'deleted',
+  );
+  @override
+  late final GeneratedColumn<bool> deleted = GeneratedColumn<bool>(
+    'deleted',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("deleted" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    kind,
+    entityId,
+    bookId,
+    modifiedAt,
+    deviceId,
+    deleted,
+    payload,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'sync_revisions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SyncRevisionEntity> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('entity_id')) {
+      context.handle(
+        _entityIdMeta,
+        entityId.isAcceptableOrUnknown(data['entity_id']!, _entityIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_entityIdMeta);
+    }
+    if (data.containsKey('book_id')) {
+      context.handle(
+        _bookIdMeta,
+        bookId.isAcceptableOrUnknown(data['book_id']!, _bookIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_bookIdMeta);
+    }
+    if (data.containsKey('modified_at')) {
+      context.handle(
+        _modifiedAtMeta,
+        modifiedAt.isAcceptableOrUnknown(data['modified_at']!, _modifiedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_modifiedAtMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('deleted')) {
+      context.handle(
+        _deletedMeta,
+        deleted.isAcceptableOrUnknown(data['deleted']!, _deletedMeta),
+      );
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {kind, entityId};
+  @override
+  SyncRevisionEntity map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SyncRevisionEntity(
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      entityId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}entity_id'],
+      )!,
+      bookId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}book_id'],
+      )!,
+      modifiedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}modified_at'],
+      )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      deleted: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}deleted'],
+      )!,
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      )!,
+    );
+  }
+
+  @override
+  $SyncRevisionsTable createAlias(String alias) {
+    return $SyncRevisionsTable(attachedDatabase, alias);
+  }
+}
+
+class SyncRevisionEntity extends DataClass
+    implements Insertable<SyncRevisionEntity> {
+  final String kind;
+  final String entityId;
+  final String bookId;
+  final int modifiedAt;
+  final String deviceId;
+  final bool deleted;
+  final String payload;
+  const SyncRevisionEntity({
+    required this.kind,
+    required this.entityId,
+    required this.bookId,
+    required this.modifiedAt,
+    required this.deviceId,
+    required this.deleted,
+    required this.payload,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['kind'] = Variable<String>(kind);
+    map['entity_id'] = Variable<String>(entityId);
+    map['book_id'] = Variable<String>(bookId);
+    map['modified_at'] = Variable<int>(modifiedAt);
+    map['device_id'] = Variable<String>(deviceId);
+    map['deleted'] = Variable<bool>(deleted);
+    map['payload'] = Variable<String>(payload);
+    return map;
+  }
+
+  SyncRevisionsCompanion toCompanion(bool nullToAbsent) {
+    return SyncRevisionsCompanion(
+      kind: Value(kind),
+      entityId: Value(entityId),
+      bookId: Value(bookId),
+      modifiedAt: Value(modifiedAt),
+      deviceId: Value(deviceId),
+      deleted: Value(deleted),
+      payload: Value(payload),
+    );
+  }
+
+  factory SyncRevisionEntity.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SyncRevisionEntity(
+      kind: serializer.fromJson<String>(json['kind']),
+      entityId: serializer.fromJson<String>(json['entityId']),
+      bookId: serializer.fromJson<String>(json['bookId']),
+      modifiedAt: serializer.fromJson<int>(json['modifiedAt']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      deleted: serializer.fromJson<bool>(json['deleted']),
+      payload: serializer.fromJson<String>(json['payload']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'kind': serializer.toJson<String>(kind),
+      'entityId': serializer.toJson<String>(entityId),
+      'bookId': serializer.toJson<String>(bookId),
+      'modifiedAt': serializer.toJson<int>(modifiedAt),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'deleted': serializer.toJson<bool>(deleted),
+      'payload': serializer.toJson<String>(payload),
+    };
+  }
+
+  SyncRevisionEntity copyWith({
+    String? kind,
+    String? entityId,
+    String? bookId,
+    int? modifiedAt,
+    String? deviceId,
+    bool? deleted,
+    String? payload,
+  }) => SyncRevisionEntity(
+    kind: kind ?? this.kind,
+    entityId: entityId ?? this.entityId,
+    bookId: bookId ?? this.bookId,
+    modifiedAt: modifiedAt ?? this.modifiedAt,
+    deviceId: deviceId ?? this.deviceId,
+    deleted: deleted ?? this.deleted,
+    payload: payload ?? this.payload,
+  );
+  SyncRevisionEntity copyWithCompanion(SyncRevisionsCompanion data) {
+    return SyncRevisionEntity(
+      kind: data.kind.present ? data.kind.value : this.kind,
+      entityId: data.entityId.present ? data.entityId.value : this.entityId,
+      bookId: data.bookId.present ? data.bookId.value : this.bookId,
+      modifiedAt: data.modifiedAt.present
+          ? data.modifiedAt.value
+          : this.modifiedAt,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      deleted: data.deleted.present ? data.deleted.value : this.deleted,
+      payload: data.payload.present ? data.payload.value : this.payload,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncRevisionEntity(')
+          ..write('kind: $kind, ')
+          ..write('entityId: $entityId, ')
+          ..write('bookId: $bookId, ')
+          ..write('modifiedAt: $modifiedAt, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('deleted: $deleted, ')
+          ..write('payload: $payload')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    kind,
+    entityId,
+    bookId,
+    modifiedAt,
+    deviceId,
+    deleted,
+    payload,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SyncRevisionEntity &&
+          other.kind == this.kind &&
+          other.entityId == this.entityId &&
+          other.bookId == this.bookId &&
+          other.modifiedAt == this.modifiedAt &&
+          other.deviceId == this.deviceId &&
+          other.deleted == this.deleted &&
+          other.payload == this.payload);
+}
+
+class SyncRevisionsCompanion extends UpdateCompanion<SyncRevisionEntity> {
+  final Value<String> kind;
+  final Value<String> entityId;
+  final Value<String> bookId;
+  final Value<int> modifiedAt;
+  final Value<String> deviceId;
+  final Value<bool> deleted;
+  final Value<String> payload;
+  final Value<int> rowid;
+  const SyncRevisionsCompanion({
+    this.kind = const Value.absent(),
+    this.entityId = const Value.absent(),
+    this.bookId = const Value.absent(),
+    this.modifiedAt = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.deleted = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SyncRevisionsCompanion.insert({
+    required String kind,
+    required String entityId,
+    required String bookId,
+    required int modifiedAt,
+    required String deviceId,
+    this.deleted = const Value.absent(),
+    required String payload,
+    this.rowid = const Value.absent(),
+  }) : kind = Value(kind),
+       entityId = Value(entityId),
+       bookId = Value(bookId),
+       modifiedAt = Value(modifiedAt),
+       deviceId = Value(deviceId),
+       payload = Value(payload);
+  static Insertable<SyncRevisionEntity> custom({
+    Expression<String>? kind,
+    Expression<String>? entityId,
+    Expression<String>? bookId,
+    Expression<int>? modifiedAt,
+    Expression<String>? deviceId,
+    Expression<bool>? deleted,
+    Expression<String>? payload,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (kind != null) 'kind': kind,
+      if (entityId != null) 'entity_id': entityId,
+      if (bookId != null) 'book_id': bookId,
+      if (modifiedAt != null) 'modified_at': modifiedAt,
+      if (deviceId != null) 'device_id': deviceId,
+      if (deleted != null) 'deleted': deleted,
+      if (payload != null) 'payload': payload,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SyncRevisionsCompanion copyWith({
+    Value<String>? kind,
+    Value<String>? entityId,
+    Value<String>? bookId,
+    Value<int>? modifiedAt,
+    Value<String>? deviceId,
+    Value<bool>? deleted,
+    Value<String>? payload,
+    Value<int>? rowid,
+  }) {
+    return SyncRevisionsCompanion(
+      kind: kind ?? this.kind,
+      entityId: entityId ?? this.entityId,
+      bookId: bookId ?? this.bookId,
+      modifiedAt: modifiedAt ?? this.modifiedAt,
+      deviceId: deviceId ?? this.deviceId,
+      deleted: deleted ?? this.deleted,
+      payload: payload ?? this.payload,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (entityId.present) {
+      map['entity_id'] = Variable<String>(entityId.value);
+    }
+    if (bookId.present) {
+      map['book_id'] = Variable<String>(bookId.value);
+    }
+    if (modifiedAt.present) {
+      map['modified_at'] = Variable<int>(modifiedAt.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (deleted.present) {
+      map['deleted'] = Variable<bool>(deleted.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncRevisionsCompanion(')
+          ..write('kind: $kind, ')
+          ..write('entityId: $entityId, ')
+          ..write('bookId: $bookId, ')
+          ..write('modifiedAt: $modifiedAt, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('deleted: $deleted, ')
+          ..write('payload: $payload, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $SyncIdentitiesTable extends SyncIdentities
+    with TableInfo<$SyncIdentitiesTable, SyncIdentityEntity> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SyncIdentitiesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _clockMeta = const VerificationMeta('clock');
+  @override
+  late final GeneratedColumn<int> clock = GeneratedColumn<int>(
+    'clock',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, deviceId, clock];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'sync_identities';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SyncIdentityEntity> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('clock')) {
+      context.handle(
+        _clockMeta,
+        clock.isAcceptableOrUnknown(data['clock']!, _clockMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_clockMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  SyncIdentityEntity map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SyncIdentityEntity(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+      clock: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}clock'],
+      )!,
+    );
+  }
+
+  @override
+  $SyncIdentitiesTable createAlias(String alias) {
+    return $SyncIdentitiesTable(attachedDatabase, alias);
+  }
+}
+
+class SyncIdentityEntity extends DataClass
+    implements Insertable<SyncIdentityEntity> {
+  final int id;
+  final String deviceId;
+  final int clock;
+  const SyncIdentityEntity({
+    required this.id,
+    required this.deviceId,
+    required this.clock,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['device_id'] = Variable<String>(deviceId);
+    map['clock'] = Variable<int>(clock);
+    return map;
+  }
+
+  SyncIdentitiesCompanion toCompanion(bool nullToAbsent) {
+    return SyncIdentitiesCompanion(
+      id: Value(id),
+      deviceId: Value(deviceId),
+      clock: Value(clock),
+    );
+  }
+
+  factory SyncIdentityEntity.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SyncIdentityEntity(
+      id: serializer.fromJson<int>(json['id']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      clock: serializer.fromJson<int>(json['clock']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'clock': serializer.toJson<int>(clock),
+    };
+  }
+
+  SyncIdentityEntity copyWith({int? id, String? deviceId, int? clock}) =>
+      SyncIdentityEntity(
+        id: id ?? this.id,
+        deviceId: deviceId ?? this.deviceId,
+        clock: clock ?? this.clock,
+      );
+  SyncIdentityEntity copyWithCompanion(SyncIdentitiesCompanion data) {
+    return SyncIdentityEntity(
+      id: data.id.present ? data.id.value : this.id,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      clock: data.clock.present ? data.clock.value : this.clock,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncIdentityEntity(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('clock: $clock')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, deviceId, clock);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SyncIdentityEntity &&
+          other.id == this.id &&
+          other.deviceId == this.deviceId &&
+          other.clock == this.clock);
+}
+
+class SyncIdentitiesCompanion extends UpdateCompanion<SyncIdentityEntity> {
+  final Value<int> id;
+  final Value<String> deviceId;
+  final Value<int> clock;
+  const SyncIdentitiesCompanion({
+    this.id = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.clock = const Value.absent(),
+  });
+  SyncIdentitiesCompanion.insert({
+    this.id = const Value.absent(),
+    required String deviceId,
+    required int clock,
+  }) : deviceId = Value(deviceId),
+       clock = Value(clock);
+  static Insertable<SyncIdentityEntity> custom({
+    Expression<int>? id,
+    Expression<String>? deviceId,
+    Expression<int>? clock,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (deviceId != null) 'device_id': deviceId,
+      if (clock != null) 'clock': clock,
+    });
+  }
+
+  SyncIdentitiesCompanion copyWith({
+    Value<int>? id,
+    Value<String>? deviceId,
+    Value<int>? clock,
+  }) {
+    return SyncIdentitiesCompanion(
+      id: id ?? this.id,
+      deviceId: deviceId ?? this.deviceId,
+      clock: clock ?? this.clock,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (clock.present) {
+      map['clock'] = Variable<int>(clock.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncIdentitiesCompanion(')
+          ..write('id: $id, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('clock: $clock')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $SyncExcludedBooksTable extends SyncExcludedBooks
+    with TableInfo<$SyncExcludedBooksTable, SyncExcludedBookEntity> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SyncExcludedBooksTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _bookHashMeta = const VerificationMeta(
+    'bookHash',
+  );
+  @override
+  late final GeneratedColumn<String> bookHash = GeneratedColumn<String>(
+    'book_hash',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [bookHash];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'sync_excluded_books';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SyncExcludedBookEntity> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('book_hash')) {
+      context.handle(
+        _bookHashMeta,
+        bookHash.isAcceptableOrUnknown(data['book_hash']!, _bookHashMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_bookHashMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {bookHash};
+  @override
+  SyncExcludedBookEntity map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SyncExcludedBookEntity(
+      bookHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}book_hash'],
+      )!,
+    );
+  }
+
+  @override
+  $SyncExcludedBooksTable createAlias(String alias) {
+    return $SyncExcludedBooksTable(attachedDatabase, alias);
+  }
+}
+
+class SyncExcludedBookEntity extends DataClass
+    implements Insertable<SyncExcludedBookEntity> {
+  final String bookHash;
+  const SyncExcludedBookEntity({required this.bookHash});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['book_hash'] = Variable<String>(bookHash);
+    return map;
+  }
+
+  SyncExcludedBooksCompanion toCompanion(bool nullToAbsent) {
+    return SyncExcludedBooksCompanion(bookHash: Value(bookHash));
+  }
+
+  factory SyncExcludedBookEntity.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SyncExcludedBookEntity(
+      bookHash: serializer.fromJson<String>(json['bookHash']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{'bookHash': serializer.toJson<String>(bookHash)};
+  }
+
+  SyncExcludedBookEntity copyWith({String? bookHash}) =>
+      SyncExcludedBookEntity(bookHash: bookHash ?? this.bookHash);
+  SyncExcludedBookEntity copyWithCompanion(SyncExcludedBooksCompanion data) {
+    return SyncExcludedBookEntity(
+      bookHash: data.bookHash.present ? data.bookHash.value : this.bookHash,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncExcludedBookEntity(')
+          ..write('bookHash: $bookHash')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => bookHash.hashCode;
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SyncExcludedBookEntity && other.bookHash == this.bookHash);
+}
+
+class SyncExcludedBooksCompanion
+    extends UpdateCompanion<SyncExcludedBookEntity> {
+  final Value<String> bookHash;
+  final Value<int> rowid;
+  const SyncExcludedBooksCompanion({
+    this.bookHash = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SyncExcludedBooksCompanion.insert({
+    required String bookHash,
+    this.rowid = const Value.absent(),
+  }) : bookHash = Value(bookHash);
+  static Insertable<SyncExcludedBookEntity> custom({
+    Expression<String>? bookHash,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (bookHash != null) 'book_hash': bookHash,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SyncExcludedBooksCompanion copyWith({
+    Value<String>? bookHash,
+    Value<int>? rowid,
+  }) {
+    return SyncExcludedBooksCompanion(
+      bookHash: bookHash ?? this.bookHash,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (bookHash.present) {
+      map['book_hash'] = Variable<String>(bookHash.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncExcludedBooksCompanion(')
+          ..write('bookHash: $bookHash, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -1818,6 +2702,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $ReadingProgressesTable(this);
   late final $HighlightsTable highlights = $HighlightsTable(this);
   late final $BookmarksTable bookmarks = $BookmarksTable(this);
+  late final $SyncRevisionsTable syncRevisions = $SyncRevisionsTable(this);
+  late final $SyncIdentitiesTable syncIdentities = $SyncIdentitiesTable(this);
+  late final $SyncExcludedBooksTable syncExcludedBooks =
+      $SyncExcludedBooksTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1827,6 +2715,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     readingProgresses,
     highlights,
     bookmarks,
+    syncRevisions,
+    syncIdentities,
+    syncExcludedBooks,
   ];
 }
 
@@ -3448,6 +4339,547 @@ typedef $$BookmarksTableProcessedTableManager =
       BookmarkEntity,
       PrefetchHooks Function({bool bookId})
     >;
+typedef $$SyncRevisionsTableCreateCompanionBuilder =
+    SyncRevisionsCompanion Function({
+      required String kind,
+      required String entityId,
+      required String bookId,
+      required int modifiedAt,
+      required String deviceId,
+      Value<bool> deleted,
+      required String payload,
+      Value<int> rowid,
+    });
+typedef $$SyncRevisionsTableUpdateCompanionBuilder =
+    SyncRevisionsCompanion Function({
+      Value<String> kind,
+      Value<String> entityId,
+      Value<String> bookId,
+      Value<int> modifiedAt,
+      Value<String> deviceId,
+      Value<bool> deleted,
+      Value<String> payload,
+      Value<int> rowid,
+    });
+
+class $$SyncRevisionsTableFilterComposer
+    extends Composer<_$AppDatabase, $SyncRevisionsTable> {
+  $$SyncRevisionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get entityId => $composableBuilder(
+    column: $table.entityId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get bookId => $composableBuilder(
+    column: $table.bookId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get modifiedAt => $composableBuilder(
+    column: $table.modifiedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get deleted => $composableBuilder(
+    column: $table.deleted,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$SyncRevisionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $SyncRevisionsTable> {
+  $$SyncRevisionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get entityId => $composableBuilder(
+    column: $table.entityId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get bookId => $composableBuilder(
+    column: $table.bookId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get modifiedAt => $composableBuilder(
+    column: $table.modifiedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get deleted => $composableBuilder(
+    column: $table.deleted,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SyncRevisionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SyncRevisionsTable> {
+  $$SyncRevisionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get entityId =>
+      $composableBuilder(column: $table.entityId, builder: (column) => column);
+
+  GeneratedColumn<String> get bookId =>
+      $composableBuilder(column: $table.bookId, builder: (column) => column);
+
+  GeneratedColumn<int> get modifiedAt => $composableBuilder(
+    column: $table.modifiedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumn<bool> get deleted =>
+      $composableBuilder(column: $table.deleted, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+}
+
+class $$SyncRevisionsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SyncRevisionsTable,
+          SyncRevisionEntity,
+          $$SyncRevisionsTableFilterComposer,
+          $$SyncRevisionsTableOrderingComposer,
+          $$SyncRevisionsTableAnnotationComposer,
+          $$SyncRevisionsTableCreateCompanionBuilder,
+          $$SyncRevisionsTableUpdateCompanionBuilder,
+          (
+            SyncRevisionEntity,
+            BaseReferences<
+              _$AppDatabase,
+              $SyncRevisionsTable,
+              SyncRevisionEntity
+            >,
+          ),
+          SyncRevisionEntity,
+          PrefetchHooks Function()
+        > {
+  $$SyncRevisionsTableTableManager(_$AppDatabase db, $SyncRevisionsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SyncRevisionsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SyncRevisionsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SyncRevisionsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> kind = const Value.absent(),
+                Value<String> entityId = const Value.absent(),
+                Value<String> bookId = const Value.absent(),
+                Value<int> modifiedAt = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<bool> deleted = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SyncRevisionsCompanion(
+                kind: kind,
+                entityId: entityId,
+                bookId: bookId,
+                modifiedAt: modifiedAt,
+                deviceId: deviceId,
+                deleted: deleted,
+                payload: payload,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String kind,
+                required String entityId,
+                required String bookId,
+                required int modifiedAt,
+                required String deviceId,
+                Value<bool> deleted = const Value.absent(),
+                required String payload,
+                Value<int> rowid = const Value.absent(),
+              }) => SyncRevisionsCompanion.insert(
+                kind: kind,
+                entityId: entityId,
+                bookId: bookId,
+                modifiedAt: modifiedAt,
+                deviceId: deviceId,
+                deleted: deleted,
+                payload: payload,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SyncRevisionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SyncRevisionsTable,
+      SyncRevisionEntity,
+      $$SyncRevisionsTableFilterComposer,
+      $$SyncRevisionsTableOrderingComposer,
+      $$SyncRevisionsTableAnnotationComposer,
+      $$SyncRevisionsTableCreateCompanionBuilder,
+      $$SyncRevisionsTableUpdateCompanionBuilder,
+      (
+        SyncRevisionEntity,
+        BaseReferences<_$AppDatabase, $SyncRevisionsTable, SyncRevisionEntity>,
+      ),
+      SyncRevisionEntity,
+      PrefetchHooks Function()
+    >;
+typedef $$SyncIdentitiesTableCreateCompanionBuilder =
+    SyncIdentitiesCompanion Function({
+      Value<int> id,
+      required String deviceId,
+      required int clock,
+    });
+typedef $$SyncIdentitiesTableUpdateCompanionBuilder =
+    SyncIdentitiesCompanion Function({
+      Value<int> id,
+      Value<String> deviceId,
+      Value<int> clock,
+    });
+
+class $$SyncIdentitiesTableFilterComposer
+    extends Composer<_$AppDatabase, $SyncIdentitiesTable> {
+  $$SyncIdentitiesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get clock => $composableBuilder(
+    column: $table.clock,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$SyncIdentitiesTableOrderingComposer
+    extends Composer<_$AppDatabase, $SyncIdentitiesTable> {
+  $$SyncIdentitiesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get clock => $composableBuilder(
+    column: $table.clock,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SyncIdentitiesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SyncIdentitiesTable> {
+  $$SyncIdentitiesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumn<int> get clock =>
+      $composableBuilder(column: $table.clock, builder: (column) => column);
+}
+
+class $$SyncIdentitiesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SyncIdentitiesTable,
+          SyncIdentityEntity,
+          $$SyncIdentitiesTableFilterComposer,
+          $$SyncIdentitiesTableOrderingComposer,
+          $$SyncIdentitiesTableAnnotationComposer,
+          $$SyncIdentitiesTableCreateCompanionBuilder,
+          $$SyncIdentitiesTableUpdateCompanionBuilder,
+          (
+            SyncIdentityEntity,
+            BaseReferences<
+              _$AppDatabase,
+              $SyncIdentitiesTable,
+              SyncIdentityEntity
+            >,
+          ),
+          SyncIdentityEntity,
+          PrefetchHooks Function()
+        > {
+  $$SyncIdentitiesTableTableManager(
+    _$AppDatabase db,
+    $SyncIdentitiesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SyncIdentitiesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SyncIdentitiesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SyncIdentitiesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<int> clock = const Value.absent(),
+              }) => SyncIdentitiesCompanion(
+                id: id,
+                deviceId: deviceId,
+                clock: clock,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String deviceId,
+                required int clock,
+              }) => SyncIdentitiesCompanion.insert(
+                id: id,
+                deviceId: deviceId,
+                clock: clock,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SyncIdentitiesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SyncIdentitiesTable,
+      SyncIdentityEntity,
+      $$SyncIdentitiesTableFilterComposer,
+      $$SyncIdentitiesTableOrderingComposer,
+      $$SyncIdentitiesTableAnnotationComposer,
+      $$SyncIdentitiesTableCreateCompanionBuilder,
+      $$SyncIdentitiesTableUpdateCompanionBuilder,
+      (
+        SyncIdentityEntity,
+        BaseReferences<_$AppDatabase, $SyncIdentitiesTable, SyncIdentityEntity>,
+      ),
+      SyncIdentityEntity,
+      PrefetchHooks Function()
+    >;
+typedef $$SyncExcludedBooksTableCreateCompanionBuilder =
+    SyncExcludedBooksCompanion Function({
+      required String bookHash,
+      Value<int> rowid,
+    });
+typedef $$SyncExcludedBooksTableUpdateCompanionBuilder =
+    SyncExcludedBooksCompanion Function({
+      Value<String> bookHash,
+      Value<int> rowid,
+    });
+
+class $$SyncExcludedBooksTableFilterComposer
+    extends Composer<_$AppDatabase, $SyncExcludedBooksTable> {
+  $$SyncExcludedBooksTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get bookHash => $composableBuilder(
+    column: $table.bookHash,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$SyncExcludedBooksTableOrderingComposer
+    extends Composer<_$AppDatabase, $SyncExcludedBooksTable> {
+  $$SyncExcludedBooksTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get bookHash => $composableBuilder(
+    column: $table.bookHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SyncExcludedBooksTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SyncExcludedBooksTable> {
+  $$SyncExcludedBooksTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get bookHash =>
+      $composableBuilder(column: $table.bookHash, builder: (column) => column);
+}
+
+class $$SyncExcludedBooksTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SyncExcludedBooksTable,
+          SyncExcludedBookEntity,
+          $$SyncExcludedBooksTableFilterComposer,
+          $$SyncExcludedBooksTableOrderingComposer,
+          $$SyncExcludedBooksTableAnnotationComposer,
+          $$SyncExcludedBooksTableCreateCompanionBuilder,
+          $$SyncExcludedBooksTableUpdateCompanionBuilder,
+          (
+            SyncExcludedBookEntity,
+            BaseReferences<
+              _$AppDatabase,
+              $SyncExcludedBooksTable,
+              SyncExcludedBookEntity
+            >,
+          ),
+          SyncExcludedBookEntity,
+          PrefetchHooks Function()
+        > {
+  $$SyncExcludedBooksTableTableManager(
+    _$AppDatabase db,
+    $SyncExcludedBooksTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SyncExcludedBooksTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SyncExcludedBooksTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SyncExcludedBooksTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> bookHash = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) =>
+                  SyncExcludedBooksCompanion(bookHash: bookHash, rowid: rowid),
+          createCompanionCallback:
+              ({
+                required String bookHash,
+                Value<int> rowid = const Value.absent(),
+              }) => SyncExcludedBooksCompanion.insert(
+                bookHash: bookHash,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SyncExcludedBooksTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SyncExcludedBooksTable,
+      SyncExcludedBookEntity,
+      $$SyncExcludedBooksTableFilterComposer,
+      $$SyncExcludedBooksTableOrderingComposer,
+      $$SyncExcludedBooksTableAnnotationComposer,
+      $$SyncExcludedBooksTableCreateCompanionBuilder,
+      $$SyncExcludedBooksTableUpdateCompanionBuilder,
+      (
+        SyncExcludedBookEntity,
+        BaseReferences<
+          _$AppDatabase,
+          $SyncExcludedBooksTable,
+          SyncExcludedBookEntity
+        >,
+      ),
+      SyncExcludedBookEntity,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -3460,4 +4892,10 @@ class $AppDatabaseManager {
       $$HighlightsTableTableManager(_db, _db.highlights);
   $$BookmarksTableTableManager get bookmarks =>
       $$BookmarksTableTableManager(_db, _db.bookmarks);
+  $$SyncRevisionsTableTableManager get syncRevisions =>
+      $$SyncRevisionsTableTableManager(_db, _db.syncRevisions);
+  $$SyncIdentitiesTableTableManager get syncIdentities =>
+      $$SyncIdentitiesTableTableManager(_db, _db.syncIdentities);
+  $$SyncExcludedBooksTableTableManager get syncExcludedBooks =>
+      $$SyncExcludedBooksTableTableManager(_db, _db.syncExcludedBooks);
 }

@@ -12,6 +12,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../app_update/presentation/app_update_controller.dart';
 import '../../app_update/presentation/app_update_settings_section.dart';
 import '../../auth/domain/providers/auth_provider.dart';
+import '../../local_sync/presentation/local_sync_screen.dart';
 import '../../search/domain/providers/book_source_clients.dart';
 import '../../search/presentation/zlibrary_mirrors_screen.dart';
 import '../../search/presentation/anna_access_screen.dart';
@@ -115,6 +116,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 await ref.read(authProvider.notifier).logout();
                               },
                             ),
+                        ],
+                      ),
+                      AppSection(
+                        title: l10n.localSyncTitle,
+                        children: [
+                          ListTile(
+                            leading: const Icon(Icons.qr_code_rounded),
+                            title: Text(l10n.localSyncSettingsAction),
+                            subtitle: Text(l10n.localSyncSettingsHint),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => Navigator.of(context).push<void>(
+                              MaterialPageRoute(
+                                builder: (_) => const LocalSyncScreen(),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                       AppSection(

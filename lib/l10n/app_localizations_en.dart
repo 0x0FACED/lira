@@ -115,7 +115,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get guest => 'Guest';
 
   @override
-  String get guestSyncHint => 'Local only — sign in to sync';
+  String get guestSyncHint =>
+      'Stored on this device · local QR sync needs no account';
 
   @override
   String get notSignedIn => 'Not signed in';
@@ -1058,4 +1059,297 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get annaSessionOpenError =>
       'Could not open Anna’s Archive in the browser.';
+
+  @override
+  String get annotationsToolsSearch => 'Search quotes and notes';
+
+  @override
+  String get annotationsToolsHasNote => 'With note';
+
+  @override
+  String get annotationsToolsClearFilters => 'Clear filters';
+
+  @override
+  String get annotationsToolsSelectVisible => 'Select visible';
+
+  @override
+  String get annotationsToolsDeselectVisible => 'Deselect visible';
+
+  @override
+  String annotationsToolsSelected(String count) {
+    return 'Selected: $count';
+  }
+
+  @override
+  String get annotationsToolsExport => 'Export';
+
+  @override
+  String get annotationsToolsNoMatches => 'No matching annotations';
+
+  @override
+  String get annotationsToolsNoMatchesHint =>
+      'Change your search or clear the filters.';
+
+  @override
+  String get annotationsToolsSelectQuote => 'Select quote for export';
+
+  @override
+  String get annotationsToolsCopyQuote => 'Copy quote with source';
+
+  @override
+  String annotationsToolsCopyError(String error) {
+    return 'Could not copy quote: $error';
+  }
+
+  @override
+  String get annotationsToolsExportScope => 'Annotations to export';
+
+  @override
+  String annotationsToolsAllSaved(String count) {
+    return 'All saved ($count)';
+  }
+
+  @override
+  String annotationsToolsVisible(String count) {
+    return 'Visible results ($count)';
+  }
+
+  @override
+  String annotationsToolsSelectedVisible(String count) {
+    return 'Selected visible ($count)';
+  }
+
+  @override
+  String get annotationsToolsPlainText => 'Plain text';
+
+  @override
+  String get annotationsToolsSourceTitle => 'Title';
+
+  @override
+  String get annotationsToolsSourceAuthor => 'Author';
+
+  @override
+  String get annotationsToolsSourceFormat => 'Format';
+
+  @override
+  String get annotationsToolsSourceId => 'Library book ID';
+
+  @override
+  String get annotationsToolsSourceAdded => 'Book added (UTC)';
+
+  @override
+  String get annotationsToolsExportedAt => 'Exported (UTC)';
+
+  @override
+  String get annotationsToolsNote => 'Note';
+
+  @override
+  String get annotationsToolsColor => 'Color';
+
+  @override
+  String get annotationsToolsCreatedAt => 'Annotation created (UTC)';
+
+  @override
+  String get annotationsToolsChapter => 'Chapter (reading order)';
+
+  @override
+  String get annotationsToolsPage => 'Page';
+
+  @override
+  String annotationsToolsSaved(String path) {
+    return 'Annotations saved: $path';
+  }
+
+  @override
+  String annotationsToolsExportError(String error) {
+    return 'Could not export annotations: $error';
+  }
+
+  @override
+  String get localSyncTitle => 'Local sync';
+
+  @override
+  String get localSyncSettingsAction => 'Sync with another device';
+
+  @override
+  String get localSyncSettingsHint =>
+      'Transfer your library and annotations over local Wi-Fi using a QR code. No account needed.';
+
+  @override
+  String get localSyncDescription =>
+      'Connect both devices to the same Wi-Fi network or personal hotspot. Keep Lira open on both devices to exchange books, reading progress, highlights, notes and bookmarks in both directions. No account or cloud service is used.';
+
+  @override
+  String get localSyncSecurity =>
+      'Use a trusted local network. The invitation is a secret: share it only with your other device. Before approving, compare the requesting device with the one you are connecting. Transfers are encrypted. Leaving this screen or putting Lira in the background stops the session.';
+
+  @override
+  String get localSyncMergePolicy =>
+      'For conflicting changes, the most recently modified version wins. Deleted highlights and bookmarks stay deleted after merging. Deleting a book remains local and does not delete it from the other device.';
+
+  @override
+  String get localSyncHost => 'Show invitation QR code';
+
+  @override
+  String get localSyncNewSession => 'Start a new invitation';
+
+  @override
+  String get localSyncJoin => 'Join another device';
+
+  @override
+  String get localSyncScan => 'Scan QR code';
+
+  @override
+  String get localSyncScanHint =>
+      'Point the camera at the invitation QR code in Lira on your other device.';
+
+  @override
+  String get localSyncCloseCamera => 'Close camera';
+
+  @override
+  String get localSyncCameraUnavailable =>
+      'The camera is unavailable or permission was denied. Close the camera and import a QR image or paste an invitation instead. You can enable camera access in system settings and scan again.';
+
+  @override
+  String get localSyncDesktopScanHint =>
+      'Camera scanning is not available on this platform. Import an image of the invitation QR code or paste the invitation below.';
+
+  @override
+  String get localSyncImportImage => 'Read QR code from image';
+
+  @override
+  String get localSyncImportingImage => 'Reading QR image…';
+
+  @override
+  String get localSyncInvitation => 'Paste invitation';
+
+  @override
+  String get localSyncConnect => 'Connect with invitation';
+
+  @override
+  String get localSyncShowQrHint =>
+      'Scan this code on your other device, then approve its request here. The invitation expires in five minutes. Start a new session to get a fresh code.';
+
+  @override
+  String get localSyncQrLabel => 'Secret local sync invitation QR code';
+
+  @override
+  String get localSyncCopyInvitation => 'Copy invitation';
+
+  @override
+  String get localSyncCopied => 'Invitation copied';
+
+  @override
+  String get localSyncIdle => 'Ready to start a session';
+
+  @override
+  String get localSyncPreparing => 'Preparing local sync…';
+
+  @override
+  String get localSyncHosting => 'Waiting for another device';
+
+  @override
+  String get localSyncConnecting => 'Connecting to the other device…';
+
+  @override
+  String get localSyncWaitingApproval =>
+      'Waiting for approval on the other device…';
+
+  @override
+  String get localSyncApproveTitle => 'A device wants to sync';
+
+  @override
+  String get localSyncApproveHint =>
+      'Approve only if this is your device and you just scanned or entered this invitation. Approval shares the entire library and annotations in both directions.';
+
+  @override
+  String get localSyncApprove => 'Approve and sync';
+
+  @override
+  String get localSyncReject => 'Reject request';
+
+  @override
+  String localSyncPeer(String name) {
+    return 'Other device: $name';
+  }
+
+  @override
+  String get localSyncTransferring =>
+      'Exchanging library and annotations… Keep both devices open.';
+
+  @override
+  String get localSyncComplete => 'Sync complete';
+
+  @override
+  String localSyncResult(
+    int books,
+    int progress,
+    int highlights,
+    int bookmarks,
+  ) {
+    return 'Changes on this device: books received — $books; reading progress — $progress; highlights and notes — $highlights; bookmarks — $bookmarks.';
+  }
+
+  @override
+  String get localSyncFailed => 'The session ended with an error';
+
+  @override
+  String get localSyncStop => 'Stop session';
+
+  @override
+  String get localSyncTryAgain => 'Try again';
+
+  @override
+  String get localSyncStoppedBackground =>
+      'The session stopped because Lira left the foreground. Start a new invitation or join again to retry.';
+
+  @override
+  String get localSyncErrorInitialization =>
+      'Could not open the local library for sync. Try again.';
+
+  @override
+  String get localSyncErrorInvalidInvitation =>
+      'This is not a valid Lira sync invitation. Scan or paste a fresh invitation from your other device.';
+
+  @override
+  String get localSyncErrorNoLocalAddress =>
+      'No local network address is available. Connect to Wi-Fi or a hotspot, then start a new session.';
+
+  @override
+  String get localSyncErrorExpired =>
+      'The invitation expired. Show a new invitation on the other device and connect again.';
+
+  @override
+  String get localSyncErrorRejected =>
+      'The other device rejected the request. Start a new session if you want to try again.';
+
+  @override
+  String get localSyncErrorUnauthorized =>
+      'The devices could not authenticate this session. Use a new invitation and approve only your own device.';
+
+  @override
+  String get localSyncErrorConnection =>
+      'Could not reach the other device. Check that both devices are on the same local network, keep Lira open, and allow local network access through the system firewall. Then start a new session.';
+
+  @override
+  String get localSyncErrorTransfer =>
+      'The transfer could not finish. Some verified changes may already have been saved. Check the connection and available storage, then start a new session; changes already received will be merged safely.';
+
+  @override
+  String get localSyncErrorCancelled =>
+      'The session was cancelled. Start a new invitation or join again to retry.';
+
+  @override
+  String get localSyncErrorImage =>
+      'Could not read a Lira invitation QR code from this image. Choose a clear PNG, JPEG, BMP or WebP image up to 20 MB, or paste the invitation.';
+
+  @override
+  String get localSyncQrImageType => 'QR code image';
+
+  @override
+  String get localSyncDetails => 'Security and merge rules';
+
+  @override
+  String get localSyncErrorClipboard =>
+      'Could not copy the invitation. Scan the displayed QR code instead.';
 }

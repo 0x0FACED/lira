@@ -115,7 +115,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get guest => 'Гость';
 
   @override
-  String get guestSyncHint => 'Только локально — войдите для синхронизации';
+  String get guestSyncHint =>
+      'Данные на устройстве · локальная QR-синхронизация без аккаунта';
 
   @override
   String get notSignedIn => 'Не авторизован';
@@ -1064,4 +1065,298 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get annaSessionOpenError =>
       'Не удалось открыть Anna’s Archive в браузере.';
+
+  @override
+  String get annotationsToolsSearch => 'Поиск по цитатам и заметкам';
+
+  @override
+  String get annotationsToolsHasNote => 'С заметкой';
+
+  @override
+  String get annotationsToolsClearFilters => 'Сбросить фильтры';
+
+  @override
+  String get annotationsToolsSelectVisible => 'Выбрать видимые';
+
+  @override
+  String get annotationsToolsDeselectVisible => 'Снять выбор видимых';
+
+  @override
+  String annotationsToolsSelected(String count) {
+    return 'Выбрано: $count';
+  }
+
+  @override
+  String get annotationsToolsExport => 'Экспорт';
+
+  @override
+  String get annotationsToolsNoMatches => 'Ничего не найдено';
+
+  @override
+  String get annotationsToolsNoMatchesHint =>
+      'Измените запрос или сбросьте фильтры.';
+
+  @override
+  String get annotationsToolsSelectQuote => 'Выбрать цитату для экспорта';
+
+  @override
+  String get annotationsToolsCopyQuote => 'Скопировать цитату с источником';
+
+  @override
+  String annotationsToolsCopyError(String error) {
+    return 'Не удалось скопировать цитату: $error';
+  }
+
+  @override
+  String get annotationsToolsExportScope => 'Что экспортировать';
+
+  @override
+  String annotationsToolsAllSaved(String count) {
+    return 'Все сохранённые ($count)';
+  }
+
+  @override
+  String annotationsToolsVisible(String count) {
+    return 'Видимые результаты ($count)';
+  }
+
+  @override
+  String annotationsToolsSelectedVisible(String count) {
+    return 'Выбранные видимые ($count)';
+  }
+
+  @override
+  String get annotationsToolsPlainText => 'Обычный текст';
+
+  @override
+  String get annotationsToolsSourceTitle => 'Название';
+
+  @override
+  String get annotationsToolsSourceAuthor => 'Автор';
+
+  @override
+  String get annotationsToolsSourceFormat => 'Формат';
+
+  @override
+  String get annotationsToolsSourceId => 'ID книги в библиотеке';
+
+  @override
+  String get annotationsToolsSourceAdded => 'Книга добавлена (UTC)';
+
+  @override
+  String get annotationsToolsExportedAt => 'Экспортировано (UTC)';
+
+  @override
+  String get annotationsToolsNote => 'Заметка';
+
+  @override
+  String get annotationsToolsColor => 'Цвет';
+
+  @override
+  String get annotationsToolsCreatedAt => 'Аннотация создана (UTC)';
+
+  @override
+  String get annotationsToolsChapter => 'Глава (по порядку чтения)';
+
+  @override
+  String get annotationsToolsPage => 'Страница';
+
+  @override
+  String annotationsToolsSaved(String path) {
+    return 'Аннотации сохранены: $path';
+  }
+
+  @override
+  String annotationsToolsExportError(String error) {
+    return 'Не удалось экспортировать аннотации: $error';
+  }
+
+  @override
+  String get localSyncTitle => 'Локальная синхронизация';
+
+  @override
+  String get localSyncSettingsAction => 'Синхронизация с другим устройством';
+
+  @override
+  String get localSyncSettingsHint =>
+      'Передайте библиотеку и аннотации по локальной сети Wi-Fi с помощью QR-кода. Без аккаунта.';
+
+  @override
+  String get localSyncDescription =>
+      'Подключите оба устройства к одной сети Wi-Fi или точке доступа. Не закрывайте Lira на обоих устройствах: книги, прогресс чтения, выделения, заметки и закладки передаются в обе стороны. Аккаунт и облако не нужны.';
+
+  @override
+  String get localSyncSecurity =>
+      'Используйте доверенную локальную сеть. Приглашение — это секрет: передавайте его только своему устройству. Перед подтверждением сверьте запрашивающее устройство с тем, которое подключаете. Передача зашифрована. При выходе с этого экрана или сворачивании Lira сеанс останавливается.';
+
+  @override
+  String get localSyncMergePolicy =>
+      'При конфликте изменений сохраняется версия с более поздним временем изменения. Удалённые выделения и закладки не восстанавливаются при объединении. Удаление книги действует только на текущем устройстве и не удаляет её на другом.';
+
+  @override
+  String get localSyncHost => 'Показать QR-код приглашения';
+
+  @override
+  String get localSyncNewSession => 'Создать новое приглашение';
+
+  @override
+  String get localSyncJoin => 'Подключиться к другому устройству';
+
+  @override
+  String get localSyncScan => 'Сканировать QR-код';
+
+  @override
+  String get localSyncScanHint =>
+      'Наведите камеру на QR-код приглашения в Lira на другом устройстве.';
+
+  @override
+  String get localSyncCloseCamera => 'Закрыть камеру';
+
+  @override
+  String get localSyncCameraUnavailable =>
+      'Камера недоступна или доступ запрещён. Закройте камеру и выберите изображение QR-кода или вставьте приглашение. Доступ к камере можно разрешить в настройках системы, затем повторить сканирование.';
+
+  @override
+  String get localSyncDesktopScanHint =>
+      'На этой платформе сканирование камерой недоступно. Выберите изображение QR-кода приглашения или вставьте приглашение ниже.';
+
+  @override
+  String get localSyncImportImage => 'Прочитать QR-код из изображения';
+
+  @override
+  String get localSyncImportingImage => 'Чтение изображения QR-кода…';
+
+  @override
+  String get localSyncInvitation => 'Вставьте приглашение';
+
+  @override
+  String get localSyncConnect => 'Подключиться по приглашению';
+
+  @override
+  String get localSyncShowQrHint =>
+      'Отсканируйте этот код на другом устройстве, затем подтвердите его запрос здесь. Приглашение действует пять минут. Для нового кода создайте новый сеанс.';
+
+  @override
+  String get localSyncQrLabel =>
+      'Секретный QR-код приглашения к локальной синхронизации';
+
+  @override
+  String get localSyncCopyInvitation => 'Скопировать приглашение';
+
+  @override
+  String get localSyncCopied => 'Приглашение скопировано';
+
+  @override
+  String get localSyncIdle => 'Можно начать сеанс';
+
+  @override
+  String get localSyncPreparing => 'Подготовка локальной синхронизации…';
+
+  @override
+  String get localSyncHosting => 'Ожидание другого устройства';
+
+  @override
+  String get localSyncConnecting => 'Подключение к другому устройству…';
+
+  @override
+  String get localSyncWaitingApproval =>
+      'Ожидание подтверждения на другом устройстве…';
+
+  @override
+  String get localSyncApproveTitle => 'Устройство запрашивает синхронизацию';
+
+  @override
+  String get localSyncApproveHint =>
+      'Подтверждайте запрос, только если это ваше устройство и вы только что отсканировали или ввели это приглашение. После подтверждения вся библиотека и аннотации передаются в обе стороны.';
+
+  @override
+  String get localSyncApprove => 'Подтвердить и синхронизировать';
+
+  @override
+  String get localSyncReject => 'Отклонить запрос';
+
+  @override
+  String localSyncPeer(String name) {
+    return 'Другое устройство: $name';
+  }
+
+  @override
+  String get localSyncTransferring =>
+      'Обмен библиотекой и аннотациями… Не закрывайте оба устройства.';
+
+  @override
+  String get localSyncComplete => 'Синхронизация завершена';
+
+  @override
+  String localSyncResult(
+    int books,
+    int progress,
+    int highlights,
+    int bookmarks,
+  ) {
+    return 'Изменения на этом устройстве: получено книг — $books; прогресс чтения — $progress; выделения и заметки — $highlights; закладки — $bookmarks.';
+  }
+
+  @override
+  String get localSyncFailed => 'Сеанс завершён с ошибкой';
+
+  @override
+  String get localSyncStop => 'Остановить сеанс';
+
+  @override
+  String get localSyncTryAgain => 'Повторить';
+
+  @override
+  String get localSyncStoppedBackground =>
+      'Сеанс остановлен, поскольку Lira была свёрнута. Создайте новое приглашение или подключитесь заново.';
+
+  @override
+  String get localSyncErrorInitialization =>
+      'Не удалось открыть локальную библиотеку для синхронизации. Повторите попытку.';
+
+  @override
+  String get localSyncErrorInvalidInvitation =>
+      'Это не действительное приглашение синхронизации Lira. Отсканируйте или вставьте новое приглашение с другого устройства.';
+
+  @override
+  String get localSyncErrorNoLocalAddress =>
+      'Локальный сетевой адрес недоступен. Подключитесь к Wi-Fi или точке доступа, затем начните новый сеанс.';
+
+  @override
+  String get localSyncErrorExpired =>
+      'Срок действия приглашения истёк. Покажите новое приглашение на другом устройстве и подключитесь заново.';
+
+  @override
+  String get localSyncErrorRejected =>
+      'Другое устройство отклонило запрос. Для повторной попытки начните новый сеанс.';
+
+  @override
+  String get localSyncErrorUnauthorized =>
+      'Не удалось подтвердить подлинность сеанса. Используйте новое приглашение и подтверждайте только своё устройство.';
+
+  @override
+  String get localSyncErrorConnection =>
+      'Не удалось связаться с другим устройством. Проверьте, что оба устройства находятся в одной локальной сети, Lira открыта и доступ к локальной сети разрешён брандмауэром. Затем начните новый сеанс.';
+
+  @override
+  String get localSyncErrorTransfer =>
+      'Не удалось завершить передачу. Часть проверенных изменений уже могла сохраниться. Проверьте соединение и свободное место, затем начните новый сеанс: уже полученные изменения будут объединены.';
+
+  @override
+  String get localSyncErrorCancelled =>
+      'Сеанс отменён. Для повторной попытки создайте новое приглашение или подключитесь заново.';
+
+  @override
+  String get localSyncErrorImage =>
+      'Не удалось прочитать QR-код приглашения Lira на изображении. Выберите чёткое изображение PNG, JPEG, BMP или WebP размером до 20 МБ либо вставьте приглашение.';
+
+  @override
+  String get localSyncQrImageType => 'Изображение QR-кода';
+
+  @override
+  String get localSyncDetails => 'Безопасность и правила объединения';
+
+  @override
+  String get localSyncErrorClipboard =>
+      'Не удалось скопировать приглашение. Отсканируйте QR-код с экрана.';
 }

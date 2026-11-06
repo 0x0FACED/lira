@@ -18,6 +18,7 @@ import '../../progress/domain/providers/reading_progress_provider.dart';
 import '../../settings/data/settings_provider.dart';
 import '../../settings/presentation/reader_page_dimming.dart';
 import '../../settings/presentation/reader_settings_workspace.dart';
+import '../domain/annotation_tools.dart';
 import '../domain/engine/book_reader_engine.dart';
 import '../domain/engine/epub_book_reader_engine.dart';
 import '../domain/engine/pdf_book_reader_engine.dart';
@@ -1063,7 +1064,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
               ),
               IconButton(
                 icon: Semantics(
-                  label: l10n.copyText,
+                  label: l10n.annotationsToolsCopyQuote,
                   child: const Icon(Icons.copy_outlined),
                 ),
                 onPressed: _copySelection,
@@ -1207,21 +1208,33 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     }
   }
 
-  void _copySelection() {
-    if (_selectedText != null) {
-      Clipboard.setData(ClipboardData(text: _selectedText!));
+  Future<void> _copySelection() async {
+    final text = _selectedText;
+    if (text == null) return;
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      await Clipboard.setData(
+        ClipboardData(text: attributedQuote(text, widget.book)),
+      );
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(AppLocalizations.of(context)!.copied),
+          content: Text(l10n.copied),
           duration: const Duration(seconds: 1),
         ),
       );
+      if (_selectedText != text) return;
+      FocusManager.instance.primaryFocus?.unfocus();
+      setState(() {
+        _selectedText = null;
+        _selectedLocation = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.annotationsToolsCopyError('$error'))),
+      );
     }
-    FocusManager.instance.primaryFocus?.unfocus();
-    setState(() {
-      _selectedText = null;
-      _selectedLocation = null;
-    });
   }
 
   Color _parseColor(String hex) {
@@ -1238,7 +1251,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     showAppBottomSheet<void>(
       context: context,
       builder: (ctx) => ReaderAnnotationsPanel(
-        bookId: widget.book.id,
+        book: widget.book,
         onNavigate: (location) {
           _engine?.goToLocation(BookLocation(locator: location));
           Navigator.pop(ctx);

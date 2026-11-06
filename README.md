@@ -30,6 +30,8 @@ A good reader should make it easier to stay with a book. Lira keeps your library
 - **Bring the books you already have.** Import EPUB and PDF files from your device and give them a home on your own shelf.
 - **Leave the connection behind.** Once a book is on your device, you can read it offline. Your progress, highlights, notes, and bookmarks are saved locally.
 - **Keep more than your place.** Bookmark a reading position, highlight a passage, add a thought, and jump back when you need it. Highlights and bookmarks have separate tabs. Close the book and return to where you left off.
+- **Take your notes with you.** Search saved quotes and notes, combine color/with-note filters, and export all, visible or selected visible annotations as Markdown or plain text. Copy a quote together with the book title and author.
+- **Move between your devices.** Manually sync books and reading data over your local network using a one-time QR invitation. No account or cloud service is needed.
 - **Find the passage you need.** Search words and phrases offline in EPUBs and text-based PDFs, browse highlighted results with chapter/page context, and return to where you started reading. Open search from the reader toolbar or with Ctrl/Cmd+F. Scanned PDF images are not OCR-searched.
 - **Make the page yours.** Adjust EPUB font, weight, size, line/paragraph spacing, first-line indent, alignment, margins and Russian/English hyphenation. Pick a complete day, paper, readable-dark or warm-evening palette, customize text/background colors and contrast, and dim the page separately. Preview changes on your book or the bundled sample: settings sit beside the page on large screens and in a bottom panel on phones. Scroll vertically, turn pages horizontally, or use a two-page spread when there is room.
 - **Read both formats their own way.** EPUB text adapts to your page; PDFs keep their original layout. Both share the same library and reading tools.
@@ -102,6 +104,27 @@ Browser clearance can be bound to the domain, exit IP and User-Agent. Use the sa
 
 SOCKS5 settings in Lira are the explicit application-level routing policy; inherited `HTTP_PROXY`/`HTTPS_PROXY` variables are not layered inside that connection. Normal TLS certificate verification remains enabled.
 
+### Export quotes and notes
+
+In the reader's annotations panel, use **Highlights** to search quote text and notes. Color and **With note** filters intersect; whitespace-only notes do not count as notes. Check individual quotes or **Select visible**, then **Export**. Choose all saved, current visible results or selected visible results, and Markdown or plain text. Book title, author, format and dates are included; EPUB reading-order chapters and PDF pages are added when the saved position is recognized. Unknown legacy locators are omitted, not displayed as invented chapters.
+
+Desktop platforms open a save dialog. Android/iOS open the system share sheet with a real UTF-8 `.md` or `.txt` file, which can be saved or sent through installed applications. The copy action on a saved quote or an active book selection includes the original text, book title and author.
+
+### Local QR synchronization
+
+1. Connect both devices to the same Wi-Fi network or personal hotspot and open **Settings → Local sync** in Lira.
+2. On one device choose **Show invitation QR code**. On the other choose **Scan QR code**, import an image of the code, or paste a copied invitation.
+3. Approve the request on the device displaying the code. Approval exchanges the entire saved library, reading positions, highlights, notes and bookmarks in both directions.
+4. Keep both applications open until **Sync complete**. Leaving the screen or putting the application in the background stops the session. Start a new invitation for the next exchange.
+
+Invitations expire after five minutes; an approved exchange can continue longer. QR camera scanning is supported on Android, iOS and macOS. Image import and copied invitations also work on Windows and Linux. Camera/local-network permission and firewall access may be required; isolated guest Wi-Fi networks can prevent devices from reaching each other. The transport uses local IPv4 connections directly, bypassing Lira's source-access SOCKS/HTTP proxy, and does not use cloud relay or discovery services.
+
+Files and annotation metadata are authenticated and encrypted with AES-256-GCM, using a fresh secret in each invitation. Treat the QR and copied invitation as a secret, share it only with your intended device, and approve only the request you initiated. File hashes are checked before import. Matching is by SHA-256 of the complete EPUB/PDF file, not title, so different editions do not share incompatible positions. A missing local file can be restored without creating another library entry.
+
+Conflicts use the saved modification timestamp and a stable device-ID tie-break, not the highest reading percentage; keep device clocks correct. Deleted highlights and bookmarks remain deleted after merging. Deleting a book is local: it does not remove the other device's copy and suppresses automatic re-import until you explicitly import/save that book again. Unsaved article previews, source credentials, account state and appearance settings are not exchanged. There is no automatic/background or cloud synchronization. Interrupted exchanges may have saved verified changes on one device; starting a new session safely merges them again.
+
+Each protocol message is limited to 16 MiB of serialized metadata (at most 100,000 records per snapshot), and each book file to 2 GiB. A session exceeding these limits fails rather than silently omitting books or annotations.
+
 ### Updating Lira
 
 Open **Settings → App updates** to check the latest stable GitHub release. Lira checks when you first open Settings; **Check for updates** checks again.
@@ -121,7 +144,7 @@ Yes. Imported and downloaded books can be read without an internet connection. B
 <details>
 <summary><strong>Will my library sync between devices?</strong></summary>
 
-Not currently. Your books, reading progress, highlights, notes, and bookmarks are stored on the device you are using. Lira is available on multiple platforms, but cloud sync is not implemented.
+Yes, through manual [local QR synchronization](#local-qr-synchronization), including the EPUB/PDF files themselves. Both devices must be reachable on the same local network and keep Lira open. Cloud and automatic background sync are not implemented.
 
 </details>
 

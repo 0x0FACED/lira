@@ -17,11 +17,11 @@ final highlightsControllerProvider =
 
 class HighlightsController
     extends FamilyAsyncNotifier<List<HighlightDto>, String> {
-  late final HighlightsLocalRepository _repository;
+  late final HighlightsLocalRepository _repository =
+      getIt<HighlightsLocalRepository>();
 
   @override
   FutureOr<List<HighlightDto>> build(String arg) async {
-    _repository = getIt<HighlightsLocalRepository>();
     return _repository.getHighlightsForBook(arg);
   }
 

@@ -17,7 +17,8 @@ final readingProgressControllerProvider =
 
 class ReadingProgressController
     extends FamilyAsyncNotifier<ReadingProgressDto?, String> {
-  late final ReadingProgressLocalRepository _repository;
+  late final ReadingProgressLocalRepository _repository =
+      getIt<ReadingProgressLocalRepository>();
   Timer? _debounceTimer;
   ReadingProgressDto? _pendingProgress;
   Future<void>? _writeFuture;
@@ -25,7 +26,7 @@ class ReadingProgressController
 
   @override
   FutureOr<ReadingProgressDto?> build(String arg) async {
-    _repository = getIt<ReadingProgressLocalRepository>();
+    _disposed = false;
     ref.onDispose(() {
       _disposed = true;
       _debounceTimer?.cancel();

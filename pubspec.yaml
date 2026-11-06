@@ -2,7 +2,7 @@ name: lira
 description: "Lira is your free feature-rich library"
 publish_to: 'none'
 
-version: 0.6.14+18
+version: 0.7.0+19
 
 environment:
   sdk: ^3.9.4
@@ -55,6 +55,13 @@ dependencies:
   html: ^0.15.5
   xml: ^6.5.0
   path: ^1.9.1
+  cryptography: ^2.9.0
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^7.5.0
+  zxing2: ^0.2.4
+  # Match the image 3 API already used by the launcher-icon toolchain.
+  image: ^3.3.0
+  share_plus: ^12.0.1
 
 dev_dependencies:
   flutter_test:

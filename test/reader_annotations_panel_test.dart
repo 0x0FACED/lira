@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lira/core/di/injection.dart';
 import 'package:lira/core/theme/app_theme.dart';
 import 'package:lira/core/widgets/app_components.dart';
 import 'package:lira/features/bookmarks/data/repositories/bookmarks_local_repository.dart';
+import 'package:lira/features/books/domain/models/book_dto.dart';
 import 'package:lira/features/bookmarks/domain/models/bookmark_dto.dart';
 import 'package:lira/features/highlights/data/repositories/highlights_local_repository.dart';
 import 'package:lira/features/highlights/domain/models/highlight_dto.dart';
@@ -71,6 +73,19 @@ class _BookmarksStore implements BookmarksLocalRepository {
   }
 }
 
+final _book = BookDto(
+  id: 'book',
+  title: 'Source title',
+  author: 'Source author',
+  format: 'epub',
+  createdAt: DateTime(2026),
+);
+
+Finder get _noteField => find.descendant(
+  of: find.byType(AlertDialog),
+  matching: find.byType(TextField),
+);
+
 Widget _app({required ValueChanged<String> onNavigate}) => ProviderScope(
   child: MaterialApp(
     locale: const Locale('en'),
@@ -83,10 +98,8 @@ Widget _app({required ValueChanged<String> onNavigate}) => ProviderScope(
           child: FilledButton(
             onPressed: () => showAppBottomSheet<void>(
               context: context,
-              builder: (_) => ReaderAnnotationsPanel(
-                bookId: 'book',
-                onNavigate: onNavigate,
-              ),
+              builder: (_) =>
+                  ReaderAnnotationsPanel(book: _book, onNavigate: onNavigate),
             ),
             child: const Text('Open annotations'),
           ),
@@ -220,7 +233,7 @@ void main() {
     await _open(tester);
     await tester.tap(find.byIcon(Icons.edit_note));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'Changed note');
+    await tester.enterText(_noteField, 'Changed note');
     highlights.noteWriteGate = Completer<void>();
     highlights.failNoteWrites = true;
     await tester.tap(find.text('Save'));
@@ -237,7 +250,7 @@ void main() {
     expect(find.byType(AlertDialog), findsOneWidget);
     expect(find.textContaining('Could not save note:'), findsOneWidget);
     expect(
-      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      tester.widget<TextField>(_noteField).controller!.text,
       'Changed note',
     );
     expect(highlights.values['highlight']!.note, 'Original note');
@@ -261,7 +274,7 @@ void main() {
       await _open(tester);
       await tester.tap(find.byIcon(Icons.edit_note));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), 'Discarded note');
+      await tester.enterText(_noteField, 'Discarded note');
       await tester.tap(find.text('Cancel'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 40));
@@ -291,5 +304,57 @@ void main() {
     await tester.tap(find.text('Bookmarks'));
     await tester.pumpAndSettle();
     expect(find.text('Could not load bookmarks'), findsOneWidget);
+  });
+
+  testWidgets('quote and note searches intersect note and color filters', (
+    tester,
+  ) async {
+    highlights.values['other'] = HighlightDto(
+      id: 'other',
+      bookId: 'book',
+      text: 'Other passage',
+      color: '#42A5F5',
+      location: 'opaque-location',
+      createdAt: DateTime(2026),
+    );
+    await _open(tester);
+    final search = find.byKey(const ValueKey('annotations-search'));
+    await tester.enterText(search, 'ORIGINAL');
+    await tester.pumpAndSettle();
+    expect(find.text('Saved passage'), findsOneWidget);
+    expect(find.text('Other passage'), findsNothing);
+    await tester.tap(find.widgetWithText(FilterChip, 'With note'));
+    await tester.tap(find.widgetWithText(FilterChip, '#42A5F5'));
+    await tester.pumpAndSettle();
+    expect(find.text('No matching annotations'), findsOneWidget);
+    await tester.tap(find.text('Clear filters'));
+    await tester.pumpAndSettle();
+    expect(find.text('Saved passage'), findsOneWidget);
+    expect(find.text('Other passage'), findsOneWidget);
+  });
+
+  testWidgets('copying saved quote includes source title and author', (
+    tester,
+  ) async {
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    await _open(tester);
+    await tester.tap(find.byIcon(Icons.copy_outlined));
+    await tester.pumpAndSettle();
+    expect(copied, 'Saved passage\n\n— Source title — Source author');
   });
 }

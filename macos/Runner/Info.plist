@@ -24,6 +24,10 @@
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>$(PRODUCT_COPYRIGHT)</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Scan a QR code to pair with another Lira device for local synchronization.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Synchronize books, reading progress and annotations with another Lira device on your local network.</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>

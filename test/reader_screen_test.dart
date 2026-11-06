@@ -450,7 +450,13 @@ void main() {
             expect(_visibleParagraphs(tester), paragraphs);
           }
         }
-        await tester.enterText(find.byType(TextField), 'Contextual note $mode');
+        await tester.enterText(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.byType(TextField),
+          ),
+          'Contextual note $mode',
+        );
         await tester.tap(find.text('Save'));
         await tester.pump();
         tester.view.resetViewInsets();

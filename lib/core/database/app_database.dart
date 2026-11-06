@@ -9,7 +9,17 @@ import 'tables.dart';
 
 part 'app_database.g.dart';
 
-@DriftDatabase(tables: [Books, ReadingProgresses, Highlights, Bookmarks])
+@DriftDatabase(
+  tables: [
+    Books,
+    ReadingProgresses,
+    Highlights,
+    Bookmarks,
+    SyncRevisions,
+    SyncIdentities,
+    SyncExcludedBooks,
+  ],
+)
 @lazySingleton
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
@@ -17,7 +27,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -34,6 +44,11 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 4) {
         await m.addColumn(books, books.isSaved);
+      }
+      if (from < 5) {
+        await m.createTable(syncRevisions);
+        await m.createTable(syncIdentities);
+        await m.createTable(syncExcludedBooks);
       }
     },
   );

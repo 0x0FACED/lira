@@ -1,6 +1,7 @@
 import 'package:injectable/injectable.dart';
 
 import '../../../../core/database/app_database.dart';
+import '../../../../core/database/sync_change_tracker.dart';
 import '../../domain/models/reading_progress_dto.dart';
 
 @injectable
@@ -17,7 +18,10 @@ class ReadingProgressLocalRepository {
       updatedAt: progress.updatedAt,
     );
 
-    await _db.into(_db.readingProgresses).insertOnConflictUpdate(companion);
+    await _db.transaction(() async {
+      await _db.into(_db.readingProgresses).insertOnConflictUpdate(companion);
+      await SyncChangeTracker(_db).captureProgress(progress.bookId);
+    });
   }
 
   Future<ReadingProgressDto?> getProgress(String bookId) async {

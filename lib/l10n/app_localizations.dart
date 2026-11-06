@@ -305,7 +305,7 @@ abstract class AppLocalizations {
   /// No description provided for @guestSyncHint.
   ///
   /// In en, this message translates to:
-  /// **'Local only — sign in to sync'**
+  /// **'Stored on this device · local QR sync needs no account'**
   String get guestSyncHint;
 
   /// No description provided for @notSignedIn.
@@ -1951,6 +1951,503 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not open Anna’s Archive in the browser.'**
   String get annaSessionOpenError;
+
+  /// No description provided for @annotationsToolsSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search quotes and notes'**
+  String get annotationsToolsSearch;
+
+  /// No description provided for @annotationsToolsHasNote.
+  ///
+  /// In en, this message translates to:
+  /// **'With note'**
+  String get annotationsToolsHasNote;
+
+  /// No description provided for @annotationsToolsClearFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear filters'**
+  String get annotationsToolsClearFilters;
+
+  /// No description provided for @annotationsToolsSelectVisible.
+  ///
+  /// In en, this message translates to:
+  /// **'Select visible'**
+  String get annotationsToolsSelectVisible;
+
+  /// No description provided for @annotationsToolsDeselectVisible.
+  ///
+  /// In en, this message translates to:
+  /// **'Deselect visible'**
+  String get annotationsToolsDeselectVisible;
+
+  /// No description provided for @annotationsToolsSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected: {count}'**
+  String annotationsToolsSelected(String count);
+
+  /// No description provided for @annotationsToolsExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get annotationsToolsExport;
+
+  /// No description provided for @annotationsToolsNoMatches.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching annotations'**
+  String get annotationsToolsNoMatches;
+
+  /// No description provided for @annotationsToolsNoMatchesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Change your search or clear the filters.'**
+  String get annotationsToolsNoMatchesHint;
+
+  /// No description provided for @annotationsToolsSelectQuote.
+  ///
+  /// In en, this message translates to:
+  /// **'Select quote for export'**
+  String get annotationsToolsSelectQuote;
+
+  /// No description provided for @annotationsToolsCopyQuote.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy quote with source'**
+  String get annotationsToolsCopyQuote;
+
+  /// No description provided for @annotationsToolsCopyError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not copy quote: {error}'**
+  String annotationsToolsCopyError(String error);
+
+  /// No description provided for @annotationsToolsExportScope.
+  ///
+  /// In en, this message translates to:
+  /// **'Annotations to export'**
+  String get annotationsToolsExportScope;
+
+  /// No description provided for @annotationsToolsAllSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'All saved ({count})'**
+  String annotationsToolsAllSaved(String count);
+
+  /// No description provided for @annotationsToolsVisible.
+  ///
+  /// In en, this message translates to:
+  /// **'Visible results ({count})'**
+  String annotationsToolsVisible(String count);
+
+  /// No description provided for @annotationsToolsSelectedVisible.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected visible ({count})'**
+  String annotationsToolsSelectedVisible(String count);
+
+  /// No description provided for @annotationsToolsPlainText.
+  ///
+  /// In en, this message translates to:
+  /// **'Plain text'**
+  String get annotationsToolsPlainText;
+
+  /// No description provided for @annotationsToolsSourceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get annotationsToolsSourceTitle;
+
+  /// No description provided for @annotationsToolsSourceAuthor.
+  ///
+  /// In en, this message translates to:
+  /// **'Author'**
+  String get annotationsToolsSourceAuthor;
+
+  /// No description provided for @annotationsToolsSourceFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Format'**
+  String get annotationsToolsSourceFormat;
+
+  /// No description provided for @annotationsToolsSourceId.
+  ///
+  /// In en, this message translates to:
+  /// **'Library book ID'**
+  String get annotationsToolsSourceId;
+
+  /// No description provided for @annotationsToolsSourceAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Book added (UTC)'**
+  String get annotationsToolsSourceAdded;
+
+  /// No description provided for @annotationsToolsExportedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Exported (UTC)'**
+  String get annotationsToolsExportedAt;
+
+  /// No description provided for @annotationsToolsNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get annotationsToolsNote;
+
+  /// No description provided for @annotationsToolsColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Color'**
+  String get annotationsToolsColor;
+
+  /// No description provided for @annotationsToolsCreatedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Annotation created (UTC)'**
+  String get annotationsToolsCreatedAt;
+
+  /// No description provided for @annotationsToolsChapter.
+  ///
+  /// In en, this message translates to:
+  /// **'Chapter (reading order)'**
+  String get annotationsToolsChapter;
+
+  /// No description provided for @annotationsToolsPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Page'**
+  String get annotationsToolsPage;
+
+  /// No description provided for @annotationsToolsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Annotations saved: {path}'**
+  String annotationsToolsSaved(String path);
+
+  /// No description provided for @annotationsToolsExportError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not export annotations: {error}'**
+  String annotationsToolsExportError(String error);
+
+  /// No description provided for @localSyncTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Local sync'**
+  String get localSyncTitle;
+
+  /// No description provided for @localSyncSettingsAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync with another device'**
+  String get localSyncSettingsAction;
+
+  /// No description provided for @localSyncSettingsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer your library and annotations over local Wi-Fi using a QR code. No account needed.'**
+  String get localSyncSettingsHint;
+
+  /// No description provided for @localSyncDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect both devices to the same Wi-Fi network or personal hotspot. Keep Lira open on both devices to exchange books, reading progress, highlights, notes and bookmarks in both directions. No account or cloud service is used.'**
+  String get localSyncDescription;
+
+  /// No description provided for @localSyncSecurity.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a trusted local network. The invitation is a secret: share it only with your other device. Before approving, compare the requesting device with the one you are connecting. Transfers are encrypted. Leaving this screen or putting Lira in the background stops the session.'**
+  String get localSyncSecurity;
+
+  /// No description provided for @localSyncMergePolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'For conflicting changes, the most recently modified version wins. Deleted highlights and bookmarks stay deleted after merging. Deleting a book remains local and does not delete it from the other device.'**
+  String get localSyncMergePolicy;
+
+  /// No description provided for @localSyncHost.
+  ///
+  /// In en, this message translates to:
+  /// **'Show invitation QR code'**
+  String get localSyncHost;
+
+  /// No description provided for @localSyncNewSession.
+  ///
+  /// In en, this message translates to:
+  /// **'Start a new invitation'**
+  String get localSyncNewSession;
+
+  /// No description provided for @localSyncJoin.
+  ///
+  /// In en, this message translates to:
+  /// **'Join another device'**
+  String get localSyncJoin;
+
+  /// No description provided for @localSyncScan.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan QR code'**
+  String get localSyncScan;
+
+  /// No description provided for @localSyncScanHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Point the camera at the invitation QR code in Lira on your other device.'**
+  String get localSyncScanHint;
+
+  /// No description provided for @localSyncCloseCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Close camera'**
+  String get localSyncCloseCamera;
+
+  /// No description provided for @localSyncCameraUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The camera is unavailable or permission was denied. Close the camera and import a QR image or paste an invitation instead. You can enable camera access in system settings and scan again.'**
+  String get localSyncCameraUnavailable;
+
+  /// No description provided for @localSyncDesktopScanHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera scanning is not available on this platform. Import an image of the invitation QR code or paste the invitation below.'**
+  String get localSyncDesktopScanHint;
+
+  /// No description provided for @localSyncImportImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Read QR code from image'**
+  String get localSyncImportImage;
+
+  /// No description provided for @localSyncImportingImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading QR image…'**
+  String get localSyncImportingImage;
+
+  /// No description provided for @localSyncInvitation.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste invitation'**
+  String get localSyncInvitation;
+
+  /// No description provided for @localSyncConnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect with invitation'**
+  String get localSyncConnect;
+
+  /// No description provided for @localSyncShowQrHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan this code on your other device, then approve its request here. The invitation expires in five minutes. Start a new session to get a fresh code.'**
+  String get localSyncShowQrHint;
+
+  /// No description provided for @localSyncQrLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Secret local sync invitation QR code'**
+  String get localSyncQrLabel;
+
+  /// No description provided for @localSyncCopyInvitation.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy invitation'**
+  String get localSyncCopyInvitation;
+
+  /// No description provided for @localSyncCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Invitation copied'**
+  String get localSyncCopied;
+
+  /// No description provided for @localSyncIdle.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to start a session'**
+  String get localSyncIdle;
+
+  /// No description provided for @localSyncPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing local sync…'**
+  String get localSyncPreparing;
+
+  /// No description provided for @localSyncHosting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for another device'**
+  String get localSyncHosting;
+
+  /// No description provided for @localSyncConnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting to the other device…'**
+  String get localSyncConnecting;
+
+  /// No description provided for @localSyncWaitingApproval.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for approval on the other device…'**
+  String get localSyncWaitingApproval;
+
+  /// No description provided for @localSyncApproveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A device wants to sync'**
+  String get localSyncApproveTitle;
+
+  /// No description provided for @localSyncApproveHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve only if this is your device and you just scanned or entered this invitation. Approval shares the entire library and annotations in both directions.'**
+  String get localSyncApproveHint;
+
+  /// No description provided for @localSyncApprove.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve and sync'**
+  String get localSyncApprove;
+
+  /// No description provided for @localSyncReject.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject request'**
+  String get localSyncReject;
+
+  /// No description provided for @localSyncPeer.
+  ///
+  /// In en, this message translates to:
+  /// **'Other device: {name}'**
+  String localSyncPeer(String name);
+
+  /// No description provided for @localSyncTransferring.
+  ///
+  /// In en, this message translates to:
+  /// **'Exchanging library and annotations… Keep both devices open.'**
+  String get localSyncTransferring;
+
+  /// No description provided for @localSyncComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync complete'**
+  String get localSyncComplete;
+
+  /// No description provided for @localSyncResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes on this device: books received — {books}; reading progress — {progress}; highlights and notes — {highlights}; bookmarks — {bookmarks}.'**
+  String localSyncResult(
+    int books,
+    int progress,
+    int highlights,
+    int bookmarks,
+  );
+
+  /// No description provided for @localSyncFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The session ended with an error'**
+  String get localSyncFailed;
+
+  /// No description provided for @localSyncStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop session'**
+  String get localSyncStop;
+
+  /// No description provided for @localSyncTryAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get localSyncTryAgain;
+
+  /// No description provided for @localSyncStoppedBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'The session stopped because Lira left the foreground. Start a new invitation or join again to retry.'**
+  String get localSyncStoppedBackground;
+
+  /// No description provided for @localSyncErrorInitialization.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the local library for sync. Try again.'**
+  String get localSyncErrorInitialization;
+
+  /// No description provided for @localSyncErrorInvalidInvitation.
+  ///
+  /// In en, this message translates to:
+  /// **'This is not a valid Lira sync invitation. Scan or paste a fresh invitation from your other device.'**
+  String get localSyncErrorInvalidInvitation;
+
+  /// No description provided for @localSyncErrorNoLocalAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'No local network address is available. Connect to Wi-Fi or a hotspot, then start a new session.'**
+  String get localSyncErrorNoLocalAddress;
+
+  /// No description provided for @localSyncErrorExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'The invitation expired. Show a new invitation on the other device and connect again.'**
+  String get localSyncErrorExpired;
+
+  /// No description provided for @localSyncErrorRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'The other device rejected the request. Start a new session if you want to try again.'**
+  String get localSyncErrorRejected;
+
+  /// No description provided for @localSyncErrorUnauthorized.
+  ///
+  /// In en, this message translates to:
+  /// **'The devices could not authenticate this session. Use a new invitation and approve only your own device.'**
+  String get localSyncErrorUnauthorized;
+
+  /// No description provided for @localSyncErrorConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not reach the other device. Check that both devices are on the same local network, keep Lira open, and allow local network access through the system firewall. Then start a new session.'**
+  String get localSyncErrorConnection;
+
+  /// No description provided for @localSyncErrorTransfer.
+  ///
+  /// In en, this message translates to:
+  /// **'The transfer could not finish. Some verified changes may already have been saved. Check the connection and available storage, then start a new session; changes already received will be merged safely.'**
+  String get localSyncErrorTransfer;
+
+  /// No description provided for @localSyncErrorCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'The session was cancelled. Start a new invitation or join again to retry.'**
+  String get localSyncErrorCancelled;
+
+  /// No description provided for @localSyncErrorImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read a Lira invitation QR code from this image. Choose a clear PNG, JPEG, BMP or WebP image up to 20 MB, or paste the invitation.'**
+  String get localSyncErrorImage;
+
+  /// No description provided for @localSyncQrImageType.
+  ///
+  /// In en, this message translates to:
+  /// **'QR code image'**
+  String get localSyncQrImageType;
+
+  /// No description provided for @localSyncDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Security and merge rules'**
+  String get localSyncDetails;
+
+  /// No description provided for @localSyncErrorClipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not copy the invitation. Scan the displayed QR code instead.'**
+  String get localSyncErrorClipboard;
 }
 
 class _AppLocalizationsDelegate

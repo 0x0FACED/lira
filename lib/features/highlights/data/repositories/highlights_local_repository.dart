@@ -2,6 +2,7 @@ import 'package:injectable/injectable.dart';
 import 'package:drift/drift.dart';
 
 import '../../../../core/database/app_database.dart';
+import '../../../../core/database/sync_change_tracker.dart';
 import '../../domain/models/highlight_dto.dart';
 
 @injectable
@@ -11,20 +12,22 @@ class HighlightsLocalRepository {
   HighlightsLocalRepository(this._db);
 
   Future<void> saveHighlight(HighlightDto highlight) async {
-    await _db
-        .into(_db.highlights)
-        .insert(
-          HighlightsCompanion.insert(
-            id: highlight.id,
-            bookId: highlight.bookId,
-            textContent: highlight.text,
-            color: Value(highlight.color),
-            location: highlight.location,
-            note: Value(highlight.note),
-            createdAt: highlight.createdAt,
-          ),
-          mode: InsertMode.replace,
-        );
+    await _db.transaction(() async {
+      await _db
+          .into(_db.highlights)
+          .insertOnConflictUpdate(
+            HighlightsCompanion.insert(
+              id: highlight.id,
+              bookId: highlight.bookId,
+              textContent: highlight.text,
+              color: Value(highlight.color),
+              location: highlight.location,
+              note: Value(highlight.note),
+              createdAt: highlight.createdAt,
+            ),
+          );
+      await SyncChangeTracker(_db).captureHighlight(highlight.id);
+    });
   }
 
   Future<List<HighlightDto>> getHighlightsForBook(String bookId) async {
@@ -48,12 +51,18 @@ class HighlightsLocalRepository {
   }
 
   Future<void> updateHighlightNote(String id, String? note) async {
-    await (_db.update(_db.highlights)..where((t) => t.id.equals(id))).write(
-      HighlightsCompanion(note: Value(note)),
-    );
+    await _db.transaction(() async {
+      await (_db.update(_db.highlights)..where((t) => t.id.equals(id))).write(
+        HighlightsCompanion(note: Value(note)),
+      );
+      await SyncChangeTracker(_db).captureHighlight(id);
+    });
   }
 
   Future<void> deleteHighlight(String id) async {
-    await (_db.delete(_db.highlights)..where((t) => t.id.equals(id))).go();
+    await _db.transaction(() async {
+      await SyncChangeTracker(_db).captureHighlight(id, deleted: true);
+      await (_db.delete(_db.highlights)..where((t) => t.id.equals(id))).go();
+    });
   }
 }

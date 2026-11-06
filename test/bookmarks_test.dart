@@ -335,8 +335,29 @@ void main() {
               'legacy-content-hash',
             ],
           );
-          await ReadingProgressLocalRepository(legacy).saveProgress(progress);
-          await HighlightsLocalRepository(legacy).saveHighlight(highlight);
+          await legacy.customStatement(
+            'INSERT INTO reading_progresses (book_id, percentage, location, updated_at) '
+            'VALUES (?, ?, ?, ?)',
+            [
+              progress.bookId,
+              progress.percentage,
+              progress.location,
+              progress.updatedAt.millisecondsSinceEpoch ~/ 1000,
+            ],
+          );
+          await legacy.customStatement(
+            'INSERT INTO highlights (id, book_id, text_content, color, location, note, created_at) '
+            'VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [
+              highlight.id,
+              highlight.bookId,
+              highlight.text,
+              highlight.color,
+              highlight.location,
+              highlight.note,
+              highlight.createdAt.millisecondsSinceEpoch ~/ 1000,
+            ],
+          );
         } finally {
           await legacy.close();
         }

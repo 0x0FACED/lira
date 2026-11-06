@@ -60,3 +60,37 @@ class Bookmarks extends Table {
     {bookId, location},
   ];
 }
+
+/// Local revisions also cover records whose book has not been fingerprinted yet.
+@DataClassName('SyncRevisionEntity')
+class SyncRevisions extends Table {
+  TextColumn get kind => text()();
+  TextColumn get entityId => text()();
+  TextColumn get bookId => text()();
+  IntColumn get modifiedAt => integer()();
+  TextColumn get deviceId => text()();
+  BoolColumn get deleted => boolean().withDefault(const Constant(false))();
+  TextColumn get payload => text()();
+
+  @override
+  Set<Column> get primaryKey => {kind, entityId};
+}
+
+@DataClassName('SyncIdentityEntity')
+class SyncIdentities extends Table {
+  IntColumn get id => integer()();
+  TextColumn get deviceId => text()();
+  IntColumn get clock => integer()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// A library removal is local, not a request to delete another device's book.
+@DataClassName('SyncExcludedBookEntity')
+class SyncExcludedBooks extends Table {
+  TextColumn get bookHash => text()();
+
+  @override
+  Set<Column> get primaryKey => {bookHash};
+}
