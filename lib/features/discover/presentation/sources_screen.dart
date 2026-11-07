@@ -99,6 +99,14 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen> {
       }
     }
     final notifier = ref.read(selectedDiscoverSourcesProvider.notifier);
+    final floatingLabelGap =
+        AppSpacing.sm +
+        (MediaQuery.textScalerOf(context).scale(
+                      Theme.of(context).textTheme.bodyLarge!.fontSize! * 0.75,
+                    ) /
+                    AppSpacing.xs)
+                .ceil() *
+            AppSpacing.xs;
     return Scaffold(
       body: SafeArea(
         child: DiscoverContent(
@@ -136,7 +144,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen> {
                         onChanged: (value) =>
                             setState(() => _query = value.trim().toLowerCase()),
                       ),
-                      const SizedBox(height: AppSpacing.sm),
+                      SizedBox(height: floatingLabelGap),
                       LayoutBuilder(
                         builder: (context, constraints) {
                           final twoColumns =
@@ -149,7 +157,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen> {
                               : constraints.maxWidth;
                           return Wrap(
                             spacing: AppSpacing.sm,
-                            runSpacing: AppSpacing.compact,
+                            runSpacing: floatingLabelGap,
                             children: [
                               SizedBox(
                                 width: width,

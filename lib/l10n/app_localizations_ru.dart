@@ -15,32 +15,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get signIn => 'Войти';
 
   @override
-  String get register => 'Регистрация';
-
-  @override
-  String get username => 'Имя пользователя';
-
-  @override
-  String get password => 'Пароль';
-
-  @override
-  String get continueAsGuest => 'Продолжить как гость';
-
-  @override
-  String get guestLocalOnly =>
-      'Книги и прогресс будут храниться только локально';
-
-  @override
-  String get noAccountRegister => 'Нет аккаунта? Зарегистрируйтесь';
-
-  @override
-  String get haveAccountSignIn => 'Уже есть аккаунт? Войти';
-
-  @override
   String get yourLibrary => 'Ваша персональная библиотека';
-
-  @override
-  String get fillAllFields => 'Пожалуйста, заполните все поля';
 
   @override
   String get library => 'Библиотека';
@@ -109,29 +84,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profile => 'Профиль';
 
   @override
-  String get signedIn => 'Авторизован';
-
-  @override
-  String get guest => 'Гость';
-
-  @override
-  String get guestSyncHint =>
-      'Данные на устройстве · локальная QR-синхронизация без аккаунта';
-
-  @override
-  String get notSignedIn => 'Не авторизован';
-
-  @override
   String get account => 'Аккаунт';
-
-  @override
-  String get logout => 'Выйти';
-
-  @override
-  String get signInComingSoon => 'Вход скоро будет доступен';
-
-  @override
-  String get registrationComingSoon => 'Регистрация скоро будет доступна';
 
   @override
   String get appearance => 'Внешний вид';
@@ -243,7 +196,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get noChapters => 'В этом EPUB нет доступных глав.';
 
   @override
-  String get searchLibrary => 'Поиск по библиотеке...';
+  String get searchLibrary => 'Поиск';
 
   @override
   String get libraryReadingProgress => 'Прогресс чтения';
@@ -391,7 +344,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String bookmarkPosition(String percentage) {
-    return 'Позиция: $percentage%';
+    return 'Позиция: $percentage';
   }
 
   @override
@@ -1359,4 +1312,72 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get localSyncErrorClipboard =>
       'Не удалось скопировать приглашение. Отсканируйте QR-код с экрана.';
+
+  @override
+  String get localAccessTitle => 'Чтение без аккаунта';
+
+  @override
+  String get localAccessDescription =>
+      'Книги и данные чтения хранятся на этом устройстве. Локальная QR-синхронизация позволяет обмениваться библиотекой с другим устройством без аккаунта.';
+
+  @override
+  String get serverAccountUnavailable =>
+      'Аккаунты Lira и серверный вход недоступны. Для чтения и локальной синхронизации пароль не нужен.';
+
+  @override
+  String get localAccessContinue => 'Открыть библиотеку';
+
+  @override
+  String get localAccessError =>
+      'Не удалось сохранить локальный доступ. Повторите попытку.';
+
+  @override
+  String get bookAuthorUnknown => 'Автор не указан';
+
+  @override
+  String get searchFailedDescription =>
+      'Не удалось выполнить поиск книг. Повторите попытку или проверьте доступ к источнику.';
+
+  @override
+  String searchSourceUnavailable(String source) {
+    return 'Источник $source недоступен';
+  }
+
+  @override
+  String get searchTechnicalDetails => 'Технические сведения';
+
+  @override
+  String get searchDownloadFailed => 'Не удалось скачать книгу';
+
+  @override
+  String get localProfileTitle => 'Локальная библиотека';
+
+  @override
+  String get localProfileHint =>
+      'Книги и данные чтения хранятся на этом устройстве. Обменивайтесь ими с другим устройством через QR-синхронизацию.';
+
+  @override
+  String get serverAccountInfoTitle => 'Информация о серверном аккаунте';
+
+  @override
+  String get serverAccountInfoHint =>
+      'Вход на сервер недоступен. Для локальной библиотеки и QR-синхронизации аккаунт не нужен.';
+
+  @override
+  String proxyAppliedEndpoint(String host, int port) {
+    return 'Применено: $host:$port';
+  }
+
+  @override
+  String get proxyHostRequired => 'Укажите адрес прокси';
+
+  @override
+  String get proxyPortInvalid => 'Укажите порт от 1 до 65535';
+
+  @override
+  String get zLibraryLoginError =>
+      'Не удалось войти в Z-Library. Проверьте учётные данные и доступность источника.';
+
+  @override
+  String get zLibraryLoginErrorDetails => 'Технические подробности';
 }

@@ -85,40 +85,41 @@ class _BookmarksStore implements BookmarksLocalRepository {
   }
 }
 
-Widget _app(BookDto book) => ProviderScope(
-  child: MaterialApp(
-    locale: const Locale('en'),
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
-    home: Builder(
-      builder: (context) => Scaffold(
-        body: Center(
-          child: FilledButton(
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => Builder(
-                  builder: (context) => Scaffold(
-                    body: Center(
-                      child: FilledButton(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => ReaderScreen(book: book),
+Widget _app(BookDto book, {Locale locale = const Locale('en')}) =>
+    ProviderScope(
+      child: MaterialApp(
+        locale: locale,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: FilledButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => Builder(
+                      builder: (context) => Scaffold(
+                        body: Center(
+                          child: FilledButton(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => ReaderScreen(book: book),
+                              ),
+                            ),
+                            child: const Text('Open reader'),
                           ),
                         ),
-                        child: const Text('Open reader'),
                       ),
                     ),
                   ),
                 ),
+                child: const Text('Open library'),
               ),
             ),
-            child: const Text('Open library'),
           ),
         ),
       ),
-    ),
-  ),
-);
+    );
 
 Future<void> _open(WidgetTester tester, BookDto book) async {
   await tester.pumpWidget(_app(book));
@@ -264,7 +265,18 @@ void main() {
     );
     add(
       'content.opf',
-      '<package><metadata><title>Reader fixture</title><creator>Lira</creator></metadata><manifest><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="chapter"/></spine></package>',
+      '<package><metadata><title>Reader fixture</title><creator>Lira</creator></metadata><manifest><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/></manifest><spine><itemref idref="chapter"/></spine></package>',
+    );
+    add(
+      'nav.xhtml',
+      '<html><body><nav><ol>'
+          '<li><a href="chapter.xhtml">Root branch</a><ol>'
+          '<li><a href="chapter.xhtml">Child leaf</a></li>'
+          '<li><a href="chapter.xhtml">Child branch</a><ol>'
+          '<li><a href="chapter.xhtml">Grandchild leaf</a></li>'
+          '</ol></li></ol></li>'
+          '<li><a href="chapter.xhtml">Root leaf</a></li>'
+          '</ol></nav></body></html>',
     );
     add(
       'chapter.xhtml',
@@ -314,6 +326,115 @@ void main() {
         );
     await getIt.reset();
   });
+
+  testWidgets(
+    'mixed toc levels align and expansion stays separate from navigation',
+    (tester) async {
+      await _open(tester, readable);
+      await _showControls(tester);
+      final readerState = tester.state(find.byType(EpubNativeView));
+      final visibleBefore = _visibleParagraphs(tester);
+      await tester.tap(find.byIcon(Icons.format_list_bulleted));
+      await tester.pumpAndSettle();
+      final drawer = find.byType(Drawer);
+      Finder title(String value) =>
+          find.descendant(of: drawer, matching: find.text(value));
+      Finder expand(String value) => find.descendant(
+        of: find.ancestor(of: title(value), matching: find.byType(Row)).first,
+        matching: find.byType(IconButton),
+      );
+      expect(
+        tester.getTopLeft(title('Root branch')).dx,
+        tester.getTopLeft(title('Root leaf')).dx,
+      );
+      await tester.tap(expand('Root branch'));
+      await tester.pumpAndSettle();
+      expect(drawer, findsOneWidget);
+      expect(_visibleParagraphs(tester), visibleBefore);
+      final rootX = tester.getTopLeft(title('Root branch')).dx;
+      final childX = tester.getTopLeft(title('Child branch')).dx;
+      expect(childX, greaterThan(rootX));
+      expect(tester.getTopLeft(title('Child leaf')).dx, childX);
+      await tester.tap(expand('Child branch'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getTopLeft(title('Grandchild leaf')).dx,
+        greaterThan(childX),
+      );
+      await tester.tap(title('Child branch'));
+      await tester.pumpAndSettle();
+      expect(drawer, findsNothing);
+      expect(tester.state(find.byType(EpubNativeView)), same(readerState));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'chrome percentage follows locale without recreating the reader',
+    (tester) async {
+      await _open(tester, readable);
+      await _showControls(tester);
+      final readerState = tester.state(find.byType(EpubNativeView));
+      final viewport = tester.getRect(find.byType(EpubNativeView));
+      final bottomBar = find.byKey(const ValueKey('reader-bottom-bar'));
+      expect(
+        find.descendant(of: bottomBar, matching: find.text('0.0%')),
+        findsOneWidget,
+      );
+      await tester.pumpWidget(_app(readable, locale: const Locale('ru')));
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(of: bottomBar, matching: find.text('0,0%')),
+        findsOneWidget,
+      );
+      expect(tester.state(find.byType(EpubNativeView)), same(readerState));
+      expect(tester.getRect(find.byType(EpubNativeView)), viewport);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'annotation filtering keyboard does not resize or move the book',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 640);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetViewInsets);
+      highlights.values['saved'] = HighlightDto(
+        id: 'saved',
+        bookId: readable.id,
+        text: 'Saved passage',
+        color: '#FFEB3B',
+        location: EpubLocation.fromPosition(
+          chapterIndex: 0,
+          charOffset: 0,
+          hasExactCharOffset: true,
+        ).toJson(),
+        createdAt: DateTime(2026),
+      );
+      await _open(tester, readable);
+      await _showControls(tester);
+      final readerState = tester.state(find.byType(EpubNativeView));
+      final viewport = tester.getRect(find.byType(EpubNativeView));
+      final visibleBefore = _visibleParagraphs(tester);
+      await _openAnnotations(tester);
+      final filter = find.byKey(const ValueKey('annotations-search'));
+      await tester.ensureVisible(filter);
+      await tester.pumpAndSettle();
+      await tester.enterText(filter, 'Saved');
+      for (final inset in [120.0, 400.0, 180.0, 0.0]) {
+        tester.view.viewInsets = FakeViewPadding(bottom: inset);
+        await tester.pumpAndSettle();
+        expect(tester.state(find.byType(EpubNativeView)), same(readerState));
+        expect(tester.getRect(find.byType(EpubNativeView)), viewport);
+        expect(_visibleParagraphs(tester), visibleBefore);
+        expect(tester.takeException(), isNull);
+      }
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   for (final size in [const Size(390, 844), const Size(1200, 800)]) {
     testWidgets(
@@ -429,16 +550,35 @@ void main() {
           greaterThan(0),
         );
         final viewport = tester.getRect(find.byType(EpubNativeView));
+        final readerState = tester.state(find.byType(EpubNativeView));
         final paragraphs = _visibleParagraphs(tester);
         await _showControls(tester);
         await _openAnnotations(tester);
-        await tester.tap(
-          find.descendant(
+        final addNote = find.descendant(
+          of: find.byType(ReaderAnnotationsPanel),
+          matching: find.widgetWithIcon(IconButton, Icons.note_add_outlined),
+        );
+        await tester.scrollUntilVisible(
+          addNote,
+          100,
+          scrollable: find.descendant(
             of: find.byType(ReaderAnnotationsPanel),
-            matching: find.byIcon(Icons.note_add_outlined),
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Scrollable &&
+                  widget.axisDirection == AxisDirection.down,
+            ),
           ),
         );
         await tester.pumpAndSettle();
+        expect(addNote.hitTestable(), findsOneWidget);
+        await tester.tap(addNote);
+        await tester.pumpAndSettle();
+        final noteField = find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.byType(TextField),
+        );
+        expect(noteField, findsOneWidget);
         addTearDown(tester.view.resetViewInsets);
         for (final inset in [120.0, 300.0, 180.0]) {
           tester.view.viewInsets = FakeViewPadding(
@@ -447,15 +587,20 @@ void main() {
           for (var frame = 0; frame < 4; frame++) {
             await tester.pump(const Duration(milliseconds: 16));
             expect(tester.getRect(find.byType(EpubNativeView)), viewport);
+            expect(
+              tester.state(find.byType(EpubNativeView)),
+              same(readerState),
+            );
             expect(_visibleParagraphs(tester), paragraphs);
           }
         }
-        await tester.enterText(
-          find.descendant(
-            of: find.byType(AlertDialog),
-            matching: find.byType(TextField),
-          ),
-          'Contextual note $mode',
+        await tester.ensureVisible(noteField);
+        await tester.pumpAndSettle();
+        expect(noteField.hitTestable(), findsOneWidget);
+        await tester.enterText(noteField, 'Contextual note $mode');
+        expect(
+          find.widgetWithText(FilledButton, 'Save').hitTestable(),
+          findsOneWidget,
         );
         await tester.tap(find.text('Save'));
         await tester.pump();
@@ -463,6 +608,7 @@ void main() {
         for (var frame = 0; frame < 20; frame++) {
           await tester.pump(const Duration(milliseconds: 16));
           expect(tester.getRect(find.byType(EpubNativeView)), viewport);
+          expect(tester.state(find.byType(EpubNativeView)), same(readerState));
           expect(_visibleParagraphs(tester), paragraphs);
         }
         await tester.pumpAndSettle();
@@ -477,7 +623,7 @@ void main() {
     'search leaves reading fixed until selection, navigates matches and returns without saving annotations',
     (tester) async {
       tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = const Size(360, 800);
+      tester.view.physicalSize = const Size(360, 640);
       addTearDown(tester.view.resetDevicePixelRatio);
       addTearDown(tester.view.resetPhysicalSize);
       await _open(tester, readable);
@@ -488,6 +634,7 @@ void main() {
       final origin = progress.persisted!.location;
       final viewport = tester.getRect(find.byType(EpubNativeView));
       final visibleBefore = _visibleParagraphs(tester);
+      final readerState = tester.state(find.byType(EpubNativeView));
 
       await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
       await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
@@ -506,19 +653,53 @@ void main() {
 
       addTearDown(tester.view.resetViewInsets);
       tester.view.viewInsets = FakeViewPadding(
-        bottom: 220 * tester.view.devicePixelRatio,
+        bottom: 400 * tester.view.devicePixelRatio,
       );
       await tester.pumpAndSettle();
       expect(tester.getRect(find.byType(EpubNativeView)), viewport);
+      expect(tester.state(find.byType(EpubNativeView)), same(readerState));
       expect(_visibleParagraphs(tester), visibleBefore);
-      await tester.tap(
-        find
-            .descendant(
-              of: find.byType(ReaderSearchPanel),
-              matching: find.byType(ListTile),
-            )
-            .first,
+      expect(tester.takeException(), isNull);
+      await tester.ensureVisible(field);
+      await tester.pumpAndSettle();
+      expect(field.hitTestable(), findsOneWidget);
+      expect(tester.getBottomLeft(field).dy, lessThanOrEqualTo(240));
+      final close = find.descendant(
+        of: find.byType(ReaderSearchPanel),
+        matching: find.widgetWithIcon(IconButton, Icons.close),
       );
+      await tester.ensureVisible(close);
+      await tester.pumpAndSettle();
+      expect(close.hitTestable(), findsOneWidget);
+      expect(tester.getBottomLeft(close).dy, lessThanOrEqualTo(240));
+      await tester.tap(close);
+      await tester.pumpAndSettle();
+      expect(find.byType(ReaderSearchPanel), findsNothing);
+      expect(tester.getRect(find.byType(EpubNativeView)), viewport);
+      expect(tester.state(find.byType(EpubNativeView)), same(readerState));
+      expect(_visibleParagraphs(tester), visibleBefore);
+      expect(progress.persisted!.location, origin);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(field).controller!.text, 'Paragraph 4');
+      final result = find
+          .descendant(
+            of: find.byType(ReaderSearchPanel),
+            matching: find.byType(ListTile),
+          )
+          .first;
+      // Long excerpts can exceed the keyboard viewport. Scroll to the result's
+      // title and activate its visible hit target, not the whole tile's center.
+      final resultTitle = find
+          .descendant(of: result, matching: find.byType(Text))
+          .first;
+      await tester.ensureVisible(resultTitle);
+      await tester.pumpAndSettle();
+      expect(resultTitle.hitTestable(), findsOneWidget);
+      expect(tester.getBottomLeft(resultTitle).dy, lessThanOrEqualTo(240));
+      await tester.tap(resultTitle);
       tester.view.resetViewInsets();
       await tester.pumpAndSettle();
       expect(
@@ -541,6 +722,7 @@ void main() {
       await tester.pumpAndSettle();
       _expectSavedTextVisible(tester, EpubLocation.fromJson(origin)!);
       expect(find.byType(ReaderSearchNavigation), findsNothing);
+      expect(tester.state(find.byType(EpubNativeView)), same(readerState));
       expect(
         tester.widget<EpubNativeView>(find.byType(EpubNativeView)).highlights,
         isEmpty,

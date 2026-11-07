@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_tokens.dart';
-import '../../../core/widgets/app_components.dart';
 import '../../../l10n/app_localizations.dart';
 import '../domain/providers/auth_provider.dart';
 
@@ -15,81 +14,33 @@ class AuthScreen extends ConsumerStatefulWidget {
 }
 
 class _AuthScreenState extends ConsumerState<AuthScreen> {
-  final _usernameController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _isLogin = true;
-  bool _isLoading = false;
+  bool _loading = false;
+  bool _failed = false;
 
-  @override
-  void dispose() {
-    _usernameController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _handleAuth() async {
-    final l10n = AppLocalizations.of(context)!;
-    final username = _usernameController.text.trim();
-    final password = _passwordController.text.trim();
-
-    if (username.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: Theme.of(context).colorScheme.errorContainer,
-          content: Text(
-            l10n.fillAllFields,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onErrorContainer,
-            ),
-          ),
-        ),
-      );
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
+  Future<void> _continue() async {
+    setState(() {
+      _loading = true;
+      _failed = false;
+    });
     try {
-      if (_isLogin) {
-        await ref
-            .read(authProvider.notifier)
-            .login(username: username, password: password);
+      await ref.read(authProvider.notifier).continueAsGuest();
+      if (!mounted) return;
+      if (context.canPop()) {
+        context.pop();
       } else {
-        await ref
-            .read(authProvider.notifier)
-            .register(username: username, password: password);
+        context.go('/');
       }
-      if (mounted) context.go('/');
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: Theme.of(context).colorScheme.errorContainer,
-            content: Text(
-              'Error: $e',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onErrorContainer,
-              ),
-            ),
-          ),
-        );
-      }
+    } catch (_) {
+      if (mounted) setState(() => _failed = true);
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _loading = false);
     }
-  }
-
-  Future<void> _handleGuest() async {
-    await ref.read(authProvider.notifier).continueAsGuest();
-    if (mounted) context.go('/');
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colors = theme.colorScheme;
     final l10n = AppLocalizations.of(context)!;
-
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -103,109 +54,57 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 maxWidth: AppLayout.formMaxWidth,
               ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (context.canPop())
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: MergeSemantics(
+                        child: Semantics(
+                          label: MaterialLocalizations.of(
+                            context,
+                          ).backButtonTooltip,
+                          child: BackButton(onPressed: () => context.pop()),
+                        ),
+                      ),
+                    ),
                   Text(l10n.appTitle, style: theme.textTheme.displaySmall),
                   const SizedBox(height: AppSpacing.sm),
+                  Text(l10n.yourLibrary, style: theme.textTheme.bodyLarge),
+                  const SizedBox(height: AppSpacing.xl),
                   Text(
-                    l10n.yourLibrary,
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: colors.onSurfaceVariant,
-                    ),
+                    l10n.localAccessTitle,
+                    style: theme.textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(l10n.localAccessDescription),
+                  const SizedBox(height: AppSpacing.lg),
+                  Text(
+                    l10n.serverAccountUnavailable,
+                    style: theme.textTheme.bodySmall,
                   ),
                   const SizedBox(height: AppSpacing.lg),
-                  AutofillGroup(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        AppStateTransition(
-                          child: Align(
-                            key: ValueKey(_isLogin ? 'login' : 'register'),
-                            alignment: AlignmentDirectional.centerStart,
-                            child: Text(
-                              _isLogin ? l10n.signIn : l10n.register,
-                              style: theme.textTheme.headlineSmall,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        TextField(
-                          controller: _usernameController,
-                          autofillHints: const [AutofillHints.username],
-                          textInputAction: TextInputAction.next,
-                          decoration: InputDecoration(labelText: l10n.username),
-                        ),
-                        const SizedBox(height: AppSpacing.compact),
-                        TextField(
-                          controller: _passwordController,
-                          autofillHints: [
-                            _isLogin
-                                ? AutofillHints.password
-                                : AutofillHints.newPassword,
-                          ],
-                          obscureText: true,
-                          textInputAction: TextInputAction.done,
-                          decoration: InputDecoration(labelText: l10n.password),
-                          onSubmitted: (_) => _handleAuth(),
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        FilledButton(
-                          onPressed: _isLoading ? null : _handleAuth,
-                          child: AppStateTransition(
-                            child: _isLoading
-                                ? SizedBox(
-                                    key: const ValueKey('auth-loading'),
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      semanticsLabel: _isLogin
-                                          ? l10n.signIn
-                                          : l10n.register,
-                                    ),
-                                  )
-                                : Text(
-                                    key: ValueKey(
-                                      _isLogin ? 'sign-in' : 'register',
-                                    ),
-                                    _isLogin ? l10n.signIn : l10n.register,
-                                    textAlign: TextAlign.center,
-                                  ),
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        TextButton(
-                          onPressed: () => setState(() => _isLogin = !_isLogin),
-                          child: Text(
-                            _isLogin
-                                ? l10n.noAccountRegister
-                                : l10n.haveAccountSignIn,
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(
-                            vertical: AppSpacing.sm,
-                          ),
-                          child: Divider(),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: _handleGuest,
-                          icon: const Icon(Icons.visibility_off_outlined),
-                          label: Text(
-                            l10n.continueAsGuest,
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.compact),
-                        Text(
-                          l10n.guestLocalOnly,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colors.onSurfaceVariant,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
+                  if (_failed) ...[
+                    Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        l10n.localAccessError,
+                        style: TextStyle(color: theme.colorScheme.error),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
+                  FilledButton.icon(
+                    onPressed: _loading ? null : _continue,
+                    icon: _loading
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.menu_book_outlined),
+                    label: Text(
+                      l10n.localAccessContinue,
+                      textAlign: TextAlign.center,
                     ),
                   ),
                 ],

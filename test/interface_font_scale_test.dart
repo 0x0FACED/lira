@@ -4,14 +4,19 @@ import 'package:epub_engine/epub_engine.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:lira/core/providers/preferences_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lira/core/theme/app_theme.dart';
 import 'package:lira/core/widgets/app_text_scaling.dart';
+import 'package:lira/features/search/domain/providers/book_source_clients.dart';
 import 'package:lira/features/settings/data/interface_font_scale_provider.dart';
 import 'package:lira/features/settings/data/settings_provider.dart';
 import 'package:lira/features/settings/presentation/settings_screen.dart';
 import 'package:lira/l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:zlibrary_api/zlibrary_api.dart';
 
 class _SystemTextCurve extends TextScaler {
   const _SystemTextCurve();
@@ -119,8 +124,190 @@ void main() {
       hasLength(1),
       reason: 'The value must not squeeze the label into fragments',
     );
+    expect(
+      tester.getTopLeft(title).dx,
+      tester.getTopLeft(find.text('Language')).dx,
+    );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('proxy drafts validate before applying and survive rebuilds', (
+    tester,
+  ) async {
+    await sharedPrefs.setBool('pref_proxy_enabled', true);
+    await sharedPrefs.setString('pref_proxy_host', 'applied.example');
+    await sharedPrefs.setInt('pref_proxy_port', 1080);
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: AppTheme.lightTheme,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          builder: (context, child) => AppTextScaling(child: child!),
+          home: const TickerMode(enabled: false, child: SettingsScreen()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(SettingsScreen)),
+    );
+    final l10n = AppLocalizations.of(
+      tester.element(find.byType(SettingsScreen)),
+    )!;
+    Finder field(String label) => find.ancestor(
+      of: find.text(label),
+      matching: find.byType(TextFormField),
+    );
+    final host = field(l10n.proxyHost);
+    final port = field(l10n.proxyPort);
+    final save = find.widgetWithText(FilledButton, l10n.save);
+    await tester.ensureVisible(host);
+    await tester.enterText(host, '   ');
+    await tester.ensureVisible(port);
+    await tester.enterText(port, '65536');
+    await tester.ensureVisible(save);
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    expect(find.text(l10n.proxyHostRequired), findsOneWidget);
+    expect(find.text(l10n.proxyPortInvalid), findsOneWidget);
+    expect(container.read(socks5ConfigProvider).host, 'applied.example');
+    expect(container.read(socks5ConfigProvider).port, 1080);
+    await container.read(interfaceFontScaleProvider.notifier).setPercent(120);
+    await tester.pumpAndSettle();
+    final editableFields = tester.widgetList<EditableText>(
+      find.descendant(
+        of: find.byType(Form),
+        matching: find.byType(EditableText),
+      ),
+    );
+    expect(editableFields.map((field) => field.controller.text), [
+      '   ',
+      '65536',
+    ]);
+    for (final invalidPort in ['0', '-1', 'port', '']) {
+      await tester.ensureVisible(port);
+      await tester.enterText(port, invalidPort);
+      await tester.ensureVisible(save);
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(find.text(l10n.proxyPortInvalid), findsOneWidget);
+      expect(container.read(socks5ConfigProvider).port, 1080);
+    }
+    await tester.ensureVisible(host);
+    await tester.enterText(host, 'new.example');
+    await tester.ensureVisible(port);
+    await tester.enterText(port, '65535');
+    expect(container.read(socks5ConfigProvider).host, 'applied.example');
+    await tester.ensureVisible(save);
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    expect(container.read(socks5ConfigProvider).host, 'new.example');
+    expect(container.read(socks5ConfigProvider).port, 65535);
+    expect(
+      find.text(l10n.proxyAppliedEndpoint('new.example', 65535)),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final locale in [const Locale('en'), const Locale('ru')]) {
+    testWidgets('source login failure separates details in $locale', (
+      tester,
+    ) async {
+      final requests = <http.Request>[];
+      final api = ZLibraryApi(
+        mirrors: const ['https://catalog.test'],
+        client: MockClient((request) async {
+          requests.add(request);
+          return http.Response('{"response":{"validationError":true}}', 200);
+        }),
+      );
+      addTearDown(api.close);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [zLibraryApiProvider.overrideWithValue(api)],
+          child: MaterialApp(
+            locale: locale,
+            theme: AppTheme.lightTheme,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const TickerMode(enabled: false, child: SettingsScreen()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final settings = find.byType(SettingsScreen);
+      final context = tester.element(settings);
+      final l10n = AppLocalizations.of(context)!;
+      final signIn = find.widgetWithText(FilledButton, l10n.signIn);
+      final settingsSignIn = find.descendant(of: settings, matching: signIn);
+      await tester.scrollUntilVisible(
+        settingsSignIn,
+        240,
+        scrollable: find
+            .descendant(of: settings, matching: find.byType(Scrollable))
+            .first,
+      );
+      await tester.pumpAndSettle();
+      expect(settingsSignIn.hitTestable(), findsOneWidget);
+      await tester.tap(settingsSignIn);
+      await tester.pumpAndSettle();
+      final dialog = find.byType(AlertDialog);
+      expect(dialog, findsOneWidget);
+      final fields = find.descendant(
+        of: dialog,
+        matching: find.byType(TextField),
+      );
+      expect(fields, findsNWidgets(2));
+      await tester.ensureVisible(fields.first);
+      await tester.pumpAndSettle();
+      await tester.enterText(fields.first, 'reader@example.test');
+      await tester.ensureVisible(fields.last);
+      await tester.pumpAndSettle();
+      await tester.enterText(fields.last, 'rejected password');
+      final submit = find.descendant(of: dialog, matching: signIn);
+      await tester.ensureVisible(submit);
+      await tester.pumpAndSettle();
+      expect(submit.hitTestable(), findsOneWidget);
+      await tester.tap(submit);
+      await tester.pumpAndSettle();
+      expect(requests, hasLength(1));
+      expect(requests.single.method, 'POST');
+      expect(requests.single.bodyFields, containsPair('action', 'login'));
+      expect(
+        requests.single.bodyFields,
+        containsPair('email', 'reader@example.test'),
+      );
+      expect(
+        requests.single.bodyFields,
+        containsPair('password', 'rejected password'),
+      );
+      expect(find.text(l10n.zLibraryLoginError), findsOneWidget);
+      expect(find.byType(SelectableText), findsNothing);
+      final details = find.text(l10n.zLibraryLoginErrorDetails);
+      await tester.ensureVisible(details);
+      await tester.pumpAndSettle();
+      expect(details.hitTestable(), findsOneWidget);
+      await tester.tap(details);
+      await tester.pumpAndSettle();
+      final detailText = find.descendant(
+        of: dialog,
+        matching: find.byType(SelectableText),
+      );
+      await tester.ensureVisible(detailText);
+      await tester.pumpAndSettle();
+      expect(detailText.hitTestable(), findsOneWidget);
+      final technicalDetails = tester.widget<SelectableText>(detailText).data!;
+      expect(technicalDetails, isNotEmpty);
+      expect(technicalDetails, isNot(l10n.zLibraryLoginError));
+      expect(
+        ProviderScope.containerOf(context).read(zLibraryCredentialsProvider),
+        isNull,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   for (final mode in ReadingMode.values) {
     testWidgets(

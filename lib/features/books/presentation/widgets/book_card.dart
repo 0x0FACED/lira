@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/formatters.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../core/widgets/app_components.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/models/book_dto.dart';
+import '../book_labels.dart';
 import 'book_cover.dart';
 
 class BookCard extends StatelessWidget {
@@ -52,6 +54,7 @@ class BookCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final textScaler = MediaQuery.textScalerOf(context);
     return Material(
       type: MaterialType.transparency,
@@ -83,7 +86,7 @@ class BookCard extends StatelessWidget {
             SizedBox(
               height: _textLineExtent(textScaler, _authorSize),
               child: Text(
-                book.author.trim(),
+                bookAuthorLabel(book.author, l10n),
                 style: theme.textTheme.bodySmall?.copyWith(
                   fontSize: _authorSize,
                   height: _lineHeight,
@@ -105,6 +108,7 @@ class BookCard extends StatelessWidget {
     return showAppDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        scrollable: true,
         title: Text(l10n.deleteBook),
         content: Text(l10n.deleteBookConfirm(book.title)),
         actions: [
@@ -129,6 +133,7 @@ class BookCard extends StatelessWidget {
 
   Widget _buildFooter(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final style = theme.textTheme.labelSmall?.copyWith(
       fontWeight: FontWeight.w400,
       height: _lineHeight,
@@ -138,7 +143,7 @@ class BookCard extends StatelessWidget {
     // A rounded display must not claim completion before the real end event.
     final displayed = percentage == null
         ? null
-        : ((percentage * 10).floor() / 10).toStringAsFixed(1);
+        : formatReadingPercentage(percentage, l10n.localeName, floor: true);
     final metadata = Wrap(
       spacing: AppSpacing.xs,
       children: [
@@ -147,8 +152,7 @@ class BookCard extends StatelessWidget {
           ExcludeSemantics(child: Text('·', style: style)),
           Text(
             '${book.pageCount}',
-            semanticsLabel:
-                '${AppLocalizations.of(context)!.pages}: ${book.pageCount}',
+            semanticsLabel: '${l10n.pages}: ${book.pageCount}',
             style: style,
           ),
         ],
@@ -157,10 +161,10 @@ class BookCard extends StatelessWidget {
     final progress = displayed == null
         ? null
         : Semantics(
-            label: AppLocalizations.of(context)!.libraryReadingProgress,
-            value: '$displayed%',
+            label: l10n.libraryReadingProgress,
+            value: displayed,
             excludeSemantics: true,
-            child: Text('$displayed%', style: style),
+            child: Text(displayed, style: style),
           );
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -168,7 +172,7 @@ class BookCard extends StatelessWidget {
             MediaQuery.textScalerOf(context).scale(11) *
             (book.format.length +
                 (book.pageCount > 0 ? '${book.pageCount}'.length + 3 : 0) +
-                (displayed == null ? 0 : displayed.length + 1)) *
+                (displayed?.length ?? 0)) *
             0.8;
         final stacked = constraints.maxWidth < labelWidth + AppSpacing.sm;
         return Column(

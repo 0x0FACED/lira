@@ -8,7 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
+import '../../../core/formatters.dart';
 
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_components.dart';
@@ -75,119 +75,123 @@ class _ReaderAnnotationsPanelState
         ? highlights.whenOrNull(data: (items) => items.length)
         : bookmarks.whenOrNull(data: (items) => items.length);
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.75,
-      minChildSize: 0.3,
-      maxChildSize: 0.85,
-      expand: false,
-      builder: (context, scrollController) => CustomScrollView(
-        controller: scrollController,
-        slivers: [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                AppLayout.pageGutter(context),
-                AppSpacing.md,
-                AppLayout.pageGutter(context),
-                AppSpacing.sm,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      l10n.annotations,
-                      style: theme.textTheme.titleLarge,
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: DraggableScrollableSheet(
+        initialChildSize: 0.75,
+        minChildSize: 0.3,
+        maxChildSize: 0.85,
+        expand: false,
+        builder: (context, scrollController) => CustomScrollView(
+          controller: scrollController,
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  AppLayout.pageGutter(context),
+                  AppSpacing.md,
+                  AppLayout.pageGutter(context),
+                  AppSpacing.sm,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        l10n.annotations,
+                        style: theme.textTheme.titleLarge,
+                      ),
                     ),
-                  ),
-                  if (count != null) ...[
-                    const SizedBox(width: AppSpacing.sm),
-                    AppMetadata(label: '$count'),
+                    if (count != null) ...[
+                      const SizedBox(width: AppSpacing.sm),
+                      AppMetadata(label: '$count'),
+                    ],
                   ],
-                ],
-              ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: AppLayout.pageGutter(context),
-                vertical: AppSpacing.sm,
-              ),
-              child: SegmentedButton<_AnnotationsTab>(
-                showSelectedIcon: false,
-                segments: [
-                  ButtonSegment(
-                    value: _AnnotationsTab.highlights,
-                    label: Text(l10n.highlights),
-                  ),
-                  ButtonSegment(
-                    value: _AnnotationsTab.bookmarks,
-                    label: Text(l10n.bookmarks),
-                  ),
-                ],
-                selected: {_tab},
-                onSelectionChanged: (selection) {
-                  setState(() {
-                    _tab = selection.single;
-                  });
-                },
-              ),
-            ),
-          ),
-          const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.sm)),
-          if (_tab == _AnnotationsTab.highlights)
-            highlights.when(
-              loading: () => const SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(child: CircularProgressIndicator()),
-              ),
-              error: (error, _) => SliverToBoxAdapter(
-                child: AppEmptyState(
-                  icon: Icons.error_outline,
-                  title: l10n.highlightsLoadError,
-                  description: '$error',
-                  iconColor: theme.colorScheme.error,
                 ),
               ),
-              data: _buildHighlights,
-            )
-          else
-            bookmarks.when(
-              loading: () => const SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(child: CircularProgressIndicator()),
-              ),
-              error: (error, _) => SliverToBoxAdapter(
-                child: AppEmptyState(
-                  icon: Icons.error_outline,
-                  title: l10n.bookmarksLoadError,
-                  description: '$error',
-                  iconColor: theme.colorScheme.error,
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppLayout.pageGutter(context),
+                  vertical: AppSpacing.sm,
+                ),
+                child: SegmentedButton<_AnnotationsTab>(
+                  showSelectedIcon: false,
+                  segments: [
+                    ButtonSegment(
+                      value: _AnnotationsTab.highlights,
+                      label: Text(l10n.highlights),
+                    ),
+                    ButtonSegment(
+                      value: _AnnotationsTab.bookmarks,
+                      label: Text(l10n.bookmarks),
+                    ),
+                  ],
+                  selected: {_tab},
+                  onSelectionChanged: (selection) {
+                    setState(() {
+                      _tab = selection.single;
+                    });
+                  },
                 ),
               ),
-              data: (items) => items.isEmpty
-                  ? SliverToBoxAdapter(
-                      child: AppEmptyState(
-                        icon: Icons.bookmark_border,
-                        title: l10n.bookmarksEmpty,
-                        description: l10n.bookmarksEmptyHint,
-                      ),
-                    )
-                  : SliverPadding(
-                      padding: EdgeInsets.only(
-                        bottom:
-                            AppSpacing.compact +
-                            MediaQuery.paddingOf(context).bottom,
-                      ),
-                      sliver: SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) => _buildBookmarkTile(items[index]),
-                          childCount: items.length,
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.sm)),
+            if (_tab == _AnnotationsTab.highlights)
+              highlights.when(
+                loading: () => const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (error, _) => SliverToBoxAdapter(
+                  child: AppEmptyState(
+                    icon: Icons.error_outline,
+                    title: l10n.highlightsLoadError,
+                    description: '$error',
+                    iconColor: theme.colorScheme.error,
+                  ),
+                ),
+                data: _buildHighlights,
+              )
+            else
+              bookmarks.when(
+                loading: () => const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (error, _) => SliverToBoxAdapter(
+                  child: AppEmptyState(
+                    icon: Icons.error_outline,
+                    title: l10n.bookmarksLoadError,
+                    description: '$error',
+                    iconColor: theme.colorScheme.error,
+                  ),
+                ),
+                data: (items) => items.isEmpty
+                    ? SliverToBoxAdapter(
+                        child: AppEmptyState(
+                          icon: Icons.bookmark_border,
+                          title: l10n.bookmarksEmpty,
+                          description: l10n.bookmarksEmptyHint,
+                        ),
+                      )
+                    : SliverPadding(
+                        padding: EdgeInsets.only(
+                          bottom:
+                              AppSpacing.compact +
+                              MediaQuery.paddingOf(context).bottom,
+                        ),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) =>
+                                _buildBookmarkTile(items[index]),
+                            childCount: items.length,
+                          ),
                         ),
                       ),
-                    ),
-            ),
-        ],
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -353,82 +357,110 @@ class _ReaderAnnotationsPanelState
     return _AnnotationRow(
       key: ValueKey(highlight.id),
       error: _highlightDeleteErrors[highlight.id],
-      child: ListTile(
-        contentPadding: EdgeInsets.symmetric(
-          horizontal: AppLayout.pageGutter(context),
-          vertical: AppSpacing.sm,
-        ),
-        leading: Checkbox(
-          value: _selectedIds.contains(highlight.id),
-          fillColor: WidgetStateProperty.resolveWith(
-            (states) => states.contains(WidgetState.selected) ? color : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ListTile(
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: AppLayout.pageGutter(context),
+              vertical: AppSpacing.sm,
+            ),
+            title: Text(highlight.text, style: theme.textTheme.bodyMedium),
+            subtitle: highlight.note != null
+                ? Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.sm),
+                    child: Text(
+                      highlight.note!,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  )
+                : null,
+            onTap: deleting
+                ? null
+                : () => widget.onNavigate(highlight.location),
           ),
-          semanticLabel: l10n.annotationsToolsSelectQuote,
-          onChanged: deleting
-              ? null
-              : (value) {
-                  setState(() {
-                    if (value == true) {
-                      _selectedIds.add(highlight.id);
-                    } else {
-                      _selectedIds.remove(highlight.id);
-                    }
-                  });
-                },
-        ),
-        title: Text(
-          highlight.text,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.bodyMedium,
-        ),
-        subtitle: highlight.note != null
-            ? Text(
-                highlight.note!,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+          Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: AppLayout.pageGutter(context),
+            ),
+            child: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: AppSpacing.xs,
+              children: [
+                SizedBox.square(
+                  dimension: AppLayout.minTouchTarget,
+                  child: Checkbox(
+                    value: _selectedIds.contains(highlight.id),
+                    semanticLabel: l10n.annotationsToolsSelectQuote,
+                    onChanged: deleting
+                        ? null
+                        : (value) {
+                            setState(() {
+                              if (value == true) {
+                                _selectedIds.add(highlight.id);
+                              } else {
+                                _selectedIds.remove(highlight.id);
+                              }
+                            });
+                          },
+                  ),
                 ),
-              )
-            : null,
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: Semantics(
-                label: l10n.annotationsToolsCopyQuote,
-                child: const Icon(Icons.copy_outlined, size: 20),
-              ),
-              onPressed: () => _copyQuote(highlight),
-            ),
-            IconButton(
-              icon: Semantics(
-                label: highlight.note != null ? l10n.editNote : l10n.addNote,
-                child: Icon(
-                  highlight.note != null
-                      ? Icons.edit_note
-                      : Icons.note_add_outlined,
-                  size: 20,
+                ExcludeSemantics(
+                  child: CircleAvatar(backgroundColor: color, radius: 7),
                 ),
-              ),
-              onPressed: deleting ? null : () => _editNote(highlight),
+                IconButton(
+                  constraints: const BoxConstraints.tightFor(
+                    width: AppLayout.minTouchTarget,
+                    height: AppLayout.minTouchTarget,
+                  ),
+                  icon: Semantics(
+                    label: l10n.annotationsToolsCopyQuote,
+                    child: const Icon(Icons.copy_outlined, size: 20),
+                  ),
+                  onPressed: () => _copyQuote(highlight),
+                ),
+                IconButton(
+                  constraints: const BoxConstraints.tightFor(
+                    width: AppLayout.minTouchTarget,
+                    height: AppLayout.minTouchTarget,
+                  ),
+                  icon: Semantics(
+                    label: highlight.note != null
+                        ? l10n.editNote
+                        : l10n.addNote,
+                    child: Icon(
+                      highlight.note != null
+                          ? Icons.edit_note
+                          : Icons.note_add_outlined,
+                      size: 20,
+                    ),
+                  ),
+                  onPressed: deleting ? null : () => _editNote(highlight),
+                ),
+                IconButton(
+                  constraints: const BoxConstraints.tightFor(
+                    width: AppLayout.minTouchTarget,
+                    height: AppLayout.minTouchTarget,
+                  ),
+                  icon: Semantics(
+                    label: l10n.delete,
+                    child: deleting
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.delete_outline, size: 20),
+                  ),
+                  onPressed: deleting
+                      ? null
+                      : () => _deleteHighlight(highlight),
+                ),
+              ],
             ),
-            IconButton(
-              icon: Semantics(
-                label: l10n.delete,
-                child: deleting
-                    ? const SizedBox.square(
-                        dimension: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.delete_outline, size: 20),
-              ),
-              onPressed: deleting ? null : () => _deleteHighlight(highlight),
-            ),
-          ],
-        ),
-        onTap: deleting ? null : () => widget.onNavigate(highlight.location),
+          ),
+        ],
       ),
     );
   }
@@ -437,10 +469,10 @@ class _ReaderAnnotationsPanelState
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
     final deleting = _deletingBookmarks.contains(bookmark.id);
-    final percentage = NumberFormat(
-      '0.#',
+    final percentage = formatReadingPercentage(
+      bookmark.percentage,
       l10n.localeName,
-    ).format(bookmark.percentage);
+    );
 
     return _AnnotationRow(
       key: ValueKey(bookmark.id),

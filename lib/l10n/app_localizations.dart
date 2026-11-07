@@ -110,59 +110,11 @@ abstract class AppLocalizations {
   /// **'Sign In'**
   String get signIn;
 
-  /// No description provided for @register.
-  ///
-  /// In en, this message translates to:
-  /// **'Register'**
-  String get register;
-
-  /// No description provided for @username.
-  ///
-  /// In en, this message translates to:
-  /// **'Username'**
-  String get username;
-
-  /// No description provided for @password.
-  ///
-  /// In en, this message translates to:
-  /// **'Password'**
-  String get password;
-
-  /// No description provided for @continueAsGuest.
-  ///
-  /// In en, this message translates to:
-  /// **'Continue as Guest'**
-  String get continueAsGuest;
-
-  /// No description provided for @guestLocalOnly.
-  ///
-  /// In en, this message translates to:
-  /// **'Books and progress will be stored locally only'**
-  String get guestLocalOnly;
-
-  /// No description provided for @noAccountRegister.
-  ///
-  /// In en, this message translates to:
-  /// **'Don\'t have an account? Register'**
-  String get noAccountRegister;
-
-  /// No description provided for @haveAccountSignIn.
-  ///
-  /// In en, this message translates to:
-  /// **'Already have an account? Sign In'**
-  String get haveAccountSignIn;
-
   /// No description provided for @yourLibrary.
   ///
   /// In en, this message translates to:
   /// **'Your personal library reader'**
   String get yourLibrary;
-
-  /// No description provided for @fillAllFields.
-  ///
-  /// In en, this message translates to:
-  /// **'Please fill in all fields'**
-  String get fillAllFields;
 
   /// No description provided for @library.
   ///
@@ -290,53 +242,11 @@ abstract class AppLocalizations {
   /// **'Profile'**
   String get profile;
 
-  /// No description provided for @signedIn.
-  ///
-  /// In en, this message translates to:
-  /// **'Signed in'**
-  String get signedIn;
-
-  /// No description provided for @guest.
-  ///
-  /// In en, this message translates to:
-  /// **'Guest'**
-  String get guest;
-
-  /// No description provided for @guestSyncHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Stored on this device · local QR sync needs no account'**
-  String get guestSyncHint;
-
-  /// No description provided for @notSignedIn.
-  ///
-  /// In en, this message translates to:
-  /// **'Not signed in'**
-  String get notSignedIn;
-
   /// No description provided for @account.
   ///
   /// In en, this message translates to:
   /// **'Account'**
   String get account;
-
-  /// No description provided for @logout.
-  ///
-  /// In en, this message translates to:
-  /// **'Logout'**
-  String get logout;
-
-  /// No description provided for @signInComingSoon.
-  ///
-  /// In en, this message translates to:
-  /// **'Sign in coming soon'**
-  String get signInComingSoon;
-
-  /// No description provided for @registrationComingSoon.
-  ///
-  /// In en, this message translates to:
-  /// **'Registration coming soon'**
-  String get registrationComingSoon;
 
   /// No description provided for @appearance.
   ///
@@ -557,7 +467,7 @@ abstract class AppLocalizations {
   /// No description provided for @searchLibrary.
   ///
   /// In en, this message translates to:
-  /// **'Search library...'**
+  /// **'Search'**
   String get searchLibrary;
 
   /// No description provided for @libraryReadingProgress.
@@ -815,7 +725,7 @@ abstract class AppLocalizations {
   /// No description provided for @bookmarkPosition.
   ///
   /// In en, this message translates to:
-  /// **'Position: {percentage}%'**
+  /// **'Position: {percentage}'**
   String bookmarkPosition(String percentage);
 
   /// No description provided for @addBookmark.
@@ -2448,6 +2358,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not copy the invitation. Scan the displayed QR code instead.'**
   String get localSyncErrorClipboard;
+
+  /// No description provided for @localAccessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Read without an account'**
+  String get localAccessTitle;
+
+  /// No description provided for @localAccessDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Books and reading data stay on this device. Use local QR sync to exchange your library with another device without an account.'**
+  String get localAccessDescription;
+
+  /// No description provided for @serverAccountUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Lira accounts and server sign-in are not available. No password is needed to read or use local sync.'**
+  String get serverAccountUnavailable;
+
+  /// No description provided for @localAccessContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue to library'**
+  String get localAccessContinue;
+
+  /// No description provided for @localAccessError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save local access. Try again.'**
+  String get localAccessError;
+
+  /// No description provided for @bookAuthorUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown author'**
+  String get bookAuthorUnknown;
+
+  /// No description provided for @searchFailedDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not search for books. Try again or check source access.'**
+  String get searchFailedDescription;
+
+  /// No description provided for @searchSourceUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'{source} is unavailable'**
+  String searchSourceUnavailable(String source);
+
+  /// No description provided for @searchTechnicalDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Technical details'**
+  String get searchTechnicalDetails;
+
+  /// No description provided for @searchDownloadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not download the book'**
+  String get searchDownloadFailed;
+
+  /// No description provided for @localProfileTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Local library'**
+  String get localProfileTitle;
+
+  /// No description provided for @localProfileHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Books and reading data are stored on this device. Use QR sync to exchange them with another device.'**
+  String get localProfileHint;
+
+  /// No description provided for @serverAccountInfoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Server account information'**
+  String get serverAccountInfoTitle;
+
+  /// No description provided for @serverAccountInfoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Server sign-in is not available. Your local library and QR sync do not require an account.'**
+  String get serverAccountInfoHint;
+
+  /// No description provided for @proxyAppliedEndpoint.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied: {host}:{port}'**
+  String proxyAppliedEndpoint(String host, int port);
+
+  /// No description provided for @proxyHostRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a proxy host'**
+  String get proxyHostRequired;
+
+  /// No description provided for @proxyPortInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a port from 1 to 65535'**
+  String get proxyPortInvalid;
+
+  /// No description provided for @zLibraryLoginError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not sign in to Z-Library. Check your credentials and the source’s availability.'**
+  String get zLibraryLoginError;
+
+  /// No description provided for @zLibraryLoginErrorDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Technical details'**
+  String get zLibraryLoginErrorDetails;
 }
 
 class _AppLocalizationsDelegate

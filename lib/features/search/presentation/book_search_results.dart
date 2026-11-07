@@ -73,29 +73,34 @@ class _BookSearchResultsState extends ConsumerState<BookSearchResults> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     if (widget.query.trim().isEmpty) {
-      return AppEmptyState(
-        icon: Icons.manage_search_outlined,
-        title: l10n.searchBooks,
+      return AppScrollableState(
+        child: AppEmptyState(
+          icon: Icons.manage_search_outlined,
+          title: l10n.searchBooks,
+        ),
       );
     }
     final request = (query: widget.query, sourceId: widget.sourceId);
     return ref
         .watch(bookSearchProvider(request))
         .when(
-          loading: () => Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: AppSpacing.md),
-                Text(l10n.searchLoading),
-              ],
+          loading: () => AppScrollableState(
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(l10n.searchLoading),
+                ],
+              ),
             ),
           ),
-          error: (error, stack) => _failure(l10n, error.toString(), request),
+          error: (error, stack) =>
+              _failure(l10n, request, details: error.toString()),
           data: (result) {
-            if (result.books.isEmpty && result.errors.isNotEmpty) {
-              return _failure(l10n, result.errors.join('\n'), request);
+            if (result.books.isEmpty && result.failures.isNotEmpty) {
+              return _failure(l10n, request, failures: result.failures);
             }
             final books = _filter(result.books);
             final theme = Theme.of(context);
@@ -109,7 +114,7 @@ class _BookSearchResultsState extends ConsumerState<BookSearchResults> {
                 'book-search-${widget.sourceId}-${widget.query}',
               ),
               slivers: [
-                if (result.errors.isNotEmpty)
+                if (result.failures.isNotEmpty)
                   SliverToBoxAdapter(
                     child: AppSurface(
                       margin: EdgeInsets.symmetric(
@@ -117,11 +122,18 @@ class _BookSearchResultsState extends ConsumerState<BookSearchResults> {
                         vertical: AppSpacing.compact,
                       ),
                       color: theme.colorScheme.surfaceContainerLow,
-                      child: Text(
-                        '${l10n.searchSourcesPartialFailure}\n${result.errors.join('\n')}',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            l10n.searchSourcesPartialFailure,
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          _sourceFailures(l10n, result.failures),
+                          const SizedBox(height: AppSpacing.sm),
+                          _recoveryActions(l10n, request, result.failures),
+                        ],
                       ),
                     ),
                   ),
@@ -260,49 +272,89 @@ class _BookSearchResultsState extends ConsumerState<BookSearchResults> {
         );
   }
 
+  Widget _sourceFailures(
+    AppLocalizations l10n,
+    List<BookSearchFailure> failures,
+  ) => Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      for (final failure in failures)
+        Text(l10n.searchSourceUnavailable(failure.source.name)),
+      _technicalDetails(
+        l10n,
+        failures
+            .map((failure) => '${failure.source.name}: ${failure.error}')
+            .join('\n'),
+      ),
+    ],
+  );
+
+  Widget _technicalDetails(AppLocalizations l10n, String details) =>
+      ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        title: Text(l10n.searchTechnicalDetails),
+        children: [
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: SelectableText(details),
+          ),
+        ],
+      );
+
+  Widget _recoveryActions(
+    AppLocalizations l10n,
+    BookSearchQuery request,
+    List<BookSearchFailure> failures,
+  ) {
+    final failedKinds = failures.map((failure) => failure.source.kind).toSet();
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: AppSpacing.sm,
+      runSpacing: AppSpacing.sm,
+      children: [
+        FilledButton.icon(
+          onPressed: () => ref.invalidate(bookSearchProvider(request)),
+          icon: const Icon(Icons.refresh_rounded),
+          label: Text(l10n.searchRetry),
+        ),
+        if (failedKinds.contains(DiscoverSourceKind.anna))
+          TextButton(
+            onPressed: () => Navigator.of(context).push<void>(
+              MaterialPageRoute(builder: (_) => const AnnaAccessScreen()),
+            ),
+            child: Text(l10n.annaSessionTitle),
+          ),
+        if (failedKinds.contains(DiscoverSourceKind.zlibrary))
+          TextButton(
+            onPressed: () => Navigator.of(context).push<void>(
+              MaterialPageRoute(builder: (_) => const ZLibraryMirrorsScreen()),
+            ),
+            child: Text(l10n.zLibraryMirrors),
+          ),
+      ],
+    );
+  }
+
   Widget _failure(
     AppLocalizations l10n,
-    String message,
-    BookSearchQuery request,
-  ) => LayoutBuilder(
-    builder: (context, constraints) => SingleChildScrollView(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(minHeight: constraints.maxHeight),
-        child: AppEmptyState(
-          icon: Icons.cloud_off_outlined,
-          title: l10n.searchFailed,
-          description: message,
-          action: Wrap(
-            alignment: WrapAlignment.center,
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: [
-              FilledButton.icon(
-                onPressed: () => ref.invalidate(bookSearchProvider(request)),
-                icon: const Icon(Icons.refresh_rounded),
-                label: Text(l10n.searchRetry),
-              ),
-              if (widget.sourceId == null ||
-                  widget.sourceId == DiscoverSourceIds.anna)
-                TextButton(
-                  onPressed: () => Navigator.of(context).push<void>(
-                    MaterialPageRoute(builder: (_) => const AnnaAccessScreen()),
-                  ),
-                  child: Text(l10n.annaSessionTitle),
-                ),
-              if (widget.sourceId == null ||
-                  widget.sourceId == DiscoverSourceIds.zlibrary)
-                TextButton(
-                  onPressed: () => Navigator.of(context).push<void>(
-                    MaterialPageRoute(
-                      builder: (_) => const ZLibraryMirrorsScreen(),
-                    ),
-                  ),
-                  child: Text(l10n.zLibraryMirrors),
-                ),
-            ],
-          ),
-        ),
+    BookSearchQuery request, {
+    List<BookSearchFailure> failures = const [],
+    String? details,
+  }) => AppScrollableState(
+    child: AppEmptyState(
+      icon: Icons.cloud_off_outlined,
+      title: l10n.searchFailed,
+      description: l10n.searchFailedDescription,
+      action: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (failures.isNotEmpty) _sourceFailures(l10n, failures),
+          if (details != null) _technicalDetails(l10n, details),
+          const SizedBox(height: AppSpacing.sm),
+          _recoveryActions(l10n, request, failures),
+        ],
       ),
     ),
   );

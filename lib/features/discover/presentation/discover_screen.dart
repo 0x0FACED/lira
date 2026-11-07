@@ -143,7 +143,8 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                   },
                 ),
               ),
-            const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.md)),
+            if (feeds.isNotEmpty)
+              const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.md)),
           ],
         ),
       ),
@@ -175,135 +176,141 @@ class _SourceShelfState extends ConsumerState<_SourceShelf>
       _lastFeed = ref.watch(discoverFeedProvider(source.id));
     }
     final feed = _lastFeed ?? const AsyncLoading<DiscoverFeed>();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          DiscoverSectionHeading(
-            source: source,
-            subtitle: source.description(
-              Localizations.localeOf(context).languageCode,
-            ),
-            onTap: () => Navigator.of(context).push<void>(
-              MaterialPageRoute(
-                builder: (_) => DiscoverSourceScreen(source: source),
+    return DiscoverContent(
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            DiscoverSectionHeading(
+              source: source,
+              subtitle: source.description(
+                Localizations.localeOf(context).languageCode,
+              ),
+              onTap: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => DiscoverSourceScreen(source: source),
+                ),
               ),
             ),
-          ),
-          feed.when(
-            data: (value) {
-              if (value.items.isEmpty) {
-                return Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: AppLayout.pageGutter(context),
-                    vertical: AppSpacing.compact,
-                  ),
-                  child: Text(
-                    l10n.discoverNoMaterials,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                );
-              }
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (value.isStale)
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        AppLayout.pageGutter(context),
-                        0,
-                        AppLayout.pageGutter(context),
-                        AppSpacing.sm,
-                      ),
-                      child: Text(
-                        '${l10n.discoverCachedFeed}\n${l10n.discoverUpdated(discoverDate(context, value.updatedAt))}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
+            feed.when(
+              data: (value) {
+                if (value.items.isEmpty) {
+                  return Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppLayout.pageGutter(context),
+                      vertical: AppSpacing.compact,
                     ),
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final text = Theme.of(context).textTheme;
-                      final scaler = MediaQuery.textScalerOf(context);
-                      final scale =
-                          scaler.scale(text.bodyMedium!.fontSize!) /
-                          text.bodyMedium!.fontSize!;
-                      final cardWidth = math.min(
-                        constraints.maxWidth -
-                            AppLayout.pageGutter(context) * 2,
-                        AppLayout.discoverCardWidth *
-                            scale.clamp(1, AppLayout.discoverMaxCardTextScale),
-                      );
-                      double lines(TextStyle style, int count) =>
-                          scaler.scale(style.fontSize!) *
-                          (style.height ?? 1) *
-                          count;
-                      var contentHeight = 0.0;
-                      for (final item in value.items.take(
-                        AppLayout.discoverShelfItemLimit,
-                      )) {
-                        final textFirst =
-                            source.category == DiscoverCategory.documents ||
-                            item.imageUrl == null;
-                        final headingHeight =
-                            lines(
-                              text.titleSmall!,
-                              AppLayout.discoverTitleLines,
-                            ) +
-                            AppSpacing.xs +
-                            (item.documentNumber == null
-                                ? 0
-                                : lines(text.bodySmall!, 1) + AppSpacing.xs) +
-                            (item.author.isEmpty
-                                ? 0
-                                : lines(text.bodySmall!, 1)) +
-                            (item.publishedAt == null
-                                ? 0
-                                : lines(text.bodySmall!, 1));
-                        final branchHeight = textFirst
-                            ? headingHeight +
-                                  (item.summary.isEmpty
-                                      ? 0
-                                      : AppSpacing.sm +
-                                            lines(
-                                              text.bodyMedium!,
-                                              AppLayout.discoverSummaryLines,
-                                            ))
-                            : cardWidth / AppLayout.discoverImageAspectRatio +
-                                  headingHeight;
-                        contentHeight = math.max(contentHeight, branchHeight);
-                      }
-                      final height =
-                          contentHeight +
-                          AppSpacing.compact +
-                          AppSpacing.sm +
-                          math.max(
-                            AppLayout.minTouchTarget,
-                            lines(text.bodySmall!, 1),
-                          );
-                      return DiscoverCarousel(
-                        source: source,
-                        items: value.items,
-                        cardWidth: cardWidth,
-                        height: height,
-                        onOpen: (item) =>
-                            openMaterialDetail(context, item, source),
-                      );
-                    },
-                  ),
-                ],
-              );
-            },
-            loading: () => const Padding(
-              padding: EdgeInsets.all(AppSpacing.lg),
-              child: Center(child: DiscoverProgress()),
+                    child: Text(
+                      l10n.discoverNoMaterials,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  );
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (value.isStale)
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          AppLayout.pageGutter(context),
+                          0,
+                          AppLayout.pageGutter(context),
+                          AppSpacing.sm,
+                        ),
+                        child: Text(
+                          '${l10n.discoverCachedFeed}\n${l10n.discoverUpdated(discoverDate(context, value.updatedAt))}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final text = Theme.of(context).textTheme;
+                        final scaler = MediaQuery.textScalerOf(context);
+                        final scale =
+                            scaler.scale(text.bodyMedium!.fontSize!) /
+                            text.bodyMedium!.fontSize!;
+                        final cardWidth = math.min(
+                          constraints.maxWidth -
+                              AppLayout.pageGutter(context) * 2,
+                          AppLayout.discoverCardWidth *
+                              scale.clamp(
+                                1,
+                                AppLayout.discoverMaxCardTextScale,
+                              ),
+                        );
+                        double lines(TextStyle style, int count) =>
+                            (scaler.scale(style.fontSize!) *
+                                    (style.height ?? 1))
+                                .ceilToDouble() *
+                            count;
+                        var contentHeight = 0.0;
+                        for (final item in value.items.take(
+                          AppLayout.discoverShelfItemLimit,
+                        )) {
+                          final textFirst =
+                              source.category == DiscoverCategory.documents ||
+                              item.imageUrl == null;
+                          final headingHeight =
+                              lines(
+                                text.titleSmall!,
+                                AppLayout.discoverTitleLines,
+                              ) +
+                              AppSpacing.xs +
+                              (item.documentNumber == null
+                                  ? 0
+                                  : lines(text.bodySmall!, 1) + AppSpacing.xs) +
+                              (item.author.isEmpty
+                                  ? 0
+                                  : lines(text.bodySmall!, 1)) +
+                              (item.publishedAt == null
+                                  ? 0
+                                  : lines(text.bodySmall!, 1));
+                          final branchHeight = textFirst
+                              ? headingHeight +
+                                    (item.summary.isEmpty
+                                        ? 0
+                                        : AppSpacing.sm +
+                                              lines(
+                                                text.bodyMedium!,
+                                                AppLayout.discoverSummaryLines,
+                                              ))
+                              : cardWidth / AppLayout.discoverImageAspectRatio +
+                                    headingHeight;
+                          contentHeight = math.max(contentHeight, branchHeight);
+                        }
+                        final height =
+                            contentHeight +
+                            AppSpacing.compact +
+                            AppSpacing.sm +
+                            math.max(
+                              AppLayout.minTouchTarget,
+                              lines(text.bodySmall!, 1),
+                            );
+                        return DiscoverCarousel(
+                          source: source,
+                          items: value.items,
+                          cardWidth: cardWidth,
+                          height: height,
+                          onOpen: (item) =>
+                              openMaterialDetail(context, item, source),
+                        );
+                      },
+                    ),
+                  ],
+                );
+              },
+              loading: () => const Padding(
+                padding: EdgeInsets.all(AppSpacing.lg),
+                child: Center(child: DiscoverProgress()),
+              ),
+              error: (_, __) => DiscoverFailure(
+                message: l10n.discoverFeedError,
+                onRetry: () => ref.invalidate(discoverFeedProvider(source.id)),
+              ),
             ),
-            error: (_, __) => DiscoverFailure(
-              message: l10n.discoverFeedError,
-              onRetry: () => ref.invalidate(discoverFeedProvider(source.id)),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

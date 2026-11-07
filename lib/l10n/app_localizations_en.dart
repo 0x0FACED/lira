@@ -15,31 +15,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get signIn => 'Sign In';
 
   @override
-  String get register => 'Register';
-
-  @override
-  String get username => 'Username';
-
-  @override
-  String get password => 'Password';
-
-  @override
-  String get continueAsGuest => 'Continue as Guest';
-
-  @override
-  String get guestLocalOnly => 'Books and progress will be stored locally only';
-
-  @override
-  String get noAccountRegister => 'Don\'t have an account? Register';
-
-  @override
-  String get haveAccountSignIn => 'Already have an account? Sign In';
-
-  @override
   String get yourLibrary => 'Your personal library reader';
-
-  @override
-  String get fillAllFields => 'Please fill in all fields';
 
   @override
   String get library => 'Library';
@@ -109,29 +85,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profile => 'Profile';
 
   @override
-  String get signedIn => 'Signed in';
-
-  @override
-  String get guest => 'Guest';
-
-  @override
-  String get guestSyncHint =>
-      'Stored on this device · local QR sync needs no account';
-
-  @override
-  String get notSignedIn => 'Not signed in';
-
-  @override
   String get account => 'Account';
-
-  @override
-  String get logout => 'Logout';
-
-  @override
-  String get signInComingSoon => 'Sign in coming soon';
-
-  @override
-  String get registrationComingSoon => 'Registration coming soon';
 
   @override
   String get appearance => 'Appearance';
@@ -242,7 +196,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noChapters => 'This EPUB has no readable chapters.';
 
   @override
-  String get searchLibrary => 'Search library...';
+  String get searchLibrary => 'Search';
 
   @override
   String get libraryReadingProgress => 'Reading progress';
@@ -388,7 +342,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String bookmarkPosition(String percentage) {
-    return 'Position: $percentage%';
+    return 'Position: $percentage';
   }
 
   @override
@@ -1352,4 +1306,71 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get localSyncErrorClipboard =>
       'Could not copy the invitation. Scan the displayed QR code instead.';
+
+  @override
+  String get localAccessTitle => 'Read without an account';
+
+  @override
+  String get localAccessDescription =>
+      'Books and reading data stay on this device. Use local QR sync to exchange your library with another device without an account.';
+
+  @override
+  String get serverAccountUnavailable =>
+      'Lira accounts and server sign-in are not available. No password is needed to read or use local sync.';
+
+  @override
+  String get localAccessContinue => 'Continue to library';
+
+  @override
+  String get localAccessError => 'Could not save local access. Try again.';
+
+  @override
+  String get bookAuthorUnknown => 'Unknown author';
+
+  @override
+  String get searchFailedDescription =>
+      'Could not search for books. Try again or check source access.';
+
+  @override
+  String searchSourceUnavailable(String source) {
+    return '$source is unavailable';
+  }
+
+  @override
+  String get searchTechnicalDetails => 'Technical details';
+
+  @override
+  String get searchDownloadFailed => 'Could not download the book';
+
+  @override
+  String get localProfileTitle => 'Local library';
+
+  @override
+  String get localProfileHint =>
+      'Books and reading data are stored on this device. Use QR sync to exchange them with another device.';
+
+  @override
+  String get serverAccountInfoTitle => 'Server account information';
+
+  @override
+  String get serverAccountInfoHint =>
+      'Server sign-in is not available. Your local library and QR sync do not require an account.';
+
+  @override
+  String proxyAppliedEndpoint(String host, int port) {
+    return 'Applied: $host:$port';
+  }
+
+  @override
+  String get proxyHostRequired => 'Enter a proxy host';
+
+  @override
+  String get proxyPortInvalid => 'Enter a port from 1 to 65535';
+
+  @override
+  String get zLibraryLoginError =>
+      'Could not sign in to Z-Library. Check your credentials and the source’s availability.';
+
+  @override
+  String get zLibraryLoginErrorDetails => 'Technical details';
 }

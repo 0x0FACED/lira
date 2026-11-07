@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/formatters.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../../l10n/app_localizations.dart';
@@ -57,7 +58,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   bool _settingsOpen = false;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ValueNotifier<_ReaderProgressState> _progressNotifier = ValueNotifier(
-    const _ReaderProgressState(fraction: 0, label: ''),
+    const _ReaderProgressState(fraction: 0),
   );
   bool _didSeedProgressFromStorage = false;
   BookLocation? _initialLocation;
@@ -526,11 +527,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                       : null,
                   title: Text(widget.book.title),
                 ),
-                body: AppEmptyState(
-                  icon: Icons.error_outline,
-                  title: l10n.errorLoadingBook,
-                  description: '${snapshot.error}',
-                  iconColor: colors.error,
+                body: AppScrollableState(
+                  child: AppEmptyState(
+                    icon: Icons.error_outline,
+                    title: l10n.errorLoadingBook,
+                    description: '${snapshot.error}',
+                    iconColor: colors.error,
+                  ),
                 ),
               );
             }
@@ -538,10 +541,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
             final engine = snapshot.data;
             if (engine == null) {
               return Scaffold(
-                body: AppEmptyState(
-                  icon: Icons.menu_book_outlined,
-                  title: l10n.failedToInitReader,
-                  iconColor: colors.error,
+                body: AppScrollableState(
+                  child: AppEmptyState(
+                    icon: Icons.menu_book_outlined,
+                    title: l10n.failedToInitReader,
+                    iconColor: colors.error,
+                  ),
                 ),
               );
             }
@@ -583,11 +588,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                                 loading: () => const Center(
                                   child: CircularProgressIndicator(),
                                 ),
-                                error: (e, st) => AppEmptyState(
-                                  icon: Icons.error_outline,
-                                  title: l10n.errorLoadingProgress,
-                                  description: '$e',
-                                  iconColor: colors.error,
+                                error: (e, st) => AppScrollableState(
+                                  child: AppEmptyState(
+                                    icon: Icons.error_outline,
+                                    title: l10n.errorLoadingProgress,
+                                    description: '$e',
+                                    iconColor: colors.error,
+                                  ),
                                 ),
                               ),
                       ),
@@ -744,7 +751,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                                                       width: AppSpacing.compact,
                                                     ),
                                                     Text(
-                                                      progressState.label,
+                                                      formatReadingPercentage(
+                                                        progressState.fraction *
+                                                            100,
+                                                        l10n.localeName,
+                                                      ),
                                                       style: theme
                                                           .textTheme
                                                           .bodySmall
@@ -960,11 +971,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     BookLocation? location,
   }) {
     final value = (percentage ?? 0).clamp(0.0, 100.0).toDouble();
-    return _ReaderProgressState(
-      fraction: value / 100,
-      label: '${value.toStringAsFixed(1)}%',
-      location: location,
-    );
+    return _ReaderProgressState(fraction: value / 100, location: location);
   }
 
   Widget _buildBookmarkAction(AsyncValue<List<BookmarkDto>> bookmarks) {
@@ -1273,10 +1280,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AppPageHeader(title: l10n.tableOfContents),
+            AppPageHeader(
+              title: l10n.tableOfContents,
+              horizontalPadding: AppSpacing.md,
+            ),
             Expanded(
               child: toc.isEmpty
-                  ? SingleChildScrollView(
+                  ? AppScrollableState(
                       child: AppEmptyState(
                         icon: Icons.format_list_bulleted,
                         title: l10n.tableOfContentsUnavailable,
@@ -1298,25 +1308,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     );
   }
 
-  Widget _buildTocItem(TOCItem item, {int depth = 0}) {
-    final padding = AppSpacing.md + (depth * AppSpacing.md);
-
-    if (item.subItems.isEmpty) {
-      return ListTile(
-        contentPadding: EdgeInsets.only(left: padding, right: AppSpacing.md),
-        title: Text(item.title, style: Theme.of(context).textTheme.bodyLarge),
-        onTap: () {
-          _engine?.goToLocation(BookLocation(locator: item.fileName));
-          Navigator.pop(context);
-          if (_showUi) _toggleUi();
-        },
-      );
-    }
-
+  Widget _buildTocItem(TOCItem item) {
     return _ExpandableTocItem(
       item: item,
-      padding: padding,
-      depth: depth,
       onNavigate: (fileName) {
         _engine?.goToLocation(BookLocation(locator: fileName));
         Navigator.pop(context);
@@ -1342,26 +1336,19 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
 class _ReaderProgressState {
   final double fraction;
-  final String label;
   final BookLocation? location;
 
-  const _ReaderProgressState({
-    required this.fraction,
-    required this.label,
-    this.location,
-  });
+  const _ReaderProgressState({required this.fraction, this.location});
 }
 
 class _ExpandableTocItem extends StatefulWidget {
   final TOCItem item;
-  final double padding;
   final int depth;
   final void Function(String fileName) onNavigate;
 
   const _ExpandableTocItem({
     required this.item,
-    required this.padding,
-    required this.depth,
+    this.depth = 0,
     required this.onNavigate,
   });
 
@@ -1377,34 +1364,62 @@ class _ExpandableTocItemState extends State<_ExpandableTocItem> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ListTile(
-          contentPadding: EdgeInsets.only(
-            left: widget.padding,
+        Padding(
+          padding: EdgeInsets.only(
+            left: AppSpacing.md + widget.depth * AppSpacing.md,
             right: AppSpacing.md,
           ),
-          leading: IconButton(
-            icon: Semantics(
-              label: _expanded
-                  ? MaterialLocalizations.of(context).expandedIconTapHint
-                  : MaterialLocalizations.of(context).collapsedIconTapHint,
-              child: Icon(
-                _expanded
-                    ? Icons.keyboard_arrow_down
-                    : Icons.keyboard_arrow_right,
-                size: 20,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox.square(
+                dimension: AppLayout.minTouchTarget,
+                child: widget.item.subItems.isEmpty
+                    ? null
+                    : IconButton(
+                        constraints: const BoxConstraints.tightFor(
+                          width: AppLayout.minTouchTarget,
+                          height: AppLayout.minTouchTarget,
+                        ),
+                        icon: Semantics(
+                          label: _expanded
+                              ? MaterialLocalizations.of(
+                                  context,
+                                ).expandedIconTapHint
+                              : MaterialLocalizations.of(
+                                  context,
+                                ).collapsedIconTapHint,
+                          child: Icon(
+                            _expanded
+                                ? Icons.keyboard_arrow_down
+                                : Icons.keyboard_arrow_right,
+                            size: 20,
+                          ),
+                        ),
+                        onPressed: () => setState(() => _expanded = !_expanded),
+                      ),
               ),
-            ),
-            onPressed: () {
-              setState(() {
-                _expanded = !_expanded;
-              });
-            },
+              Expanded(
+                child: InkWell(
+                  onTap: () => widget.onNavigate(widget.item.fileName),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      minHeight: AppLayout.minTouchTarget,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppSpacing.compact,
+                      ),
+                      child: Text(
+                        widget.item.title,
+                        style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-          title: Text(
-            widget.item.title,
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
-          onTap: () => widget.onNavigate(widget.item.fileName),
         ),
         if (_expanded) ..._buildSubItems(widget.item.subItems),
       ],
@@ -1412,24 +1427,14 @@ class _ExpandableTocItemState extends State<_ExpandableTocItem> {
   }
 
   List<Widget> _buildSubItems(List<TOCItem> items) {
-    return items.map((item) {
-      if (item.subItems.isEmpty) {
-        return ListTile(
-          contentPadding: EdgeInsets.only(
-            left: widget.padding + AppSpacing.md,
-            right: AppSpacing.md,
+    return items
+        .map(
+          (item) => _ExpandableTocItem(
+            item: item,
+            depth: widget.depth + 1,
+            onNavigate: widget.onNavigate,
           ),
-          title: Text(item.title, style: Theme.of(context).textTheme.bodyLarge),
-          onTap: () => widget.onNavigate(item.fileName),
-        );
-      }
-
-      return _ExpandableTocItem(
-        item: item,
-        padding: widget.padding + AppSpacing.md,
-        depth: widget.depth + 1,
-        onNavigate: widget.onNavigate,
-      );
-    }).toList();
+        )
+        .toList();
   }
 }

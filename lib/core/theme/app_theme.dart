@@ -7,7 +7,11 @@ class AppTheme {
   static final ThemeData lightTheme = _build(Brightness.light);
   static final ThemeData darkTheme = _build(Brightness.dark);
 
-  static const _clickCursor = WidgetStatePropertyAll(SystemMouseCursors.click);
+  static final _clickCursor = WidgetStateProperty.resolveWith<MouseCursor>(
+    (states) => states.contains(WidgetState.disabled)
+        ? SystemMouseCursors.basic
+        : SystemMouseCursors.click,
+  );
 
   static const _lightColors = ColorScheme.light(
     primary: Color(0xFFAD5036),
@@ -232,9 +236,17 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: buttonStyle.copyWith(
-          foregroundColor: WidgetStatePropertyAll(colors.onSurface),
-          side: WidgetStatePropertyAll(
-            BorderSide(color: colors.outlineVariant),
+          foregroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.disabled)
+                ? colors.onSurface.withValues(alpha: 0.38)
+                : colors.onSurface,
+          ),
+          side: WidgetStateProperty.resolveWith(
+            (states) => BorderSide(
+              color: states.contains(WidgetState.disabled)
+                  ? colors.onSurface.withValues(alpha: 0.12)
+                  : colors.outlineVariant,
+            ),
           ),
         ),
       ),

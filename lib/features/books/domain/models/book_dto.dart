@@ -8,7 +8,7 @@ abstract class BookDto with _$BookDto {
   const factory BookDto({
     required String id,
     required String title,
-    @Default('Unknown Author') String author,
+    @Default('') String author,
     required String format, // epub, pdf
     String? coverUrl,
     String? fileUrl,

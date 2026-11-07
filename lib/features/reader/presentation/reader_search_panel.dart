@@ -30,59 +30,66 @@ class ReaderSearchPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final media = MediaQuery.of(context);
+    final gutter = AppLayout.pageGutter(context);
     return SafeArea(
       top: false,
       child: Padding(
         padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
         child: SizedBox(
-          height: math.max(
-            0,
-            math.min(620, media.size.height * .78 - media.viewInsets.bottom),
+          height: math.min(
+            620,
+            math.max(0, media.size.height - media.viewInsets.bottom) * .78,
           ),
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: AppLayout.pageGutter(context),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        l10n.readerSearch,
-                        style: Theme.of(context).textTheme.titleLarge,
+          child: CustomScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            slivers: [
+              SliverPadding(
+                padding: EdgeInsets.symmetric(horizontal: gutter),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              l10n.readerSearch,
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: onClose,
+                            icon: Semantics(
+                              label: MaterialLocalizations.of(
+                                context,
+                              ).closeButtonTooltip,
+                              child: const Icon(Icons.close),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    IconButton(
-                      onPressed: onClose,
-                      icon: Semantics(
-                        label: MaterialLocalizations.of(
-                          context,
-                        ).closeButtonTooltip,
-                        child: const Icon(Icons.close),
+                      const SizedBox(height: AppSpacing.sm),
+                      AppSearchField(
+                        controller: textController,
+                        autofocus: true,
+                        hintText: l10n.readerSearchHint,
+                        onChanged: search.updateQuery,
+                        onSubmitted: (_) => onSubmit(),
+                        onSearch: onSubmit,
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                AppSearchField(
-                  controller: textController,
-                  autofocus: true,
-                  hintText: l10n.readerSearchHint,
-                  onChanged: search.updateQuery,
-                  onSubmitted: (_) => onSubmit(),
-                  onSearch: onSubmit,
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Expanded(
-                  child: ListenableBuilder(
-                    listenable: search,
-                    builder: (context, _) => _buildResults(context),
+                      const SizedBox(height: AppSpacing.md),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+              SliverPadding(
+                padding: EdgeInsets.symmetric(horizontal: gutter),
+                sliver: ListenableBuilder(
+                  listenable: search,
+                  builder: (context, _) => _buildResults(context),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -92,19 +99,26 @@ class ReaderSearchPanel extends StatelessWidget {
   Widget _buildResults(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     if (search.isSearching) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: AppSpacing.compact),
-            Text(l10n.readerSearching),
-          ],
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: AppSpacing.compact),
+                Text(l10n.readerSearching),
+              ],
+            ),
+          ),
         ),
       );
     }
     if (search.error != null) {
-      return SingleChildScrollView(
+      return SliverFillRemaining(
+        hasScrollBody: false,
         child: AppEmptyState(
           icon: Icons.search_off,
           title: l10n.readerSearchError,
@@ -116,7 +130,8 @@ class ReaderSearchPanel extends StatelessWidget {
       );
     }
     if (!search.hasSearched) {
-      return SingleChildScrollView(
+      return SliverFillRemaining(
+        hasScrollBody: false,
         child: AppEmptyState(
           icon: Icons.manage_search,
           title: l10n.readerSearchPrompt,
@@ -124,7 +139,8 @@ class ReaderSearchPanel extends StatelessWidget {
       );
     }
     if (search.matches.isEmpty) {
-      return SingleChildScrollView(
+      return SliverFillRemaining(
+        hasScrollBody: false,
         child: AppEmptyState(
           icon: Icons.search_off,
           title: l10n.readerSearchNoResults,
@@ -134,65 +150,62 @@ class ReaderSearchPanel extends StatelessWidget {
         ),
       );
     }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Semantics(
-          liveRegion: true,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-            child: Text(
-              l10n.readerSearchCount(search.matches.length),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+    return SliverMainAxisGroup(
+      slivers: [
+        SliverToBoxAdapter(
+          child: Semantics(
+            liveRegion: true,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+              child: Text(
+                l10n.readerSearchCount(search.matches.length),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
           ),
         ),
-        Expanded(
-          child: ListView.builder(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            itemCount: search.matches.length,
-            itemBuilder: (context, index) {
-              final match = search.matches[index];
-              return ListTile(
-                selected: search.activeIndex == index,
-                selectedTileColor: Colors.transparent,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.sm,
-                  vertical: AppSpacing.xs,
+        SliverList(
+          delegate: SliverChildBuilderDelegate((context, index) {
+            final match = search.matches[index];
+            return ListTile(
+              selected: search.activeIndex == index,
+              selectedTileColor: Colors.transparent,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm,
+                vertical: AppSpacing.xs,
+              ),
+              title: Text(
+                _sectionLabel(l10n, match),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: search.activeIndex == index
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
-                title: Text(
-                  _sectionLabel(l10n, match),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: search.activeIndex == index
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                subtitle: Padding(
-                  padding: const EdgeInsets.only(top: AppSpacing.xs),
-                  child: Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(text: match.excerpt.before),
-                        TextSpan(
-                          text: match.excerpt.text,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontWeight: FontWeight.w500,
-                          ),
+              ),
+              subtitle: Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.xs),
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(text: match.excerpt.before),
+                      TextSpan(
+                        text: match.excerpt.text,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w500,
                         ),
-                        TextSpan(text: match.excerpt.after),
-                      ],
-                    ),
-                    style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      TextSpan(text: match.excerpt.after),
+                    ],
                   ),
+                  style: Theme.of(context).textTheme.bodyMedium,
                 ),
-                onTap: () => onSelect(index),
-              );
-            },
-          ),
+              ),
+              onTap: () => onSelect(index),
+            );
+          }, childCount: search.matches.length),
         ),
       ],
     );

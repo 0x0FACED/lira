@@ -167,7 +167,7 @@ class _DiscoverSearchScreenState extends ConsumerState<DiscoverSearchScreen> {
                   ),
                   Expanded(
                     child: sources.isEmpty
-                        ? SingleChildScrollView(
+                        ? AppScrollableState(
                             child: AppEmptyState(
                               icon: Icons.tune_rounded,
                               title: l10n.discoverNoSources,
@@ -184,7 +184,7 @@ class _DiscoverSearchScreenState extends ConsumerState<DiscoverSearchScreen> {
                             ),
                           )
                         : _query.isEmpty
-                        ? SingleChildScrollView(
+                        ? AppScrollableState(
                             child: AppEmptyState(
                               icon: Icons.search_rounded,
                               title: l10n.discoverSearchPrompt,
@@ -215,10 +215,8 @@ class _DiscoverSearchScreenState extends ConsumerState<DiscoverSearchScreen> {
                                   key: ValueKey('${source.id}:$_query'),
                                   source: source,
                                   query: _query,
+                                  fillRemaining: targets.length == 1,
                                 ),
-                              const SliverToBoxAdapter(
-                                child: SizedBox(height: AppSpacing.md),
-                              ),
                             ],
                           ),
                   ),
@@ -237,15 +235,20 @@ class _SourceSearchSlivers extends ConsumerWidget {
     super.key,
     required this.source,
     required this.query,
+    required this.fillRemaining,
   });
   final DiscoverSource source;
   final String query;
+  final bool fillRemaining;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
     final request = (sourceId: source.id, query: query);
     final results = ref.watch(discoverSearchProvider(request));
+    Widget stateSliver(Widget child) => fillRemaining
+        ? SliverFillRemaining(hasScrollBody: false, child: child)
+        : SliverToBoxAdapter(child: child);
     return SliverMainAxisGroup(
       slivers: [
         SliverToBoxAdapter(
@@ -264,16 +267,10 @@ class _SourceSearchSlivers extends ConsumerWidget {
         results.when(
           data: (items) {
             if (items.isEmpty) {
-              return SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: AppLayout.pageGutter(context),
-                    vertical: AppSpacing.compact,
-                  ),
-                  child: Text(
-                    l10n.discoverNoMaterials,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
+              return stateSliver(
+                AppEmptyState(
+                  icon: Icons.search_off_rounded,
+                  title: l10n.discoverNoMaterials,
                 ),
               );
             }
@@ -297,14 +294,14 @@ class _SourceSearchSlivers extends ConsumerWidget {
               ),
             );
           },
-          loading: () => const SliverToBoxAdapter(
-            child: Padding(
+          loading: () => stateSliver(
+            const Padding(
               padding: EdgeInsets.all(AppSpacing.lg),
-              child: Center(child: DiscoverProgress()),
+              child: Center(child: CircularProgressIndicator()),
             ),
           ),
-          error: (_, __) => SliverToBoxAdapter(
-            child: DiscoverFailure(
+          error: (_, __) => stateSliver(
+            DiscoverFailure(
               message: l10n.discoverSearchError,
               onRetry: () => ref.invalidate(discoverSearchProvider(request)),
             ),

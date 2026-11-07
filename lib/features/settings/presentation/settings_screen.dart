@@ -11,7 +11,6 @@ import '../../../core/widgets/app_components.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../app_update/presentation/app_update_controller.dart';
 import '../../app_update/presentation/app_update_settings_section.dart';
-import '../../auth/domain/providers/auth_provider.dart';
 import '../../local_sync/presentation/local_sync_screen.dart';
 import '../../search/domain/providers/book_source_clients.dart';
 import '../../search/presentation/zlibrary_mirrors_screen.dart';
@@ -28,6 +27,19 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  final _proxyFormKey = GlobalKey<FormState>();
+  final _proxyHostController = TextEditingController();
+  final _proxyPortController = TextEditingController();
+  bool _proxyDraftInitialized = false;
+  bool _proxyDraftEdited = false;
+
+  @override
+  void dispose() {
+    _proxyHostController.dispose();
+    _proxyPortController.dispose();
+    super.dispose();
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -46,7 +58,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final auth = ref.watch(authProvider);
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final l10n = AppLocalizations.of(context)!;
@@ -80,42 +91,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               Icons.person_outline,
                               color: colors.onSurfaceVariant,
                             ),
-                            title: Text(
-                              auth.isLoggedIn
-                                  ? auth.username ?? 'User'
-                                  : auth.isGuest
-                                  ? l10n.guest
-                                  : l10n.notSignedIn,
-                            ),
-                            subtitle: auth.isLoggedIn
-                                ? Text(l10n.signedIn)
-                                : auth.isGuest
-                                ? Text(l10n.guestSyncHint)
-                                : null,
+                            title: Text(l10n.localProfileTitle),
+                            subtitle: Text(l10n.localProfileHint),
                           ),
                         ],
                       ),
                       AppSection(
                         title: l10n.account,
                         children: [
-                          if (!auth.isLoggedIn)
-                            ListTile(
-                              leading: const Icon(Icons.login),
-                              title: Text(l10n.signIn),
-                              trailing: const Icon(Icons.chevron_right),
-                              onTap: () => context.push('/login'),
-                            )
-                          else
-                            ListTile(
-                              leading: Icon(Icons.logout, color: colors.error),
-                              title: Text(
-                                l10n.logout,
-                                style: TextStyle(color: colors.error),
-                              ),
-                              onTap: () async {
-                                await ref.read(authProvider.notifier).logout();
-                              },
-                            ),
+                          ListTile(
+                            leading: const Icon(Icons.info_outline),
+                            title: Text(l10n.serverAccountInfoTitle),
+                            subtitle: Text(l10n.serverAccountInfoHint),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => context.push('/login'),
+                          ),
                         ],
                       ),
                       AppSection(
@@ -220,7 +210,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 Row(
                                   children: [
                                     const Icon(Icons.text_fields),
-                                    const SizedBox(width: AppSpacing.sm),
+                                    const SizedBox(width: AppSpacing.md),
                                     Expanded(
                                       child: Text(
                                         l10n.interfaceFontSize,
@@ -365,6 +355,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final proxyConfig = ref.watch(socks5ConfigProvider);
     final colors = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
+    if (!_proxyDraftInitialized) {
+      _proxyHostController.text = proxyConfig.host;
+      _proxyPortController.text = '${proxyConfig.port}';
+      _proxyDraftInitialized = true;
+    }
+    ref.listen(socks5ConfigProvider, (_, next) {
+      if (_proxyDraftEdited) return;
+      _proxyHostController.text = next.host;
+      _proxyPortController.text = '${next.port}';
+    });
+
+    Future<void> applyProxy() async {
+      if (!_proxyFormKey.currentState!.validate()) return;
+      final host = _proxyHostController.text.trim();
+      final port = int.parse(_proxyPortController.text.trim());
+      final notifier = ref.read(socks5ConfigProvider.notifier);
+      await notifier.setHost(host);
+      await notifier.setPort(port);
+    }
 
     return AppSection(
       title: 'SOCKS5 Proxy',
@@ -379,7 +388,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           title: const Text('SOCKS5 Proxy'),
           subtitle: Text(
             proxyConfig.enabled
-                ? '${proxyConfig.host}:${proxyConfig.port}'
+                ? l10n.proxyAppliedEndpoint(proxyConfig.host, proxyConfig.port)
                 : l10n.proxyDisabled,
           ),
           value: proxyConfig.enabled,
@@ -387,51 +396,61 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ref.read(socks5ConfigProvider.notifier).setEnabled(value);
           },
         ),
-        AppStateTransition(
-          child: proxyConfig.enabled
-              ? Padding(
-                  key: const ValueKey('proxy-fields'),
-                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextFormField(
-                        initialValue: proxyConfig.host,
-                        autocorrect: false,
-                        enableSuggestions: false,
-                        textInputAction: TextInputAction.next,
-                        decoration: InputDecoration(labelText: l10n.proxyHost),
-                        onChanged: (value) {
-                          if (value.isNotEmpty) {
-                            ref
-                                .read(socks5ConfigProvider.notifier)
-                                .setHost(value);
-                          }
-                        },
-                      ),
-                      const SizedBox(height: AppSpacing.compact),
-                      TextFormField(
-                        initialValue: proxyConfig.port.toString(),
-                        keyboardType: TextInputType.number,
-                        textInputAction: TextInputAction.done,
-                        decoration: InputDecoration(labelText: l10n.proxyPort),
-                        onChanged: (value) {
-                          final port = int.tryParse(value);
-                          if (port != null && port > 0 && port <= 65535) {
-                            ref
-                                .read(socks5ConfigProvider.notifier)
-                                .setPort(port);
-                          }
-                        },
-                      ),
-                    ],
+        if (proxyConfig.enabled)
+          Padding(
+            key: const ValueKey('proxy-fields'),
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+            child: Form(
+              key: _proxyFormKey,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextFormField(
+                    controller: _proxyHostController,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    textInputAction: TextInputAction.next,
+                    decoration: InputDecoration(
+                      labelText: l10n.proxyHost,
+                      errorMaxLines: 3,
+                    ),
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? l10n.proxyHostRequired
+                        : null,
+                    onChanged: (_) => _proxyDraftEdited = true,
                   ),
-                )
-              : const SizedBox(
-                  key: ValueKey('proxy-disabled'),
-                  width: double.infinity,
-                ),
-        ),
+                  const SizedBox(height: AppSpacing.compact),
+                  TextFormField(
+                    controller: _proxyPortController,
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.done,
+                    decoration: InputDecoration(
+                      labelText: l10n.proxyPort,
+                      errorMaxLines: 3,
+                    ),
+                    validator: (value) {
+                      final port = int.tryParse(value?.trim() ?? '');
+                      return port == null || port < 1 || port > 65535
+                          ? l10n.proxyPortInvalid
+                          : null;
+                    },
+                    onChanged: (_) => _proxyDraftEdited = true,
+                    onFieldSubmitted: (_) => applyProxy(),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: FilledButton(
+                      onPressed: applyProxy,
+                      child: Text(l10n.save),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -522,11 +541,27 @@ class _ZLibraryLoginDialogState extends ConsumerState<_ZLibraryLoginDialog> {
                         padding: const EdgeInsets.only(top: AppSpacing.compact),
                         child: Semantics(
                           liveRegion: true,
-                          child: Text(
-                            _error!,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.error,
-                            ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                l10n.zLibraryLoginError,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.error,
+                                ),
+                              ),
+                              ExpansionTile(
+                                tilePadding: EdgeInsets.zero,
+                                childrenPadding: EdgeInsets.zero,
+                                title: Text(l10n.zLibraryLoginErrorDetails),
+                                children: [
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: SelectableText(_error!),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
                       )

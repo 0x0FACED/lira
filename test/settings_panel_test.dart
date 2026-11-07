@@ -17,6 +17,7 @@ Future<ProviderContainer> _openSettings(
   Locale locale = const Locale('en'),
   Size size = const Size(1200, 1000),
   Size? panelSize,
+  double textScale = 1,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -36,6 +37,12 @@ Future<ProviderContainer> _openSettings(
       child: MaterialApp(
         locale: locale,
         theme: AppTheme.lightTheme,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
@@ -76,6 +83,37 @@ Future<void> _selectCategory(WidgetTester tester, String label) async {
 }
 
 void main() {
+  for (final width in [360.0, 640.0]) {
+    testWidgets(
+      'enlarged palette controls stack and remain usable at $width pixels',
+      (tester) async {
+        final container = await _openSettings(
+          tester,
+          settings: const ReaderSettings(),
+          size: Size(width, 360),
+          textScale: 1.6,
+        );
+        await _selectCategory(tester, 'Colors');
+        final day = find.widgetWithText(TextButton, 'Day');
+        final paper = find.widgetWithText(TextButton, 'Paper');
+        expect(tester.getRect(day).left, tester.getRect(paper).left);
+        expect(
+          tester.getRect(paper).top,
+          greaterThanOrEqualTo(tester.getRect(day).bottom),
+        );
+        final evening = find.widgetWithText(TextButton, 'Warm evening');
+        await tester.ensureVisible(evening);
+        await tester.tap(evening);
+        await tester.pumpAndSettle();
+        expect(
+          container.read(readerSettingsProvider).backgroundColor,
+          readerThemePalettes.last.backgroundColor,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets('external reset updates every category without reopening', (
     tester,
   ) async {

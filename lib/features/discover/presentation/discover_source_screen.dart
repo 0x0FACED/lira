@@ -163,10 +163,10 @@ class _DiscoverSourceScreenState extends ConsumerState<DiscoverSourceScreen> {
           )
         else
           feed!.when(
-            data: (value) => SliverList(
-              delegate: SliverChildBuilderDelegate((context, index) {
-                if (index == 0) {
-                  return Padding(
+            data: (value) => SliverMainAxisGroup(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
                     padding: EdgeInsets.fromLTRB(
                       AppLayout.pageGutter(context),
                       0,
@@ -181,46 +181,51 @@ class _DiscoverSourceScreenState extends ConsumerState<DiscoverSourceScreen> {
                             ),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
-                  );
-                }
-                if (value.items.isEmpty) {
-                  return AppEmptyState(
-                    icon: Icons.article_outlined,
-                    title: l10n.discoverNoMaterials,
-                  );
-                }
-                final item = value.items[index - 1];
-                return Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    AppLayout.pageGutter(context),
-                    0,
-                    AppLayout.pageGutter(context),
-                    AppSpacing.md,
                   ),
-                  child: DiscoverItemTile(
-                    key: ValueKey(item.id),
-                    item: item,
-                    source: source,
-                    onTap: () => openMaterialDetail(context, item, source),
+                ),
+                if (value.items.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: AppEmptyState(
+                      icon: Icons.article_outlined,
+                      title: l10n.discoverNoMaterials,
+                    ),
+                  )
+                else
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final item = value.items[index];
+                      return Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          AppLayout.pageGutter(context),
+                          0,
+                          AppLayout.pageGutter(context),
+                          AppSpacing.md,
+                        ),
+                        child: DiscoverItemTile(
+                          key: ValueKey(item.id),
+                          item: item,
+                          source: source,
+                          onTap: () =>
+                              openMaterialDetail(context, item, source),
+                        ),
+                      );
+                    }, childCount: value.items.length),
                   ),
-                );
-              }, childCount: value.items.isEmpty ? 2 : value.items.length + 1),
+              ],
             ),
             loading: () => const SliverFillRemaining(
               hasScrollBody: false,
-              child: Center(child: DiscoverProgress()),
+              child: Center(child: CircularProgressIndicator()),
             ),
             error: (_, __) => SliverFillRemaining(
               hasScrollBody: false,
-              child: Center(
-                child: DiscoverFailure(
-                  message: l10n.discoverFeedError,
-                  onRetry: _refresh,
-                ),
+              child: DiscoverFailure(
+                message: l10n.discoverFeedError,
+                onRetry: _refresh,
               ),
             ),
           ),
-        const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.md)),
       ],
     );
     return Scaffold(

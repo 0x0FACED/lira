@@ -7,10 +7,17 @@ import 'book_source_clients.dart';
 
 typedef BookSearchQuery = ({String query, String? sourceId});
 
+class BookSearchFailure {
+  const BookSearchFailure({required this.source, required this.error});
+
+  final DiscoverSource source;
+  final Object error;
+}
+
 class BookSearchResult {
-  const BookSearchResult({this.books = const [], this.errors = const []});
+  const BookSearchResult({this.books = const [], this.failures = const []});
   final List<SearchResultItem> books;
-  final List<String> errors;
+  final List<BookSearchFailure> failures;
 }
 
 final bookSearchProvider = FutureProvider.autoDispose
@@ -51,7 +58,9 @@ final bookSearchProvider = FutureProvider.autoDispose
             }
             return BookSearchResult(books: books);
           } catch (error) {
-            return BookSearchResult(errors: ['${source.name}: $error']);
+            return BookSearchResult(
+              failures: [BookSearchFailure(source: source, error: error)],
+            );
           }
         }),
       );
@@ -64,6 +73,6 @@ final bookSearchProvider = FutureProvider.autoDispose
       }
       return BookSearchResult(
         books: books,
-        errors: [for (final result in results) ...result.errors],
+        failures: [for (final result in results) ...result.failures],
       );
     });

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,6 +13,7 @@ import 'package:lira/features/books/domain/models/book_dto.dart';
 import 'package:lira/features/bookmarks/domain/models/bookmark_dto.dart';
 import 'package:lira/features/highlights/data/repositories/highlights_local_repository.dart';
 import 'package:lira/features/highlights/domain/models/highlight_dto.dart';
+import 'package:lira/features/reader/domain/annotation_tools.dart';
 import 'package:lira/features/reader/presentation/reader_annotations_panel.dart';
 import 'package:lira/l10n/app_localizations.dart';
 
@@ -86,20 +88,31 @@ Finder get _noteField => find.descendant(
   matching: find.byType(TextField),
 );
 
-Widget _app({required ValueChanged<String> onNavigate}) => ProviderScope(
+Widget _app({
+  required ValueChanged<String> onNavigate,
+  TextScaler textScaler = TextScaler.noScaling,
+  Locale locale = const Locale('en'),
+  BookDto? book,
+}) => ProviderScope(
   child: MaterialApp(
-    locale: const Locale('en'),
+    locale: locale,
     theme: AppTheme.lightTheme,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
+    builder: (context, child) => MediaQuery(
+      data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+      child: child!,
+    ),
     home: Builder(
       builder: (context) => Scaffold(
         body: Center(
           child: FilledButton(
             onPressed: () => showAppBottomSheet<void>(
               context: context,
-              builder: (_) =>
-                  ReaderAnnotationsPanel(book: _book, onNavigate: onNavigate),
+              builder: (_) => ReaderAnnotationsPanel(
+                book: book ?? _book,
+                onNavigate: onNavigate,
+              ),
             ),
             child: const Text('Open annotations'),
           ),
@@ -153,6 +166,169 @@ void main() {
   });
 
   tearDown(() => getIt.reset());
+
+  test('exports omit missing author metadata without changing source data', () {
+    const labels = AnnotationExportLabels(
+      title: 'Title',
+      author: 'Author',
+      format: 'Format',
+      bookId: 'Book',
+      sourceAdded: 'Added',
+      exported: 'Exported',
+      annotations: 'Annotations',
+      note: 'Note',
+      color: 'Color',
+      created: 'Created',
+      chapter: 'Chapter',
+      page: 'Page',
+    );
+    for (final author in ['', '   ', 'Unknown Author', ' unknown author ']) {
+      final source = _book.copyWith(author: author);
+      for (final format in AnnotationExportFormat.values) {
+        final exported = exportAnnotations(
+          book: source,
+          annotations: highlights.values.values,
+          format: format,
+          labels: labels,
+          exportedAt: DateTime(2026),
+        );
+        expect(exported, isNot(contains('Author:')));
+        expect(exported, contains('Saved passage'));
+        expect(source.author, author);
+      }
+    }
+    final known = exportAnnotations(
+      book: _book,
+      annotations: highlights.values.values,
+      format: AnnotationExportFormat.text,
+      labels: labels,
+      exportedAt: DateTime(2026),
+    );
+    expect(known, contains('Author: Source author'));
+  });
+
+  testWidgets(
+    'narrow enlarged quotes keep content above independent controls',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final quote =
+          'A saved passage must remain readable across several lines '
+          'without the editing controls squeezing away the words.';
+      highlights.values['highlight'] = highlights.values['highlight']!.copyWith(
+        text: quote,
+        color: '#FFEB3B',
+      );
+      final navigated = <String>[];
+      await tester.pumpWidget(
+        _app(
+          onNavigate: navigated.add,
+          textScaler: const TextScaler.linear(1.6),
+        ),
+      );
+      await tester.tap(find.text('Open annotations'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text(quote));
+      await tester.pumpAndSettle();
+      final paragraph = tester.renderObject<RenderParagraph>(find.text(quote));
+      expect(paragraph.didExceedMaxLines, isFalse);
+      expect(paragraph.size.width, greaterThanOrEqualTo(320));
+      final checkbox = find.byType(Checkbox);
+      await tester.ensureVisible(checkbox);
+      await tester.pumpAndSettle();
+      expect(
+        tester.getTopLeft(checkbox).dy,
+        greaterThanOrEqualTo(tester.getBottomLeft(find.text(quote)).dy),
+      );
+      expect(tester.getSize(checkbox), const Size(48, 48));
+      for (final icon in [
+        Icons.copy_outlined,
+        Icons.edit_note,
+        Icons.delete_outline,
+      ]) {
+        final button = find.widgetWithIcon(IconButton, icon);
+        expect(tester.getSize(button).width, greaterThanOrEqualTo(48));
+        expect(tester.getSize(button).height, greaterThanOrEqualTo(48));
+      }
+      await tester.tap(checkbox);
+      await tester.pumpAndSettle();
+      expect(tester.widget<Checkbox>(checkbox).value, isTrue);
+      expect(navigated, isEmpty);
+      await tester.ensureVisible(find.text(quote));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(quote));
+      expect(navigated, [highlights.values['highlight']!.location]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'keyboard leaves annotation filters and matching actions reachable',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 640);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetViewInsets);
+      await _open(tester);
+      final search = find.byKey(const ValueKey('annotations-search'));
+      await tester.enterText(search, 'Original');
+      tester.view.viewInsets = const FakeViewPadding(bottom: 400);
+      await tester.pumpAndSettle();
+      final copy = find.widgetWithIcon(IconButton, Icons.copy_outlined);
+      await tester.scrollUntilVisible(
+        copy,
+        100,
+        scrollable: find.descendant(
+          of: find.byType(ReaderAnnotationsPanel),
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Scrollable &&
+                widget.axisDirection == AxisDirection.down,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getBottomLeft(copy).dy, lessThanOrEqualTo(240));
+      expect(copy.hitTestable(), findsOneWidget);
+      final noteFilter = find.widgetWithText(FilterChip, 'With note');
+      await tester.ensureVisible(noteFilter);
+      await tester.pumpAndSettle();
+      expect(noteFilter.hitTestable(), findsOneWidget);
+      expect(tester.getBottomLeft(noteFilter).dy, lessThanOrEqualTo(240));
+      await tester.tap(noteFilter);
+      await tester.pumpAndSettle();
+      expect(tester.widget<FilterChip>(noteFilter).selected, isTrue);
+      await tester.ensureVisible(search);
+      await tester.pumpAndSettle();
+      expect(search.hitTestable(), findsOneWidget);
+      expect(tester.getBottomLeft(search).dy, lessThanOrEqualTo(240));
+      expect(highlights.values, hasLength(1));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('localized bookmark percentages retain the original target', (
+    tester,
+  ) async {
+    final navigated = <String>[];
+    await tester.pumpWidget(
+      _app(onNavigate: navigated.add, locale: const Locale('ru')),
+    );
+    await tester.tap(find.text('Open annotations'));
+    await tester.pumpAndSettle();
+    final panel = find.byType(ReaderAnnotationsPanel);
+    final l10n = AppLocalizations.of(tester.element(panel))!;
+    await tester.tap(find.text(l10n.bookmarks));
+    await tester.pumpAndSettle();
+    final position = find.text(l10n.bookmarkPosition('42,5%'));
+    expect(position, findsOneWidget);
+    await tester.tap(position);
+    expect(navigated, [bookmarks.values['bookmark']!.location]);
+    expect(bookmarks.values['bookmark']!.percentage, 42.5);
+  });
 
   testWidgets('tabs separate annotations and preserve opaque navigation', (
     tester,
@@ -215,6 +391,8 @@ void main() {
   ) async {
     highlights.failDeletes = true;
     await _open(tester);
+    await tester.ensureVisible(find.byIcon(Icons.delete_outline));
+    await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.delete_outline));
     await tester.pumpAndSettle();
     expect(find.textContaining('Could not delete highlight:'), findsOneWidget);
@@ -231,6 +409,8 @@ void main() {
     tester,
   ) async {
     await _open(tester);
+    await tester.ensureVisible(find.byIcon(Icons.edit_note));
+    await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.edit_note));
     await tester.pumpAndSettle();
     await tester.enterText(_noteField, 'Changed note');
@@ -272,6 +452,8 @@ void main() {
     'cancel leaves the saved note unchanged through route dismissal',
     (tester) async {
       await _open(tester);
+      await tester.ensureVisible(find.byIcon(Icons.edit_note));
+      await tester.pumpAndSettle();
       await tester.tap(find.byIcon(Icons.edit_note));
       await tester.pumpAndSettle();
       await tester.enterText(_noteField, 'Discarded note');
@@ -330,7 +512,21 @@ void main() {
     await tester.tap(find.text('Clear filters'));
     await tester.pumpAndSettle();
     expect(find.text('Saved passage'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Other passage'),
+      100,
+      scrollable: find.descendant(
+        of: find.byType(ReaderAnnotationsPanel),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Scrollable &&
+              widget.axisDirection == AxisDirection.down,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
     expect(find.text('Other passage'), findsOneWidget);
+    expect(find.text('Other passage').hitTestable(), findsOneWidget);
   });
 
   testWidgets('copying saved quote includes source title and author', (
@@ -352,9 +548,27 @@ void main() {
         null,
       ),
     );
-    await _open(tester);
-    await tester.tap(find.byIcon(Icons.copy_outlined));
-    await tester.pumpAndSettle();
-    expect(copied, 'Saved passage\n\n— Source title — Source author');
+    for (final author in ['Source author', '', 'Unknown Author']) {
+      await tester.pumpWidget(
+        _app(
+          onNavigate: (_) {},
+          book: _book.copyWith(author: author),
+        ),
+      );
+      await tester.tap(find.text('Open annotations'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byIcon(Icons.copy_outlined));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.copy_outlined));
+      await tester.pumpAndSettle();
+      expect(
+        copied,
+        author == 'Source author'
+            ? 'Saved passage\n\n— Source title — Source author'
+            : 'Saved passage\n\n— Source title',
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    }
   });
 }

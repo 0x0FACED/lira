@@ -93,11 +93,17 @@ class _ReaderSettingsWorkspaceState extends State<ReaderSettingsWorkspace> {
               320.0,
               400.0,
             );
+            final keyboardInset = MediaQuery.viewInsetsOf(
+              context,
+            ).bottom.clamp(0.0, constraints.maxHeight).toDouble();
             final panelHeight = math.max(
               0.0,
               math.min(
-                constraints.maxHeight * 0.52,
-                constraints.maxHeight - 160,
+                math.min(
+                  constraints.maxHeight * 0.52,
+                  constraints.maxHeight - 160,
+                ),
+                constraints.maxHeight - keyboardInset,
               ),
             );
             return Stack(
@@ -180,7 +186,7 @@ class _ReaderSettingsWorkspaceState extends State<ReaderSettingsWorkspace> {
                 Positioned(
                   key: const ValueKey('reader-settings-position'),
                   top: sideBySide ? 0 : null,
-                  bottom: 0,
+                  bottom: keyboardInset,
                   left: 0,
                   right: sideBySide ? null : 0,
                   width: sideBySide ? panelWidth : null,
@@ -220,63 +226,78 @@ class _ReaderSettingsWorkspaceState extends State<ReaderSettingsWorkspace> {
                             child: SafeArea(
                               right: !sideBySide,
                               top: sideBySide,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      16,
-                                      4,
-                                      4,
-                                      0,
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            widget.previewOnly
-                                                ? l10n.readerPreviewTitle
-                                                : l10n.readerSettings,
-                                            style: Theme.of(
-                                              context,
-                                            ).textTheme.titleLarge,
-                                          ),
-                                        ),
-                                        IconButton(
-                                          icon: Semantics(
-                                            label: l10n.readerCloseSettings,
-                                            child: const Icon(Icons.close),
-                                          ),
-                                          onPressed: widget.onClose,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  if (!widget.previewOnly)
+                              child: SingleChildScrollView(
+                                key: const PageStorageKey(
+                                  'reader-settings-scroll',
+                                ),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
                                     Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
+                                      padding: const EdgeInsets.fromLTRB(
+                                        16,
+                                        4,
+                                        4,
+                                        0,
                                       ),
-                                      child: SegmentedButton<bool>(
-                                        showSelectedIcon: false,
-                                        segments: [
-                                          ButtonSegment(
-                                            value: false,
-                                            label: Text(l10n.readerCurrentBook),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              widget.previewOnly
+                                                  ? l10n.readerPreviewTitle
+                                                  : l10n.readerSettings,
+                                              style: Theme.of(
+                                                context,
+                                              ).textTheme.titleLarge,
+                                            ),
                                           ),
-                                          ButtonSegment(
-                                            value: true,
-                                            label: Text(l10n.readerPreviewBook),
+                                          IconButton(
+                                            icon: Semantics(
+                                              label: l10n.readerCloseSettings,
+                                              child: const Icon(Icons.close),
+                                            ),
+                                            onPressed: widget.onClose,
                                           ),
                                         ],
-                                        selected: {_sampleSelected},
-                                        onSelectionChanged: (value) => setState(
-                                          () => _sampleSelected = value.single,
-                                        ),
                                       ),
                                     ),
-                                  const Expanded(child: SettingsPanel()),
-                                ],
+                                    if (!widget.previewOnly)
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: AppSpacing.md,
+                                        ),
+                                        child: SingleChildScrollView(
+                                          scrollDirection: Axis.horizontal,
+                                          child: SegmentedButton<bool>(
+                                            showSelectedIcon: false,
+                                            segments: [
+                                              ButtonSegment(
+                                                value: false,
+                                                label: Text(
+                                                  l10n.readerCurrentBook,
+                                                ),
+                                              ),
+                                              ButtonSegment(
+                                                value: true,
+                                                label: Text(
+                                                  l10n.readerPreviewBook,
+                                                ),
+                                              ),
+                                            ],
+                                            selected: {_sampleSelected},
+                                            onSelectionChanged: (value) =>
+                                                setState(
+                                                  () => _sampleSelected =
+                                                      value.single,
+                                                ),
+                                          ),
+                                        ),
+                                      ),
+                                    const SettingsPanel(),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -380,11 +401,32 @@ class _ReaderSampleState extends ConsumerState<_ReaderSample> {
         future: _book,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return Center(child: Text(l10n.readerPreviewError));
+            return Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: AppScrollableState(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Text(
+                    l10n.readerPreviewError,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+              ),
+            );
           }
           final book = snapshot.data;
           if (book == null) {
-            return const Center(child: CircularProgressIndicator());
+            return Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: Center(
+                child: CircularProgressIndicator(
+                  semanticsLabel: l10n.readerPreviewBook,
+                ),
+              ),
+            );
           }
           return SafeArea(
             child: ReaderPageDimming(

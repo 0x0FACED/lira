@@ -70,7 +70,7 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
     await File(file.path).copy(newFilePath);
 
     // Extract cover and metadata
-    String author = 'Unknown Author';
+    String author = '';
     String? coverPath;
     int pageCount = 0;
     int fileSizeBytes = await File(file.path).length();
@@ -79,7 +79,7 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
       try {
         final bytes = await File(newFilePath).readAsBytes();
         final parsed = await EpubParser.parse(bytes);
-        author = parsed.author;
+        author = _authorMetadata(parsed.author);
 
         // Estimate page count based on total characters (~1800 chars/page)
         final totalChars = parsed.chapters.fold<int>(
@@ -370,7 +370,7 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
     }
 
     // Extract cover and metadata dynamically like import
-    String author = book.author;
+    String author = _authorMetadata(book.author);
     String? coverPath;
     int pageCount = 0;
     int fileSizeBytes = await File(newFilePath).length();
@@ -378,7 +378,7 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
     final parsed = downloadedEpub;
     if (parsed != null) {
       if (author.isEmpty) {
-        author = parsed.author;
+        author = _authorMetadata(parsed.author);
       }
       final totalChars = parsed.chapters.fold<int>(
         0,
@@ -486,6 +486,11 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
 
     await _repository.saveBook(newBook);
     state = AsyncData([...currentBooks, newBook]);
+  }
+
+  String _authorMetadata(String value) {
+    final author = value.trim();
+    return author == 'Unknown Author' ? '' : author;
   }
 
   Future<void> updateBook(BookDto updatedBook) async {

@@ -98,8 +98,12 @@ class AnnotationExportLabels {
   final String page;
 }
 
+bool _hasAuthor(BookDto book) =>
+    book.author.trim().isNotEmpty &&
+    book.author.trim().toLowerCase() != 'unknown author';
+
 String attributedQuote(String text, BookDto book) =>
-    '$text\n\n— ${book.title} — ${book.author}';
+    '$text\n\n— ${book.title}${_hasAuthor(book) ? ' — ${book.author}' : ''}';
 
 String exportAnnotations({
   required BookDto book,
@@ -120,7 +124,7 @@ String exportAnnotations({
 
   if (markdown) output.writeln('# ${escape(book.title)}\n');
   metadata(labels.title, book.title);
-  metadata(labels.author, book.author);
+  if (_hasAuthor(book)) metadata(labels.author, book.author);
   metadata(labels.format, book.format.toUpperCase());
   metadata(labels.bookId, book.id);
   metadata(labels.sourceAdded, book.createdAt.toUtc().toIso8601String());

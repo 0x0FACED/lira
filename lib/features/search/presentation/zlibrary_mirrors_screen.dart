@@ -116,6 +116,14 @@ class _ZLibraryMirrorsScreenState extends ConsumerState<ZLibraryMirrorsScreen> {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final busy = _saving || _discovering;
+    final floatingLabelGap =
+        AppSpacing.sm +
+        (MediaQuery.textScalerOf(
+                      context,
+                    ).scale(theme.textTheme.bodyLarge!.fontSize! * 0.75) /
+                    AppSpacing.xs)
+                .ceil() *
+            AppSpacing.xs;
     return Scaffold(
       body: SafeArea(
         child: Align(
@@ -157,7 +165,7 @@ class _ZLibraryMirrorsScreenState extends ConsumerState<ZLibraryMirrorsScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.md),
+                      SizedBox(height: floatingLabelGap),
                       TextField(
                         controller: _controller,
                         enabled: !busy,

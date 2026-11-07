@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_tokens.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../domain/models/book_dto.dart';
+import '../book_labels.dart';
 
 class BookCover extends StatelessWidget {
   const BookCover({super.key, required this.book});
@@ -86,7 +88,7 @@ class TypographicBookCover extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      author.trim(),
+                      bookAuthorLabel(author, AppLocalizations.of(context)!),
                       style: theme.textTheme.bodySmall?.copyWith(
                         fontSize: (constraints.maxWidth * 0.055).clamp(
                           9.0,
@@ -104,7 +106,7 @@ class TypographicBookCover extends StatelessWidget {
                         child: Text(
                           title.trim(),
                           style: theme.textTheme.headlineSmall?.copyWith(
-                            fontSize: (constraints.maxWidth * 0.12).clamp(
+                            fontSize: (constraints.maxWidth * 0.10).clamp(
                               12.0,
                               26.0,
                             ),
@@ -122,7 +124,7 @@ class TypographicBookCover extends StatelessWidget {
                       style: theme.textTheme.labelSmall?.copyWith(
                         fontSize: 9,
                         fontWeight: FontWeight.w400,
-                        letterSpacing: 1.5,
+                        letterSpacing: 0.5,
                       ),
                     ),
                   ],

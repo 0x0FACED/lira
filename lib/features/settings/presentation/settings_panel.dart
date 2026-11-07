@@ -39,56 +39,55 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
             defaultTargetPlatform == TargetPlatform.iOS) &&
         media.size.shortestSide < 600;
 
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.md,
-          AppSpacing.sm,
-          AppSpacing.md,
-          AppSpacing.md,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  for (final category in _SettingsCategory.values) ...[
-                    if (category != _SettingsCategory.values.first)
-                      const SizedBox(width: AppSpacing.sm),
-                    Semantics(
-                      selected: _category == category,
-                      child: TextButton(
-                        onPressed: () => setState(() => _category = category),
-                        child: Text(
-                          _categoryLabel(category, l10n),
-                          style: Theme.of(context).textTheme.labelLarge
-                              ?.copyWith(
-                                color: _category == category
-                                    ? Theme.of(context).colorScheme.primary
-                                    : Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant,
-                              ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final content = SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.sm,
+              AppSpacing.md,
+              AppSpacing.md,
             ),
-            const SizedBox(height: AppSpacing.sm),
-            Flexible(
-              child: SingleChildScrollView(
-                key: PageStorageKey(_category),
-                // Floating field labels paint above the field's layout box.
-                padding: EdgeInsets.only(
-                  top: media.textScaler.scale(AppSpacing.md),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final category in _SettingsCategory.values) ...[
+                        if (category != _SettingsCategory.values.first)
+                          const SizedBox(width: AppSpacing.sm),
+                        Semantics(
+                          selected: _category == category,
+                          child: TextButton(
+                            onPressed: () =>
+                                setState(() => _category = category),
+                            child: Text(
+                              _categoryLabel(category, l10n),
+                              style: Theme.of(context).textTheme.labelLarge
+                                  ?.copyWith(
+                                    color: _category == category
+                                        ? Theme.of(context).colorScheme.primary
+                                        : Theme.of(
+                                            context,
+                                          ).colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-                child: switch (_category) {
+                // Keep floating labels inside the scrolling viewport.
+                SizedBox(
+                  height: AppSpacing.sm + media.textScaler.scale(AppSpacing.md),
+                ),
+                switch (_category) {
                   _SettingsCategory.typography => _typographySettings(
                     settings,
                     l10n,
@@ -100,11 +99,15 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
                   ),
                   _SettingsCategory.colors => _colorSettings(settings, l10n),
                 },
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+        // The workspace supplies one scroll view for its header and controls.
+        return constraints.hasBoundedHeight
+            ? SingleChildScrollView(child: content)
+            : content;
+      },
     );
   }
 
@@ -358,17 +361,24 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
         Text(l10n.readerPalette, style: theme.textTheme.labelLarge),
         const SizedBox(height: AppSpacing.sm),
         LayoutBuilder(
-          builder: (context, constraints) => Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: [
-              for (final palette in readerThemePalettes)
-                SizedBox(
-                  width: (constraints.maxWidth - AppSpacing.sm) / 2,
-                  child: _paletteButton(palette, settings, l10n),
-                ),
-            ],
-          ),
+          builder: (context, constraints) {
+            final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+            final columns = constraints.maxWidth >= 480 * textScale ? 2 : 1;
+            final width =
+                (constraints.maxWidth - AppSpacing.sm * (columns - 1)) /
+                columns;
+            return Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: [
+                for (final palette in readerThemePalettes)
+                  SizedBox(
+                    width: width,
+                    child: _paletteButton(palette, settings, l10n),
+                  ),
+              ],
+            );
+          },
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(

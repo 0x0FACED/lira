@@ -93,6 +93,85 @@ String _pageText(WidgetTester tester) => tester
     .join('\n');
 
 void main() {
+  for (final size in [const Size(360, 360), const Size(640, 360)]) {
+    testWidgets(
+      'short settings scroll all controls without resizing the book at $size',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = size;
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetViewInsets);
+        SharedPreferences.setMockInitialValues({});
+        final prefs = await SharedPreferences.getInstance();
+        var open = true;
+        const bookKey = ValueKey('live-book');
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              readerSettingsProvider.overrideWith(
+                (ref) => ReaderSettingsNotifier(prefs),
+              ),
+            ],
+            child: MaterialApp(
+              theme: AppTheme.lightTheme,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(textScaler: const TextScaler.linear(1.6)),
+                child: child!,
+              ),
+              home: Scaffold(
+                resizeToAvoidBottomInset: false,
+                body: StatefulBuilder(
+                  builder: (context, setState) => ReaderSettingsWorkspace(
+                    isOpen: open,
+                    onOpen: () => setState(() => open = true),
+                    onClose: () => setState(() => open = false),
+                    child: const SizedBox.expand(key: bookKey),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final book = tester.getRect(find.byKey(bookKey));
+        await tester.ensureVisible(find.text('Word hyphenation'));
+        await tester.pumpAndSettle();
+        final hyphenation = find.byType(SwitchListTile);
+        await tester.tap(hyphenation);
+        await tester.pumpAndSettle();
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(ReaderSettingsWorkspace)),
+        );
+        expect(container.read(readerSettingsProvider).hyphenation, isTrue);
+        await tester.ensureVisible(find.text('Colors'));
+        await tester.tap(find.text('Colors'));
+        await tester.pumpAndSettle();
+        final evening = find.widgetWithText(TextButton, 'Warm evening');
+        await tester.ensureVisible(evening);
+        await tester.tap(evening);
+        await tester.pumpAndSettle();
+        expect(tester.getRect(find.byKey(bookKey)), book);
+        tester.view.viewInsets = const FakeViewPadding(bottom: 140);
+        await tester.pumpAndSettle();
+        expect(tester.getRect(find.byKey(bookKey)), book);
+        final close = find.widgetWithIcon(IconButton, Icons.close);
+        await tester.ensureVisible(close);
+        await tester.pumpAndSettle();
+        await tester.tap(close);
+        await tester.pump(const Duration(milliseconds: 90));
+        expect(open, isFalse);
+        expect(tester.getRect(find.byKey(bookKey)), book);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   for (final size in [const Size(390, 844), const Size(1200, 800)]) {
     final wide = size.width >= 760;
     for (final textScale in [1.0, 1.6]) {

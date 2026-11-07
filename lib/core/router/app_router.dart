@@ -63,10 +63,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       if (!auth.isAuthenticated && !isOnLogin) {
         return '/login';
       }
-      // Fully logged-in user (not guest) on login page → go home
-      if (auth.isLoggedIn && isOnLogin) {
-        return '/';
-      }
       return null;
     },
   );

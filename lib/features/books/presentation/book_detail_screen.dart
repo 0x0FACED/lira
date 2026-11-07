@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../../l10n/app_localizations.dart';
 import '../domain/models/book_dto.dart';
 import '../domain/providers/books_provider.dart';
+import 'book_labels.dart';
 import 'widgets/book_cover.dart';
 
 class BookDetailScreen extends ConsumerWidget {
@@ -25,62 +27,68 @@ class BookDetailScreen extends ConsumerWidget {
         book;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.details),
-        leading: MergeSemantics(
-          child: Semantics(
-            label: MaterialLocalizations.of(context).backButtonTooltip,
-            child: BackButton(onPressed: () => context.pop()),
-          ),
-        ),
-      ),
       body: SafeArea(
-        top: false,
         child: SingleChildScrollView(
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(
                 maxWidth: AppLayout.contentMaxWidth,
               ),
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  AppLayout.pageGutter(context),
-                  28,
-                  AppLayout.pageGutter(context),
-                  AppSpacing.lg,
-                ),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final cover = SizedBox(
-                      width: 240,
-                      child: BookCover(book: currentBook),
-                    );
-                    final details = _buildDetails(
-                      context,
-                      ref,
-                      l10n,
-                      currentBook,
-                    );
-                    if (constraints.maxWidth >= 720) {
-                      return Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          cover,
-                          const SizedBox(width: AppSpacing.lg),
-                          Expanded(child: details),
-                        ],
-                      );
-                    }
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Center(child: cover),
-                        const SizedBox(height: AppSpacing.lg),
-                        details,
-                      ],
-                    );
-                  },
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  AppPageHeader(
+                    title: l10n.details,
+                    leading: MergeSemantics(
+                      child: Semantics(
+                        label: MaterialLocalizations.of(
+                          context,
+                        ).backButtonTooltip,
+                        child: BackButton(onPressed: () => context.pop()),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      AppLayout.pageGutter(context),
+                      0,
+                      AppLayout.pageGutter(context),
+                      AppSpacing.lg,
+                    ),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final cover = SizedBox(
+                          width: 240,
+                          child: BookCover(book: currentBook),
+                        );
+                        final details = _buildDetails(
+                          context,
+                          ref,
+                          l10n,
+                          currentBook,
+                        );
+                        if (constraints.maxWidth >= 720) {
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              cover,
+                              const SizedBox(width: AppSpacing.lg),
+                              Expanded(child: details),
+                            ],
+                          );
+                        }
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Center(child: cover),
+                            const SizedBox(height: AppSpacing.lg),
+                            details,
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -111,14 +119,19 @@ class BookDetailScreen extends ConsumerWidget {
             ),
             const SizedBox(width: AppSpacing.sm),
             IconButton(
-              tooltip: l10n.editBook,
-              icon: const Icon(Icons.edit_outlined),
+              icon: Semantics(
+                label: l10n.editBook,
+                child: const Icon(Icons.edit_outlined),
+              ),
               onPressed: () => _showEditDialog(context, ref, l10n, currentBook),
             ),
           ],
         ),
         const SizedBox(height: AppSpacing.sm),
-        Text(currentBook.author, style: theme.textTheme.bodyLarge),
+        Text(
+          bookAuthorLabel(currentBook.author, l10n),
+          style: theme.textTheme.bodyLarge,
+        ),
         const SizedBox(height: AppSpacing.compact),
         AppMetadata(label: currentBook.format.toUpperCase()),
         const SizedBox(height: AppSpacing.lg),
@@ -141,7 +154,7 @@ class BookDetailScreen extends ConsumerWidget {
           context,
           l10n.size,
           currentBook.fileSizeBytes > 0
-              ? _formatBytes(currentBook.fileSizeBytes)
+              ? _formatBytes(currentBook.fileSizeBytes, l10n.localeName)
               : l10n.unknown,
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -156,6 +169,7 @@ class BookDetailScreen extends ConsumerWidget {
           onPressed: () => showAppDialog<void>(
             context: context,
             builder: (dialogContext) => AlertDialog(
+              scrollable: true,
               title: Text(l10n.deleteBook),
               content: Text(l10n.deleteBookConfirm(currentBook.title)),
               actions: [
@@ -188,13 +202,19 @@ class BookDetailScreen extends ConsumerWidget {
     return Text('$label: $value', style: Theme.of(context).textTheme.bodySmall);
   }
 
-  String _formatBytes(int bytes) {
-    if (bytes <= 0) return '0 B';
-    const suffixes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    int i = (bytes.toDouble() / 1024).floor().toString().length ~/ 3;
-    if (i >= suffixes.length) i = suffixes.length - 1;
-    double size = bytes / (1024 * i > 0 ? 1024 * i : 1);
-    return '${size.toStringAsFixed(1)} ${suffixes[i]}';
+  String _formatBytes(int bytes, String locale) {
+    const suffixes = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
+    var size = bytes.toDouble();
+    var unit = 0;
+    while (size >= 1024 && unit < suffixes.length - 1) {
+      size /= 1024;
+      unit++;
+    }
+    final number = NumberFormat.decimalPatternDigits(
+      locale: locale,
+      decimalDigits: 1,
+    ).format(size);
+    return '$number ${suffixes[unit]}';
   }
 
   void _showEditDialog(
@@ -204,7 +224,9 @@ class BookDetailScreen extends ConsumerWidget {
     BookDto currentBook,
   ) {
     var title = currentBook.title;
-    var author = currentBook.author;
+    var author = currentBook.author.trim() == 'Unknown Author'
+        ? ''
+        : currentBook.author;
 
     showAppDialog<void>(
       context: context,
@@ -222,7 +244,7 @@ class BookDetailScreen extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.md),
             TextFormField(
-              initialValue: currentBook.author,
+              initialValue: author,
               onChanged: (value) => author = value,
               decoration: InputDecoration(labelText: l10n.editBookAuthor),
               textCapitalization: TextCapitalization.words,
@@ -242,12 +264,7 @@ class BookDetailScreen extends ConsumerWidget {
                 ref
                     .read(booksControllerProvider.notifier)
                     .updateBook(
-                      currentBook.copyWith(
-                        title: newTitle,
-                        author: newAuthor.isEmpty
-                            ? 'Unknown Author'
-                            : newAuthor,
-                      ),
+                      currentBook.copyWith(title: newTitle, author: newAuthor),
                     );
               }
               Navigator.pop(dialogContext);

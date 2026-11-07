@@ -92,6 +92,14 @@ class _AnnaAccessScreenState extends ConsumerState<AnnaAccessScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+    final floatingLabelGap =
+        AppSpacing.sm +
+        (MediaQuery.textScalerOf(
+                      context,
+                    ).scale(theme.textTheme.bodyLarge!.fontSize! * 0.75) /
+                    AppSpacing.xs)
+                .ceil() *
+            AppSpacing.xs;
     return Scaffold(
       body: SafeArea(
         child: Align(
@@ -123,7 +131,7 @@ class _AnnaAccessScreenState extends ConsumerState<AnnaAccessScreen> {
                         l10n.annaSessionHint,
                         style: theme.textTheme.bodyMedium,
                       ),
-                      const SizedBox(height: AppSpacing.md),
+                      SizedBox(height: floatingLabelGap),
                       DropdownButtonFormField<String>(
                         initialValue: _origin,
                         isExpanded: true,
@@ -171,7 +179,7 @@ class _AnnaAccessScreenState extends ConsumerState<AnnaAccessScreen> {
                         l10n.annaSessionInstructions,
                         style: theme.textTheme.bodySmall,
                       ),
-                      const SizedBox(height: AppSpacing.compact),
+                      SizedBox(height: floatingLabelGap),
                       TextField(
                         controller: _cookies,
                         enabled: !_saving,
@@ -195,7 +203,7 @@ class _AnnaAccessScreenState extends ConsumerState<AnnaAccessScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.compact),
+                      SizedBox(height: floatingLabelGap),
                       TextField(
                         controller: _userAgent,
                         enabled: !_saving,

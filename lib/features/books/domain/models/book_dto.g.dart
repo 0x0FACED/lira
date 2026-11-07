@@ -9,7 +9,7 @@ part of 'book_dto.dart';
 _BookDto _$BookDtoFromJson(Map<String, dynamic> json) => _BookDto(
   id: json['id'] as String,
   title: json['title'] as String,
-  author: json['author'] as String? ?? 'Unknown Author',
+  author: json['author'] as String? ?? '',
   format: json['format'] as String,
   coverUrl: json['coverUrl'] as String?,
   fileUrl: json['fileUrl'] as String?,

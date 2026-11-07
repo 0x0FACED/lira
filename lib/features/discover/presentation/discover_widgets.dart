@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_tokens.dart';
+import '../../../core/widgets/app_components.dart';
 import '../../../l10n/app_localizations.dart';
 import '../domain/discover_item.dart';
 import '../domain/discover_source.dart';
@@ -337,16 +338,19 @@ class DiscoverImage extends StatelessWidget {
         ),
       ),
     );
-    return ColoredBox(
-      color: colors.surfaceContainer,
-      child: item.imageUrl == null
-          ? fallback
-          : Image.network(
-              item.imageUrl.toString(),
-              fit: BoxFit.cover,
-              excludeFromSemantics: true,
-              errorBuilder: (_, __, ___) => fallback,
-            ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      child: ColoredBox(
+        color: colors.surfaceContainer,
+        child: item.imageUrl == null
+            ? fallback
+            : Image.network(
+                item.imageUrl.toString(),
+                fit: BoxFit.cover,
+                excludeFromSemantics: true,
+                errorBuilder: (_, __, ___) => fallback,
+              ),
+      ),
     );
   }
 }
@@ -433,26 +437,13 @@ class DiscoverFailure extends StatelessWidget {
   final VoidCallback onRetry;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.symmetric(
-      horizontal: AppLayout.pageGutter(context),
-      vertical: AppSpacing.md,
-    ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          message,
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        OutlinedButton.icon(
-          onPressed: onRetry,
-          icon: const Icon(Icons.refresh_rounded),
-          label: Text(AppLocalizations.of(context)!.searchRetry),
-        ),
-      ],
+  Widget build(BuildContext context) => AppEmptyState(
+    icon: Icons.cloud_off_outlined,
+    title: message,
+    action: OutlinedButton.icon(
+      onPressed: onRetry,
+      icon: const Icon(Icons.refresh_rounded),
+      label: Text(AppLocalizations.of(context)!.searchRetry),
     ),
   );
 }

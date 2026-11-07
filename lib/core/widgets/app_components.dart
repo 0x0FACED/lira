@@ -49,17 +49,19 @@ class AppPageHeader extends StatelessWidget {
     this.subtitle,
     this.leading,
     this.actions = const [],
+    this.horizontalPadding,
   });
 
   final String title;
   final String? subtitle;
   final Widget? leading;
   final List<Widget> actions;
+  final double? horizontalPadding;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final gutter = AppLayout.pageGutter(context);
+    final gutter = horizontalPadding ?? AppLayout.pageGutter(context);
     return Padding(
       padding: EdgeInsets.fromLTRB(
         gutter,
@@ -67,35 +69,67 @@ class AppPageHeader extends StatelessWidget {
         gutter,
         AppSpacing.md + AppSpacing.xs,
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          if (leading != null) ...[
-            leading!,
-            const SizedBox(width: AppSpacing.sm),
-          ],
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: theme.textTheme.headlineMedium),
-                if (subtitle != null) ...[
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    subtitle!,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final heading = Row(
+            children: [
+              if (leading != null) ...[
+                leading!,
+                const SizedBox(width: AppSpacing.sm),
               ],
-            ),
-          ),
-          if (actions.isNotEmpty) ...[
-            const SizedBox(width: AppSpacing.sm),
-            ...actions,
-          ],
-        ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: theme.textTheme.headlineMedium),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        subtitle!,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          );
+          if (actions.isEmpty) return heading;
+          final actionGroup = Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.xs,
+            alignment: WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: actions,
+          );
+          final compact =
+              constraints.maxWidth <
+              MediaQuery.textScalerOf(context).scale(560);
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                heading,
+                const SizedBox(height: AppSpacing.sm),
+                actionGroup,
+              ],
+            );
+          }
+          return Row(
+            children: [
+              Expanded(child: heading),
+              const SizedBox(width: AppSpacing.sm),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: constraints.maxWidth * 0.45,
+                ),
+                child: actionGroup,
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -140,6 +174,25 @@ class AppSection extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Centers short states in the available viewport, without clipping long ones.
+class AppScrollableState extends StatelessWidget {
+  const AppScrollableState({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => SingleChildScrollView(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          minHeight: constraints.hasBoundedHeight ? constraints.maxHeight : 0,
+        ),
+        child: Center(child: child),
+      ),
+    ),
+  );
 }
 
 class AppEmptyState extends StatelessWidget {

@@ -11,6 +11,7 @@ import 'package:lira/core/theme/app_theme.dart';
 import 'package:lira/features/books/data/repositories/books_local_repository.dart';
 import 'package:lira/features/books/domain/models/book_dto.dart';
 import 'package:lira/features/books/domain/providers/library_layout_provider.dart';
+import 'package:lira/features/books/presentation/book_detail_screen.dart';
 import 'package:lira/features/books/presentation/library_screen.dart';
 import 'package:lira/features/books/presentation/widgets/book_card.dart';
 import 'package:lira/features/progress/data/repositories/reading_progress_local_repository.dart';
@@ -87,6 +88,7 @@ void main() {
     double textScale = 1,
     bool dark = false,
     Locale locale = const Locale('ru'),
+    Widget home = const LibraryScreen(),
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = size;
@@ -106,7 +108,7 @@ void main() {
             ).copyWith(textScaler: TextScaler.linear(textScale)),
             child: child!,
           ),
-          home: const LibraryScreen(),
+          home: home,
         ),
       ),
     );
@@ -146,9 +148,9 @@ void main() {
         of: find.byKey(ValueKey(id)),
         matching: find.text(text),
       );
-      expect(progressFor('0', '42.7%'), findsOneWidget);
-      expect(progressFor('1', '99.9%'), findsOneWidget);
-      expect(progressFor('2', '100.0%'), findsOneWidget);
+      expect(progressFor('0', '42,7%'), findsOneWidget);
+      expect(progressFor('1', '99,9%'), findsOneWidget);
+      expect(progressFor('2', '100,0%'), findsOneWidget);
       expect(
         find.descendant(
           of: find.byKey(const ValueKey('3')),
@@ -167,13 +169,135 @@ void main() {
         await controller.flush();
       });
       await tester.pumpAndSettle();
-      expect(progressFor('0', '100.0%'), findsOneWidget);
-      expect(progressFor('1', '99.9%'), findsOneWidget);
-      await mount(tester);
+      expect(progressFor('0', '100,0%'), findsOneWidget);
+      expect(progressFor('1', '99,9%'), findsOneWidget);
+      await mount(tester, locale: const Locale('en'));
       expect(progressFor('0', '100.0%'), findsOneWidget);
       expect(progressFor('1', '99.9%'), findsOneWidget);
     },
   );
+
+  testWidgets('details use binary file sizes at unit boundaries', (
+    tester,
+  ) async {
+    for (final (bytes, expected) in [
+      (1024, '1.0 KiB'),
+      (1024 * 1024, '1.0 MiB'),
+      (100 * 1024 * 1024, '100.0 MiB'),
+    ]) {
+      await mount(
+        tester,
+        locale: const Locale('en'),
+        home: BookDetailScreen(
+          book: BookDto(
+            id: 'size-$bytes',
+            title: 'File size',
+            author: '',
+            format: 'epub',
+            fileSizeBytes: bytes,
+            createdAt: DateTime(2026),
+          ),
+        ),
+      );
+      expect(find.text('Size: $expected'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }
+  });
+
+  testWidgets('editing absent and legacy authors preserves an empty value', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    try {
+      final repository = getIt<BooksLocalRepository>();
+      for (final author in ['', 'Unknown Author', 'Original author']) {
+        final book = BookDto(
+          id: 'edit-author',
+          title: 'Book without author',
+          author: author,
+          format: 'epub',
+          createdAt: DateTime(2026),
+        );
+        await repository.saveBook(book);
+        await mount(tester, home: BookDetailScreen(book: book));
+        final context = tester.element(find.byType(BookDetailScreen));
+        final l10n = AppLocalizations.of(context)!;
+        await tester.ensureVisible(
+          find.widgetWithIcon(IconButton, Icons.edit_outlined),
+        );
+        await tester.pumpAndSettle();
+        final edit = find.bySemanticsLabel(l10n.editBook);
+        expect(edit, findsOneWidget);
+        await tester.tap(edit);
+        await tester.pumpAndSettle();
+        final authorField = find.byType(TextFormField).last;
+        if (author == 'Original author') {
+          await tester.enterText(authorField, '');
+        } else {
+          expect(
+            tester.widget<TextFormField>(authorField).initialValue,
+            isEmpty,
+          );
+        }
+        await tester.tap(find.widgetWithText(FilledButton, l10n.save));
+        await tester.pumpAndSettle();
+        expect((await repository.getBookById(book.id))!.author, isEmpty);
+        expect(find.text(l10n.bookAuthorUnknown), findsNWidgets(2));
+        expect(tester.takeException(), isNull);
+      }
+    } finally {
+      semantics.dispose();
+    }
+  });
+
+  for (final details in [false, true]) {
+    testWidgets(
+      'long ${details ? 'details' : 'library'} deletion can scroll and cancel',
+      (tester) async {
+        final repository = getIt<BooksLocalRepository>();
+        final book = (await repository.getBookById('0'))!.copyWith(
+          title: List.filled(80, 'Очень длинное название книги').join(' '),
+        );
+        await repository.updateBook(book);
+        await mount(
+          tester,
+          size: const Size(360, 500),
+          textScale: 2,
+          home: details ? BookDetailScreen(book: book) : const LibraryScreen(),
+        );
+        final context = tester.element(
+          find.byType(details ? BookDetailScreen : LibraryScreen),
+        );
+        final l10n = AppLocalizations.of(context)!;
+        if (details) {
+          final delete = find.widgetWithIcon(TextButton, Icons.delete_outline);
+          await tester.ensureVisible(delete);
+          await tester.tap(delete);
+        } else {
+          final card = find.byKey(const ValueKey('0'));
+          await tester.longPressAt(
+            tester.getTopLeft(card) + const Offset(24, 24),
+          );
+        }
+        await tester.pumpAndSettle();
+        final dialog = find.byType(AlertDialog);
+        final scrollable = find.descendant(
+          of: dialog,
+          matching: find.byType(Scrollable),
+        );
+        final scroll = tester.state<ScrollableState>(scrollable);
+        expect(scroll.position.maxScrollExtent, greaterThan(0));
+        await tester.drag(scrollable, const Offset(0, -200));
+        await tester.pumpAndSettle();
+        expect(scroll.position.pixels, greaterThan(0));
+        await tester.tap(find.widgetWithText(TextButton, l10n.cancel));
+        await tester.pumpAndSettle();
+        expect(dialog, findsNothing);
+        expect(await repository.getBookById(book.id), isNotNull);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('density changes preserve search and survive reopening', (
     tester,

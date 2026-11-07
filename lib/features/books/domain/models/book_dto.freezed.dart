@@ -218,7 +218,7 @@ return $default(_that.id,_that.title,_that.author,_that.format,_that.coverUrl,_t
 @JsonSerializable()
 
 class _BookDto implements BookDto {
-  const _BookDto({required this.id, required this.title, this.author = 'Unknown Author', required this.format, this.coverUrl, this.fileUrl, required this.createdAt, this.pageCount = 0, this.fileSizeBytes = 0});
+  const _BookDto({required this.id, required this.title, this.author = '', required this.format, this.coverUrl, this.fileUrl, required this.createdAt, this.pageCount = 0, this.fileSizeBytes = 0});
   factory _BookDto.fromJson(Map<String, dynamic> json) => _$BookDtoFromJson(json);
 
 @override final  String id;
