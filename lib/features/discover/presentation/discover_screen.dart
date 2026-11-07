@@ -68,6 +68,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
               child: DiscoverContent(
                 child: AppPageHeader(
                   title: l10n.discover,
+                  keepActionsInline: true,
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.of(context).push<void>(

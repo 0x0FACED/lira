@@ -58,6 +58,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 SliverToBoxAdapter(
                   child: AppPageHeader(
                     title: l10n.library,
+                    keepActionsInline: true,
                     actions: [
                       if (isPhone)
                         PopupMenuButton<int>(

@@ -50,6 +50,7 @@ class AppPageHeader extends StatelessWidget {
     this.leading,
     this.actions = const [],
     this.horizontalPadding,
+    this.keepActionsInline = false,
   });
 
   final String title;
@@ -57,6 +58,7 @@ class AppPageHeader extends StatelessWidget {
   final Widget? leading;
   final List<Widget> actions;
   final double? horizontalPadding;
+  final bool keepActionsInline;
 
   @override
   Widget build(BuildContext context) {
@@ -81,7 +83,14 @@ class AppPageHeader extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: theme.textTheme.headlineMedium),
+                    Text(
+                      title,
+                      style: theme.textTheme.headlineMedium,
+                      maxLines: keepActionsInline ? 1 : null,
+                      overflow: keepActionsInline
+                          ? TextOverflow.ellipsis
+                          : null,
+                    ),
                     if (subtitle != null) ...[
                       const SizedBox(height: AppSpacing.sm),
                       Text(
@@ -97,6 +106,19 @@ class AppPageHeader extends StatelessWidget {
             ],
           );
           if (actions.isEmpty) return heading;
+          if (keepActionsInline) {
+            return Row(
+              children: [
+                Expanded(child: heading),
+                const SizedBox(width: AppSpacing.sm),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  spacing: AppSpacing.sm,
+                  children: actions,
+                ),
+              ],
+            );
+          }
           final actionGroup = Wrap(
             spacing: AppSpacing.sm,
             runSpacing: AppSpacing.xs,

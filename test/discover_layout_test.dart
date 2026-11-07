@@ -29,7 +29,11 @@ void main() {
     await database.close();
   });
 
-  for (final layout in [(1600.0, 900.0, 1.0), (390.0, 844.0, 1.6)]) {
+  for (final layout in [
+    (1600.0, 900.0, 1.0),
+    (320.0, 740.0, 1.0),
+    (390.0, 844.0, 1.6),
+  ]) {
     testWidgets('loaded mixed shelf fits captions and aligns content at $layout', (
       tester,
     ) async {
@@ -95,6 +99,22 @@ void main() {
       expect(tester.getRect(title).bottom, lessThan(tester.getRect(save).top));
       expect(tester.getRect(save).bottom, lessThanOrEqualTo(bounds.bottom));
       final search = find.byType(AppSearchField);
+      final heading = find.descendant(
+        of: find.byType(AppPageHeader),
+        matching: find.text('Подборка'),
+      );
+      final sources = find.descendant(
+        of: find.byType(AppPageHeader),
+        matching: find.byType(TextButton),
+      );
+      expect(
+        tester.getCenter(heading).dy,
+        closeTo(tester.getCenter(sources).dy, 0.01),
+      );
+      expect(
+        tester.getRect(heading).right,
+        lessThan(tester.getRect(sources).left),
+      );
       expect(bounds.left, closeTo(tester.getRect(search).left, 0.01));
       expect(
         find

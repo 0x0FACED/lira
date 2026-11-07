@@ -341,6 +341,20 @@ void main() {
             );
             expectColumns(tester, columns);
             expect(tester.takeException(), isNull);
+            final heading = find.text('Библиотека');
+            final density = find.byType(PopupMenuButton<int>);
+            final import = find.widgetWithIcon(IconButton, Icons.add);
+            for (final action in [density, import]) {
+              expect(
+                tester.getCenter(action).dy,
+                closeTo(tester.getCenter(heading).dy, 0.01),
+              );
+              expect(
+                tester.getRect(action).left,
+                greaterThan(tester.getRect(heading).right),
+              );
+              expect(action.hitTestable(), findsOneWidget);
+            }
 
             final cards = find.byType(BookCard).evaluate().take(3).toList();
             final coverSizes = <Size>[];
