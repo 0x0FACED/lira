@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Файлы GitHub Release получили единые имена `lira-<platform>-<tag>.<extension>`, например `lira-android-v0.7.2.apk`; Android-клиент обновлений ищет APK с тегом соответствующего релиза. Старые версии приложения обновляются через страницу GitHub Release.
+
 ## [0.7.2] - 2026-11-08
 
 ### Fixed

@@ -53,17 +53,17 @@ Warm light and dark themes, layouts for phones and desktops, and English and Rus
 
 | Your device | Download | Before you open it |
 | --- | --- | --- |
-| **Android** | [APK](https://github.com/0x0FACED/lira/releases/latest/download/app-release.apk) | Install the APK directly on your device. You may need to allow installation from your browser or file manager. |
-| **Windows** | [Windows ZIP](https://github.com/0x0FACED/lira/releases/latest/download/lira-windows.zip) | Extract the archive and launch the app. |
-| **macOS** | [macOS DMG](https://github.com/0x0FACED/lira/releases/latest/download/Lira.dmg) | Requires macOS 11 or later. The app is not Developer ID-signed or notarized; Gatekeeper may require you to allow it in Privacy & Security. |
-| **Linux** | [Linux ZIP](https://github.com/0x0FACED/lira/releases/latest/download/lira-linux.zip) | Extract the archive and run `lira` on a GTK 3 desktop. |
-| **iOS** | [Unsigned IPA](https://github.com/0x0FACED/lira/releases/latest/download/lira-ios-unsigned.ipa) | Sign the IPA with AltStore, Sideloadly, or another signing tool before installation. It is not a TestFlight or App Store download. |
+| **Android** | `lira-android-v<version>.apk` | Install the APK directly on your device. You may need to allow installation from your browser or file manager. |
+| **Windows** | `lira-windows-v<version>.zip` | Extract the archive and launch the app. |
+| **macOS** | `lira-macos-v<version>.dmg` | Requires macOS 11 or later. The app is not Developer ID-signed or notarized; Gatekeeper may require you to allow it in Privacy & Security. |
+| **Linux** | `lira-linux-v<version>.zip` | Extract the archive and run `lira` on a GTK 3 desktop. |
+| **iOS** | `lira-ios-v<version>.ipa` (unsigned) | Sign the IPA with AltStore, Sideloadly, or another signing tool before installation. It is not a TestFlight or App Store download. |
 
 [Browse all releases](https://github.com/0x0FACED/lira/releases) for older builds and the Android App Bundle.
 
 ## Your first chapter
 
-1. **Open Lira and continue as a guest.** You do not need a Lira account to read your own files.
+1. **Open Lira and choose Continue to library.** Reading and local QR sync do not need an account. Server accounts and password sign-in are not available.
 2. **Add a book.** Import an EPUB or PDF, or open **Discover** to search for a title through a supported source.
 3. **Settle in.** Open the book, adjust your EPUB reading settings, and start reading. Your place is saved as you go.
 

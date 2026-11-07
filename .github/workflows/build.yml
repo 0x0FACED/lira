@@ -244,7 +244,7 @@ jobs:
 
           ## Установка
 
-          iOS: `lira-ios-unsigned.ipa` не подписан. Перед установкой подпишите IPA через AltStore, Sideloadly или другой инструмент.
+          iOS: IPA не подписан. Перед установкой подпишите его через AltStore, Sideloadly или другой инструмент.
           macOS: DMG без Developer ID и notarization; возможны ограничения Gatekeeper.
           EOF
 
@@ -254,16 +254,28 @@ jobs:
           path: release-artifacts
           merge-multiple: true
 
+      - name: Name release files
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        working-directory: release-artifacts
+        run: |
+          mv app-release.apk "lira-android-$RELEASE_TAG.apk"
+          mv app-release.aab "lira-android-$RELEASE_TAG.aab"
+          mv lira-linux.zip "lira-linux-$RELEASE_TAG.zip"
+          mv lira-windows.zip "lira-windows-$RELEASE_TAG.zip"
+          mv Lira.dmg "lira-macos-$RELEASE_TAG.dmg"
+          mv lira-ios-unsigned.ipa "lira-ios-$RELEASE_TAG.ipa"
+
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            release-artifacts/app-release.apk
-            release-artifacts/app-release.aab
-            release-artifacts/lira-linux.zip
-            release-artifacts/lira-windows.zip
-            release-artifacts/Lira.dmg
-            release-artifacts/lira-ios-unsigned.ipa
+            release-artifacts/lira-android-${{ github.ref_name }}.apk
+            release-artifacts/lira-android-${{ github.ref_name }}.aab
+            release-artifacts/lira-linux-${{ github.ref_name }}.zip
+            release-artifacts/lira-windows-${{ github.ref_name }}.zip
+            release-artifacts/lira-macos-${{ github.ref_name }}.dmg
+            release-artifacts/lira-ios-${{ github.ref_name }}.ipa
           fail_on_unmatched_files: true
           body_path: ${{ runner.temp }}/release-notes.md
           draft: false

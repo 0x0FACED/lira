@@ -83,34 +83,18 @@ void main() {
     final release = await client.latest();
     expect(release.version.displayVersion, '0.6.4');
     expect(release.releaseUrl, _ReleaseServer.releaseUri('v0.6.4'));
-    expect(release.apk?.name, 'app-release.apk');
+    expect(release.apk?.name, 'lira-android-v0.6.4.apk');
     expect(release.apk?.url, server.assetUri());
     expect(release.apk?.sizeBytes, server.payload.length);
     expect(release.apk?.sha256, sha256.convert(server.payload).toString());
     expect(server.requests, hasLength(1));
   });
 
-  test('parses the published Lira v0.6.4 asset contract', () async {
-    server.assets.single.addAll({
-      'size': 101834736,
-      'browser_download_url':
-          'https://github.com/0x0FACED/lira/releases/download/v0.6.4/app-release.apk',
-      'digest':
-          'sha256:905950354fb13dcbeb954582b7439f7fa5ec06b98c07100dd4d0e4fc210b42fb',
-    });
-    final release = await client.latest();
-    expect(release.version.version, '0.6.4');
-    expect(release.apk?.sizeBytes, 101834736);
-    expect(
-      release.apk?.sha256,
-      '905950354fb13dcbeb954582b7439f7fa5ec06b98c07100dd4d0e4fc210b42fb',
-    );
-  });
-
   test('accepts an optional tag prefix and canonical numeric build', () async {
     for (final tag in ['0.6.4', 'v0.6.4+8']) {
       server.metadata['tag_name'] = tag;
       server.metadata['html_url'] = _ReleaseServer.releaseUri(tag).toString();
+      server.assets.single['name'] = 'lira-android-$tag.apk';
       server.assets.single['browser_download_url'] = server
           .assetUri(tag: tag)
           .toString();
@@ -171,6 +155,8 @@ void main() {
         server.metadata['assets'] = [null, 1],
     'no APK': (server) => server.assets.clear(),
     'wrong APK name': (server) => server.assets.single['name'] = 'other.apk',
+    'wrong APK version': (server) =>
+        server.assets.single['name'] = 'lira-android-v0.6.3.apk',
     'duplicate APK': (server) => server.assets.add({...server.assets.single}),
     'incomplete upload': (server) => server.assets.single['state'] = 'new',
     'invalid asset size': (server) => server.assets.single['size'] = '1024',
@@ -185,14 +171,24 @@ void main() {
     'digest newline': (server) =>
         server.assets.single['digest'] = 'sha256:${'a' * 64}\n',
     'foreign APK host': (server) => server.assets.single['browser_download_url'] =
-        'https://github.com.evil.example/0x0FACED/lira/releases/download/v0.6.4/app-release.apk',
+        'https://github.com.evil.example/0x0FACED/lira/releases/download/v0.6.4/lira-android-v0.6.4.apk',
     'foreign APK repository': (server) =>
         server.assets.single['browser_download_url'] = server.base
-            .resolve('/someone/lira/releases/download/v0.6.4/app-release.apk')
+            .resolve(
+              '/someone/lira/releases/download/v0.6.4/lira-android-v0.6.4.apk',
+            )
             .toString(),
     'different APK tag': (server) =>
         server.assets.single['browser_download_url'] = server
             .assetUri(tag: 'v0.6.3')
+            .toString(),
+    'wrong version in APK URL': (server) =>
+        server.assets.single['browser_download_url'] = server
+            .assetUri()
+            .replace(
+              path:
+                  '/0x0FACED/lira/releases/download/v0.6.4/lira-android-v0.6.3.apk',
+            )
             .toString(),
     'APK credentials': (server) =>
         server.assets.single['browser_download_url'] = server
@@ -375,10 +371,10 @@ void main() {
   final unsafeRedirects = [
     'https://github.com.evil.example/asset.apk',
     'https://release-assets.githubusercontent.com.evil.example/asset.apk',
-    '/someone/lira/releases/download/v0.6.4/app-release.apk',
-    '/0x0FACED/lira/releases/download/v0.6.3/app-release.apk',
+    '/someone/lira/releases/download/v0.6.4/lira-android-v0.6.4.apk',
+    '/0x0FACED/lira/releases/download/v0.6.3/lira-android-v0.6.4.apk',
     'http://secret@127.0.0.1/asset.apk',
-    '/0x0FACED/lira/releases/download/v0.6.4/app-release.apk#other',
+    '/0x0FACED/lira/releases/download/v0.6.4/lira-android-v0.6.4.apk#other',
   ];
   for (final redirect in unsafeRedirects) {
     test(
@@ -534,7 +530,7 @@ class _ReleaseServer {
   _ReleaseServer(this._server) {
     assets = [
       {
-        'name': 'app-release.apk',
+        'name': 'lira-android-v0.6.4.apk',
         'state': 'uploaded',
         'size': payload.length,
         'browser_download_url': assetUri().toString(),
@@ -578,7 +574,7 @@ class _ReleaseServer {
       'releases',
       'download',
       tag,
-      'app-release.apk',
+      'lira-android-$tag.apk',
     ],
   );
 

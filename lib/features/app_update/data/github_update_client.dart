@@ -28,7 +28,7 @@ class GitHubUpdateClient {
   }
 
   static const _repository = ['0x0FACED', 'lira'];
-  static const _apkName = 'app-release.apk';
+  static String _apkName(String tag) => 'lira-android-$tag.apk';
   static const _connectionTimeout = Duration(seconds: 15);
   static const _readTimeout = Duration(seconds: 30);
   static const _metadataLimit = 1024 * 1024;
@@ -84,9 +84,10 @@ class GitHubUpdateClient {
 
   AppUpdateApk? _optionalApk(Object? assets, String tag) {
     if (assets is! List) return null;
+    final apkName = _apkName(tag);
     Map<String, dynamic>? candidate;
     for (final asset in assets) {
-      if (asset is! Map<String, dynamic> || asset['name'] != _apkName) {
+      if (asset is! Map<String, dynamic> || asset['name'] != apkName) {
         continue;
       }
       if (candidate != null) return null;
@@ -110,7 +111,7 @@ class GitHubUpdateClient {
     final uri = Uri.tryParse(url);
     if (uri == null || !_isReleaseAssetUrl(uri, tag)) return null;
     return AppUpdateApk(
-      name: _apkName,
+      name: apkName,
       url: uri,
       sizeBytes: size,
       sha256: checksum.toLowerCase(),
@@ -131,7 +132,7 @@ class GitHubUpdateClient {
     try {
       if (!_isReleaseUrl(release.releaseUrl, tag) ||
           _parseTag(tag).displayVersion != release.version.displayVersion ||
-          apk.name != _apkName ||
+          apk.name != _apkName(tag) ||
           apk.sizeBytes <= 0 ||
           apk.sizeBytes > _apkLimit ||
           !_validDigest(apk.sha256) ||
@@ -222,7 +223,7 @@ class GitHubUpdateClient {
           'releases',
           'download',
           tag,
-          _apkName,
+          _apkName(tag),
         ]);
   }
 
