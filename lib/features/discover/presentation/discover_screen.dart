@@ -51,6 +51,10 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     );
   }
 
+  void _openSources() => Navigator.of(
+    context,
+  ).push<void>(MaterialPageRoute(builder: (_) => const SourcesScreen()));
+
   @override
   Widget build(BuildContext context) {
     if (!_activated) return const SizedBox.shrink();
@@ -66,19 +70,59 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
           slivers: [
             SliverToBoxAdapter(
               child: DiscoverContent(
-                child: AppPageHeader(
-                  title: l10n.discover,
-                  keepActionsInline: true,
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).push<void>(
-                        MaterialPageRoute(
-                          builder: (_) => const SourcesScreen(),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final theme = Theme.of(context);
+                    final colors = theme.colorScheme;
+                    final labelStyle = theme.textTheme.labelLarge;
+                    final painter = TextPainter(
+                      textDirection: Directionality.of(context),
+                      textScaler: MediaQuery.textScalerOf(context),
+                      maxLines: 1,
+                    );
+                    double measure(String text, TextStyle? style) {
+                      painter.text = TextSpan(text: text, style: style);
+                      painter.layout();
+                      return painter.width.ceilToDouble();
+                    }
+
+                    final titleWidth = measure(
+                      l10n.discover,
+                      theme.textTheme.headlineMedium,
+                    );
+                    final actionWidth = math.max(
+                      AppLayout.minTouchTarget,
+                      measure(l10n.discoverSources, labelStyle) +
+                          2 * AppSpacing.compact,
+                    );
+                    painter.dispose();
+                    final availableWidth =
+                        constraints.maxWidth -
+                        2 * AppLayout.pageGutter(context);
+                    return AppPageHeader(
+                      title: l10n.discover,
+                      keepActionsInline:
+                          availableWidth >=
+                          titleWidth + AppSpacing.sm + actionWidth,
+                      actions: [
+                        TextButton(
+                          onPressed: _openSources,
+                          style: TextButton.styleFrom(
+                            foregroundColor: colors.onSurface,
+                            textStyle: labelStyle,
+                            minimumSize: const Size.square(
+                              AppLayout.minTouchTarget,
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.compact,
+                            ),
+                            side: BorderSide(color: colors.outlineVariant),
+                          ),
+                          child: Text(l10n.discoverSources),
                         ),
-                      ),
-                      child: Text(l10n.discoverSources),
-                    ),
-                  ],
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -115,11 +159,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                       : l10n.discoverSearchOnlyHint,
                   action: sources.isEmpty
                       ? OutlinedButton(
-                          onPressed: () => Navigator.of(context).push<void>(
-                            MaterialPageRoute(
-                              builder: (_) => const SourcesScreen(),
-                            ),
-                          ),
+                          onPressed: _openSources,
                           child: Text(l10n.discoverSources),
                         )
                       : OutlinedButton.icon(
@@ -183,11 +223,8 @@ class _SourceShelfState extends ConsumerState<_SourceShelf>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            DiscoverSectionHeading(
-              source: source,
-              subtitle: source.description(
-                Localizations.localeOf(context).languageCode,
-              ),
+            _ShelfHeading(
+              name: source.name,
               onTap: () => Navigator.of(context).push<void>(
                 MaterialPageRoute(
                   builder: (_) => DiscoverSourceScreen(source: source),
@@ -211,26 +248,12 @@ class _SourceShelfState extends ConsumerState<_SourceShelf>
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (value.isStale)
-                      Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          AppLayout.pageGutter(context),
-                          0,
-                          AppLayout.pageGutter(context),
-                          AppSpacing.sm,
-                        ),
-                        child: Text(
-                          '${l10n.discoverCachedFeed}\n${l10n.discoverUpdated(discoverDate(context, value.updatedAt))}',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ),
                     LayoutBuilder(
                       builder: (context, constraints) {
-                        final text = Theme.of(context).textTheme;
+                        final text = Theme.of(context).textTheme.bodyMedium!;
                         final scaler = MediaQuery.textScalerOf(context);
                         final scale =
-                            scaler.scale(text.bodyMedium!.fontSize!) /
-                            text.bodyMedium!.fontSize!;
+                            scaler.scale(text.fontSize!) / text.fontSize!;
                         final cardWidth = math.min(
                           constraints.maxWidth -
                               AppLayout.pageGutter(context) * 2,
@@ -240,54 +263,12 @@ class _SourceShelfState extends ConsumerState<_SourceShelf>
                                 AppLayout.discoverMaxCardTextScale,
                               ),
                         );
-                        double lines(TextStyle style, int count) =>
-                            (scaler.scale(style.fontSize!) *
-                                    (style.height ?? 1))
-                                .ceilToDouble() *
-                            count;
-                        var contentHeight = 0.0;
-                        for (final item in value.items.take(
-                          AppLayout.discoverShelfItemLimit,
-                        )) {
-                          final textFirst =
-                              source.category == DiscoverCategory.documents ||
-                              item.imageUrl == null;
-                          final headingHeight =
-                              lines(
-                                text.titleSmall!,
-                                AppLayout.discoverTitleLines,
-                              ) +
-                              AppSpacing.xs +
-                              (item.documentNumber == null
-                                  ? 0
-                                  : lines(text.bodySmall!, 1) + AppSpacing.xs) +
-                              (item.author.isEmpty
-                                  ? 0
-                                  : lines(text.bodySmall!, 1)) +
-                              (item.publishedAt == null
-                                  ? 0
-                                  : lines(text.bodySmall!, 1));
-                          final branchHeight = textFirst
-                              ? headingHeight +
-                                    (item.summary.isEmpty
-                                        ? 0
-                                        : AppSpacing.sm +
-                                              lines(
-                                                text.bodyMedium!,
-                                                AppLayout.discoverSummaryLines,
-                                              ))
-                              : cardWidth / AppLayout.discoverImageAspectRatio +
-                                    headingHeight;
-                          contentHeight = math.max(contentHeight, branchHeight);
-                        }
-                        final height =
-                            contentHeight +
-                            AppSpacing.compact +
-                            AppSpacing.sm +
-                            math.max(
-                              AppLayout.minTouchTarget,
-                              lines(text.bodySmall!, 1),
-                            );
+                        final height = DiscoverItemCard.shelfHeight(
+                          context,
+                          source,
+                          value.items.take(AppLayout.discoverShelfItemLimit),
+                          cardWidth,
+                        );
                         return DiscoverCarousel(
                           source: source,
                           items: value.items,
@@ -298,6 +279,19 @@ class _SourceShelfState extends ConsumerState<_SourceShelf>
                         );
                       },
                     ),
+                    if (value.isStale)
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          AppLayout.pageGutter(context),
+                          AppSpacing.sm,
+                          AppLayout.pageGutter(context),
+                          0,
+                        ),
+                        child: Text(
+                          '${l10n.discoverCachedFeed}\n${l10n.discoverUpdated(discoverDate(context, value.updatedAt))}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
                   ],
                 );
               },
@@ -312,6 +306,53 @@ class _SourceShelfState extends ConsumerState<_SourceShelf>
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ShelfHeading extends StatelessWidget {
+  const _ShelfHeading({required this.name, required this.onTap});
+
+  final String name;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: AppLayout.pageGutter(context)),
+      child: Column(
+        children: [
+          Divider(height: 1, color: theme.colorScheme.outlineVariant),
+          LayoutBuilder(
+            builder: (context, constraints) => Row(
+              children: [
+                Expanded(
+                  child: Semantics(
+                    header: true,
+                    child: Text(name, style: theme.textTheme.titleLarge),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: constraints.maxWidth * 0.45,
+                  ),
+                  child: TextButton(
+                    onPressed: onTap,
+                    child: Text(
+                      l10n.discoverViewAll,
+                      semanticsLabel: l10n.discoverViewAllFrom(name),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+        ],
       ),
     );
   }

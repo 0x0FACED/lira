@@ -49,6 +49,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get librarySortBy => 'Sort by';
 
   @override
+  String get librarySortAndFilters => 'Sort and filter';
+
+  @override
+  String get libraryClearLabelFilter => 'Clear label filter';
+
+  @override
   String get librarySortAdded => 'Date added';
 
   @override
@@ -102,6 +108,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookTags => 'Tags';
 
   @override
+  String get bookAddLabels => 'Add labels';
+
+  @override
+  String bookPageCountCompact(String count) {
+    return '$count pp.';
+  }
+
+  @override
   String get bookLabelsHint => 'Separate entries with commas or new lines';
 
   @override
@@ -122,6 +136,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settings => 'Settings';
+
+  @override
+  String get settingsReadingAppearance => 'Reading and appearance';
+
+  @override
+  String get settingsAccountsSync => 'Accounts and sync';
+
+  @override
+  String get settingsNetwork => 'Network';
 
   @override
   String get noBooks => 'No books in library';
@@ -167,9 +190,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get account => 'Account';
-
-  @override
-  String get appearance => 'Appearance';
 
   @override
   String get theme => 'Theme';
@@ -303,7 +323,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get zLibraryNotLoggedIn => 'Not logged in to Z-Library';
+  String get zLibraryNotLoggedIn => 'Not signed in';
 
   @override
   String get zLibraryLogout => 'Logout';
@@ -706,6 +726,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get discoverSources => 'Sources';
+
+  @override
+  String get discoverViewAll => 'View all';
+
+  @override
+  String discoverViewAllFrom(String source) {
+    return 'View all publications from $source';
+  }
 
   @override
   String get discoverSearchHint => 'Search books, articles and RFCs';
@@ -1204,11 +1232,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get localSyncTitle => 'Local sync';
 
   @override
-  String get localSyncSettingsAction => 'Sync with another device';
+  String get localSyncSettingsAction => 'QR sync';
 
   @override
   String get localSyncSettingsHint =>
-      'Transfer your library and annotations over local Wi-Fi using a QR code. No account needed.';
+      'Transfer books and reading data over your local network.';
 
   @override
   String get localSyncDescription =>
@@ -1428,14 +1456,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get localProfileHint =>
-      'Books and reading data are stored on this device. Use QR sync to exchange them with another device.';
+      'Books and reading data are stored on this device.';
 
   @override
-  String get serverAccountInfoTitle => 'Server account information';
+  String get serverAccountInfoTitle => 'Server account';
 
   @override
   String get serverAccountInfoHint =>
-      'Server sign-in is not available. Your local library and QR sync do not require an account.';
+      'Sign-in is unavailable. Reading and sync do not require an account.';
 
   @override
   String proxyAppliedEndpoint(String host, int port) {

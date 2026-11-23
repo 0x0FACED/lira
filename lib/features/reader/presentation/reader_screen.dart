@@ -551,6 +551,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
               );
             }
 
+            final chromeTheme = _readerChromeTheme(theme, settings);
             return Scaffold(
               key: _scaffoldKey,
               // The note dialog handles the keyboard; keep the book's pagination
@@ -603,76 +604,41 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                       top: 0,
                       left: 0,
                       right: 0,
-                      child: AnimatedSlide(
-                        duration: AppMotion.duration(context),
-                        curve: chromeVisible
-                            ? AppMotion.curve
-                            : Curves.easeInCubic,
-                        offset: chromeVisible
-                            ? Offset.zero
-                            : const Offset(0, -1),
-                        child: IgnorePointer(
-                          ignoring: !chromeVisible,
-                          child: ExcludeFocus(
-                            excluding: !chromeVisible,
-                            child: AppSurface(
-                              key: const ValueKey('reader-top-bar'),
-                              padding: EdgeInsets.zero,
-                              radius: 0,
-                              child: SafeArea(
-                                bottom: false,
-                                child: Center(
-                                  heightFactor: 1,
-                                  child: ConstrainedBox(
-                                    constraints: const BoxConstraints(
-                                      maxWidth: AppLayout.contentMaxWidth,
-                                      minHeight: AppLayout.minTouchTarget,
+                      child: _ReaderChromeBar(
+                        surfaceKey: const ValueKey('reader-top-bar'),
+                        visible: chromeVisible,
+                        top: true,
+                        theme: chromeTheme,
+                        child: Row(
+                          children: [
+                            IconButton(
+                              tooltip: MaterialLocalizations.of(
+                                context,
+                              ).backButtonTooltip,
+                              icon: const Icon(Icons.arrow_back),
+                              onPressed: _closeReader,
+                            ),
+                            const SizedBox(width: AppSpacing.xs),
+                            Expanded(
+                              child: Text(
+                                widget.book.title,
+                                style: chromeTheme.textTheme.titleLarge
+                                    ?.copyWith(
+                                      fontSize: 17,
+                                      color: chromeTheme.colorScheme.onSurface,
                                     ),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: AppSpacing.md,
-                                        vertical: AppSpacing.xs,
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          IconButton(
-                                            icon: Semantics(
-                                              label: MaterialLocalizations.of(
-                                                context,
-                                              ).backButtonTooltip,
-                                              child: const Icon(
-                                                Icons.arrow_back,
-                                              ),
-                                            ),
-                                            onPressed: _closeReader,
-                                          ),
-                                          const SizedBox(width: AppSpacing.sm),
-                                          Expanded(
-                                            child: Text(
-                                              widget.book.title,
-                                              style:
-                                                  theme.textTheme.titleMedium,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                          const SizedBox(width: AppSpacing.sm),
-                                          IconButton(
-                                            icon: Semantics(
-                                              label: l10n.readerSearch,
-                                              child: const Icon(Icons.search),
-                                            ),
-                                            onPressed: _showSearch,
-                                          ),
-                                          _buildBookmarkAction(bookmarksAsync),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                          ),
+                            const SizedBox(width: AppSpacing.xs),
+                            IconButton(
+                              tooltip: l10n.readerSearch,
+                              icon: const Icon(Icons.search),
+                              onPressed: _showSearch,
+                            ),
+                            _buildBookmarkAction(bookmarksAsync),
+                          ],
                         ),
                       ),
                     ),
@@ -680,157 +646,71 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                       bottom: 0,
                       left: 0,
                       right: 0,
-                      child: AnimatedSlide(
-                        duration: AppMotion.duration(context),
-                        curve: chromeVisible
-                            ? AppMotion.curve
-                            : Curves.easeInCubic,
-                        offset: chromeVisible
-                            ? Offset.zero
-                            : const Offset(0, 1),
-                        child: IgnorePointer(
-                          ignoring: !chromeVisible,
-                          child: ExcludeFocus(
-                            excluding: !chromeVisible,
-                            child: AppSurface(
-                              key: const ValueKey('reader-bottom-bar'),
-                              padding: EdgeInsets.zero,
-                              radius: 0,
-                              child: SafeArea(
-                                top: false,
-                                child: Center(
-                                  heightFactor: 1,
-                                  child: ConstrainedBox(
-                                    constraints: const BoxConstraints(
-                                      maxWidth: AppLayout.contentMaxWidth,
+                      child: _ReaderChromeBar(
+                        surfaceKey: const ValueKey('reader-bottom-bar'),
+                        visible: chromeVisible,
+                        top: false,
+                        theme: chromeTheme,
+                        child: _searchActive && _search != null
+                            ? ReaderSearchNavigation(
+                                search: _search!,
+                                canReturn: _searchHasNavigated,
+                                onOpen: _showSearch,
+                                onMove: _moveSearch,
+                                onReturn: _returnFromSearch,
+                                onFinish: _finishSearch,
+                              )
+                            : Row(
+                                children: [
+                                  IconButton(
+                                    tooltip: l10n.tableOfContents,
+                                    icon: const Icon(
+                                      Icons.format_list_bulleted,
                                     ),
-                                    child: ValueListenableBuilder<_ReaderProgressState>(
-                                      valueListenable: _progressNotifier,
-                                      builder: (context, progressState, _) {
-                                        return Padding(
-                                          padding: const EdgeInsets.fromLTRB(
-                                            AppSpacing.md,
-                                            AppSpacing.sm,
-                                            AppSpacing.md,
-                                            AppSpacing.xs,
-                                          ),
-                                          child: Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              if (_searchActive &&
-                                                  _search != null)
-                                                ReaderSearchNavigation(
-                                                  search: _search!,
-                                                  canReturn:
-                                                      _searchHasNavigated,
-                                                  onOpen: _showSearch,
-                                                  onMove: _moveSearch,
-                                                  onReturn: _returnFromSearch,
-                                                  onFinish: _finishSearch,
-                                                ),
-                                              if (!_searchActive)
-                                                Row(
-                                                  children: [
-                                                    Expanded(
-                                                      child: ClipRRect(
-                                                        borderRadius:
-                                                            BorderRadius.circular(
-                                                              AppRadius.sm,
-                                                            ),
-                                                        child: LinearProgressIndicator(
-                                                          value: progressState
-                                                              .fraction,
-                                                          backgroundColor: colors
-                                                              .surfaceContainerHighest,
-                                                          minHeight:
-                                                              AppSpacing.xs,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    const SizedBox(
-                                                      width: AppSpacing.compact,
-                                                    ),
-                                                    Text(
-                                                      formatReadingPercentage(
-                                                        progressState.fraction *
-                                                            100,
-                                                        l10n.localeName,
-                                                      ),
-                                                      style: theme
-                                                          .textTheme
-                                                          .bodySmall
-                                                          ?.copyWith(
-                                                            color: colors
-                                                                .onSurfaceVariant,
-                                                          ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              if (!_searchActive)
-                                                const SizedBox(
-                                                  height: AppSpacing.xs,
-                                                ),
-                                              if (!_searchActive)
-                                                Wrap(
-                                                  alignment:
-                                                      WrapAlignment.spaceEvenly,
-                                                  crossAxisAlignment:
-                                                      WrapCrossAlignment.center,
-                                                  spacing: AppSpacing.compact,
-                                                  children: [
-                                                    IconButton(
-                                                      icon: Semantics(
-                                                        label: l10n
-                                                            .tableOfContents,
-                                                        child: const Icon(
-                                                          Icons
-                                                              .format_list_bulleted,
-                                                        ),
-                                                      ),
-                                                      onPressed: () =>
-                                                          _scaffoldKey
-                                                              .currentState
-                                                              ?.openDrawer(),
-                                                    ),
-                                                    IconButton(
-                                                      icon: Semantics(
-                                                        label: l10n.annotations,
-                                                        child: const Icon(
-                                                          Icons
-                                                              .collections_bookmark_outlined,
-                                                        ),
-                                                      ),
-                                                      onPressed: () =>
-                                                          _showAnnotationsPanel(
-                                                            context,
-                                                          ),
-                                                    ),
-                                                    IconButton(
-                                                      icon: Semantics(
-                                                        label:
-                                                            l10n.readerSettings,
-                                                        child: const Icon(
-                                                          Icons.settings,
-                                                        ),
-                                                      ),
-                                                      onPressed: () =>
-                                                          _showSettings(
-                                                            context,
-                                                          ),
-                                                    ),
-                                                  ],
-                                                ),
-                                            ],
-                                          ),
-                                        );
-                                      },
-                                    ),
+                                    onPressed: () =>
+                                        _scaffoldKey.currentState?.openDrawer(),
                                   ),
-                                ),
+                                  IconButton(
+                                    tooltip: l10n.annotations,
+                                    icon: const Icon(
+                                      Icons.collections_bookmark_outlined,
+                                    ),
+                                    onPressed: () =>
+                                        _showAnnotationsPanel(context),
+                                  ),
+                                  IconButton(
+                                    tooltip: l10n.readerSettings,
+                                    icon: ExcludeSemantics(
+                                      child: Builder(
+                                        builder: (context) => Text(
+                                          'Aa',
+                                          style: TextStyle(
+                                            fontFamily: 'Lora',
+                                            fontSize: 19,
+                                            fontWeight: FontWeight.w600,
+                                            height: 1,
+                                            color: IconTheme.of(context).color,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    onPressed: () => _showSettings(context),
+                                  ),
+                                  const SizedBox(width: AppSpacing.sm),
+                                  Expanded(
+                                    child:
+                                        ValueListenableBuilder<
+                                          _ReaderProgressState
+                                        >(
+                                          valueListenable: _progressNotifier,
+                                          builder: (context, progress, _) =>
+                                              _ReaderChromeProgress(
+                                                fraction: progress.fraction,
+                                              ),
+                                        ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ),
-                        ),
                       ),
                     ),
                     AnimatedPositioned(
@@ -985,13 +865,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
           locator: location?.locator ?? '',
         );
         final l10n = AppLocalizations.of(context)!;
+        final activeColor = Theme.of(context).colorScheme.primary;
         return IconButton(
-          icon: Semantics(
-            label: current == null ? l10n.addBookmark : l10n.removeBookmark,
-            child: Icon(
-              current == null ? Icons.bookmark_add_outlined : Icons.bookmark,
-            ),
+          tooltip: current == null ? l10n.addBookmark : l10n.removeBookmark,
+          icon: Icon(
+            current == null ? Icons.bookmark_add_outlined : Icons.bookmark,
           ),
+          style: current == null
+              ? null
+              : IconButton.styleFrom(foregroundColor: activeColor),
           onPressed:
               location == null ||
                   location.locator.isEmpty ||
@@ -1330,6 +1212,160 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
           .read(readerSettingsProvider.notifier)
           .flush()
           .catchError((Object _) {}),
+    );
+  }
+}
+
+ThemeData _readerChromeTheme(ThemeData theme, ReaderSettings settings) {
+  final paper = Color.alphaBlend(
+    ReaderPageDimming.shadeFor(settings.brightness),
+    Color(settings.backgroundColor),
+  );
+  final paperLuminance = paper.computeLuminance();
+  bool isReadable(Color color) {
+    final luminance = color.computeLuminance();
+    return (luminance > paperLuminance
+            ? (luminance + 0.05) / (paperLuminance + 0.05)
+            : (paperLuminance + 0.05) / (luminance + 0.05)) >=
+        4.5;
+  }
+
+  // The book may deliberately be low-contrast; controls still need to be legible.
+  final pageInk = Color.alphaBlend(settings.resolvedTextColor, paper);
+  final ink = isReadable(pageInk)
+      ? pageInk
+      : paperLuminance > 0.179
+      ? Colors.black
+      : Colors.white;
+  final softenedInk = Color.lerp(paper, ink, 0.72)!;
+  final muted = isReadable(softenedInk) ? softenedInk : ink;
+  final link = Color.alphaBlend(settings.resolvedLinkColor, paper);
+  final accent = isReadable(link) ? link : ink;
+  final disabled = muted.withValues(alpha: 0.38);
+  return theme.copyWith(
+    colorScheme: theme.colorScheme.copyWith(
+      surface: paper,
+      onSurface: ink,
+      onSurfaceVariant: muted,
+      primary: accent,
+    ),
+    iconButtonTheme: IconButtonThemeData(
+      style: IconButton.styleFrom(
+        foregroundColor: muted,
+        disabledForegroundColor: disabled,
+        minimumSize: const Size.square(AppLayout.minTouchTarget),
+        iconSize: 21,
+      ).merge(theme.iconButtonTheme.style),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: muted,
+        disabledForegroundColor: disabled,
+      ).merge(theme.textButtonTheme.style),
+    ),
+  );
+}
+
+class _ReaderChromeBar extends StatelessWidget {
+  const _ReaderChromeBar({
+    required this.surfaceKey,
+    required this.visible,
+    required this.top,
+    required this.theme,
+    required this.child,
+  });
+
+  final Key surfaceKey;
+  final bool visible;
+  final bool top;
+  final ThemeData theme;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSlide(
+      duration: AppMotion.duration(context),
+      curve: visible ? AppMotion.curve : Curves.easeInCubic,
+      offset: visible ? Offset.zero : Offset(0, top ? -1 : 1),
+      child: IgnorePointer(
+        ignoring: !visible,
+        child: ExcludeFocus(
+          excluding: !visible,
+          child: Theme(
+            data: theme,
+            child: Material(
+              key: surfaceKey,
+              color: theme.colorScheme.surface,
+              child: SafeArea(
+                top: top,
+                bottom: !top,
+                child: Center(
+                  heightFactor: 1,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: AppLayout.contentMaxWidth,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.compact,
+                        vertical: AppSpacing.xs,
+                      ),
+                      child: child,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReaderChromeProgress extends StatelessWidget {
+  const _ReaderChromeProgress({required this.fraction});
+
+  final double fraction;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Flexible(
+          child: SizedBox(
+            width: 56,
+            child: ExcludeSemantics(
+              child: LinearProgressIndicator(
+                value: fraction,
+                color: colors.primary,
+                backgroundColor: colors.onSurface.withValues(alpha: 0.18),
+                minHeight: 2,
+                borderRadius: const BorderRadius.all(Radius.circular(1)),
+                stopIndicatorRadius: 0,
+                trackGap: 0,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Flexible(
+          flex: 2,
+          child: Text(
+            formatReadingPercentage(fraction * 100, l10n.localeName),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colors.onSurfaceVariant,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 }

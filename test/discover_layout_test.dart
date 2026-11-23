@@ -1,5 +1,6 @@
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lira/core/database/app_database.dart';
@@ -108,12 +109,12 @@ void main() {
         matching: find.byType(TextButton),
       );
       expect(
-        tester.getCenter(heading).dy,
-        closeTo(tester.getCenter(sources).dy, 0.01),
+        tester.renderObject<RenderParagraph>(heading).didExceedMaxLines,
+        isFalse,
       );
       expect(
-        tester.getRect(heading).right,
-        lessThan(tester.getRect(sources).left),
+        tester.getRect(heading).overlaps(tester.getRect(sources)),
+        isFalse,
       );
       expect(bounds.left, closeTo(tester.getRect(search).left, 0.01));
       expect(

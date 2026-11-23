@@ -160,18 +160,25 @@ class _DiscoverCarouselState extends State<DiscoverCarousel> {
 
   Widget _edgeControl({required bool previous}) {
     final l10n = MaterialLocalizations.of(context);
+    final colors = Theme.of(context).colorScheme;
+    final scrollSign = Directionality.of(context) == TextDirection.rtl ? -1 : 1;
     // These controls overlay the viewport, rather than shrinking it. Forward
     // horizontal pointer signals here too, so trackpad scrolling works on them.
     return Listener(
       onPointerSignal: (event) {
         if (event is PointerScrollEvent && event.scrollDelta.dx != 0) {
           GestureBinding.instance.pointerSignalResolver.register(event, (_) {
-            _jumpBy(event.scrollDelta.dx);
+            _jumpBy(event.scrollDelta.dx * scrollSign);
           });
         }
       },
-      onPointerPanZoomUpdate: (event) => _jumpBy(-event.panDelta.dx),
+      onPointerPanZoomUpdate: (event) =>
+          _jumpBy(-event.panDelta.dx * scrollSign),
       child: IconButton.filledTonal(
+        style: IconButton.styleFrom(
+          backgroundColor: colors.surfaceContainerHighest,
+          foregroundColor: colors.onSurface,
+        ),
         onPressed: (previous ? _canScrollBack : _canScrollForward)
             ? () => _scrollPage(previous ? -1 : 1)
             : null,
@@ -193,15 +200,16 @@ class _DiscoverCarouselState extends State<DiscoverCarousel> {
       TargetPlatform.windows => true,
       _ => MediaQuery.sizeOf(context).width >= AppLayout.desktopBreakpoint,
     };
+    final forward = Directionality.of(context) == TextDirection.rtl ? -1 : 1;
     return SizedBox(
       height: widget.height,
       child: FocusTraversalGroup(
         child: CallbackShortcuts(
           bindings: {
             const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
-                _focusRelative(-1),
+                _focusRelative(-forward),
             const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
-                _focusRelative(1),
+                _focusRelative(forward),
             const SingleActivator(LogicalKeyboardKey.home): () =>
                 _focusIndex(0),
             const SingleActivator(LogicalKeyboardKey.end): () =>
@@ -249,7 +257,7 @@ class _DiscoverCarouselState extends State<DiscoverCarousel> {
                           foregroundDecoration: _cardFocusNodes[index].hasFocus
                               ? BoxDecoration(
                                   borderRadius: BorderRadius.circular(
-                                    AppRadius.sm,
+                                    AppRadius.md,
                                   ),
                                   border: Border.all(
                                     color: Theme.of(

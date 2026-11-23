@@ -341,17 +341,16 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen> {
                                       child: Column(
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
+                                        spacing: AppSpacing.xs,
                                         children: [
                                           Text(
                                             source.name,
                                             style: theme.textTheme.titleMedium,
                                           ),
-                                          const SizedBox(height: AppSpacing.xs),
                                           Text(
                                             source.description(languageCode),
                                             style: theme.textTheme.bodySmall,
                                           ),
-                                          const SizedBox(height: AppSpacing.xs),
                                           Text(
                                             l10n.discoverSourceTopics(
                                               source.topics

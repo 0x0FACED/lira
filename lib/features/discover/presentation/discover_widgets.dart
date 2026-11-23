@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' show Bidi, DateFormat;
 
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_components.dart';
@@ -225,6 +225,55 @@ class DiscoverItemCard extends StatelessWidget {
     required this.onTap,
   });
 
+  static const _inset = AppSpacing.compact;
+
+  static bool _isTextFirst(DiscoverItem item, DiscoverSource source) =>
+      source.category == DiscoverCategory.documents || item.imageUrl == null;
+
+  static TextStyle _titleStyle(TextTheme text) =>
+      text.titleLarge!.copyWith(fontSize: 18, height: 1.3);
+
+  static double shelfHeight(
+    BuildContext context,
+    DiscoverSource source,
+    Iterable<DiscoverItem> items,
+    double cardWidth,
+  ) {
+    final text = Theme.of(context).textTheme;
+    final scaler = MediaQuery.textScalerOf(context);
+    double lines(TextStyle style, int count) =>
+        (scaler.scale(style.fontSize!) * (style.height ?? 1)).ceilToDouble() *
+        count;
+    final smallLine = lines(text.bodySmall!, 1);
+    final titleHeight = lines(_titleStyle(text), AppLayout.discoverTitleLines);
+    final summaryHeight = lines(
+      text.bodyMedium!,
+      AppLayout.discoverSummaryLines,
+    );
+    final imageHeight =
+        (cardWidth - _inset * 2) / AppLayout.discoverImageAspectRatio;
+    var tallest = 0.0;
+    // The viewport uses the largest caption budget so mixed cards share a
+    // baseline for the save button.
+    for (final item in items) {
+      var height = titleHeight;
+      if (item.documentNumber != null) height += smallLine + AppSpacing.xs;
+      if (item.author.trim().isNotEmpty || item.publishedAt != null) {
+        height += smallLine + AppSpacing.xs;
+      }
+      if (!_isTextFirst(item, source)) {
+        height += imageHeight + AppSpacing.sm;
+      } else if (item.summary.isNotEmpty) {
+        height += summaryHeight + AppSpacing.sm;
+      }
+      if (height > tallest) tallest = height;
+    }
+    final footerHeight = smallLine > AppLayout.minTouchTarget
+        ? smallLine
+        : AppLayout.minTouchTarget;
+    return _inset * 2 + tallest + AppSpacing.xs + footerHeight;
+  }
+
   final DiscoverItem item;
   final DiscoverSource source;
   final VoidCallback onTap;
@@ -232,86 +281,135 @@ class DiscoverItemCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final textFirst =
-        source.category == DiscoverCategory.documents || item.imageUrl == null;
-    return InkWell(
-      onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (!textFirst)
-            AspectRatio(
-              aspectRatio: AppLayout.discoverImageAspectRatio,
-              child: DiscoverImage(item: item, source: source),
-            ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(top: AppSpacing.compact),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (item.documentNumber != null) ...[
-                    Text(
-                      'RFC ${item.documentNumber}',
-                      style: theme.textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                  ],
-                  Text(
-                    item.title,
-                    maxLines: AppLayout.discoverTitleLines,
+    final textFirst = _isTextFirst(item, source);
+    final author = item.author.trim();
+    final publishedAt = item.publishedAt;
+    final date = publishedAt == null
+        ? null
+        : discoverDate(
+            context,
+            publishedAt,
+            monthOnly: item.documentNumber != null,
+          );
+    return Material(
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(_inset),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (!textFirst) ...[
+                AspectRatio(
+                  aspectRatio: AppLayout.discoverImageAspectRatio,
+                  child: DiscoverImage(item: item, source: source),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+              ],
+              if (item.documentNumber != null) ...[
+                Text(
+                  'RFC ${item.documentNumber}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+              ],
+              Text(
+                item.title,
+                maxLines: AppLayout.discoverTitleLines,
+                overflow: TextOverflow.ellipsis,
+                style: _titleStyle(theme.textTheme),
+              ),
+              if (author.isNotEmpty || date != null) ...[
+                const SizedBox(height: AppSpacing.xs),
+                _Byline(author: author, date: date),
+              ],
+              if (textFirst && item.summary.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    item.summary,
+                    maxLines: AppLayout.discoverSummaryLines,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall,
+                    style: theme.textTheme.bodyMedium,
                   ),
-                  const SizedBox(height: AppSpacing.xs),
-                  if (item.author.isNotEmpty)
-                    Text(
-                      item.author,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall,
-                    ),
-                  if (item.publishedAt != null)
-                    Text(
-                      discoverDate(
-                        context,
-                        item.publishedAt!,
-                        monthOnly: item.documentNumber != null,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall,
-                    ),
-                  if (textFirst && item.summary.isNotEmpty) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    Expanded(
-                      child: Text(
-                        item.summary,
-                        maxLines: AppLayout.discoverSummaryLines,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                    ),
-                  ] else
-                    const Spacer(),
-                  const SizedBox(height: AppSpacing.sm),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          item.status ?? source.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.xs),
-                      MaterialSaveButton(item: item),
-                    ],
+                ),
+              ] else
+                const Spacer(),
+              const SizedBox(height: AppSpacing.xs),
+              Row(
+                children: [
+                  Expanded(
+                    child: item.status == null
+                        ? const SizedBox.shrink()
+                        : Padding(
+                            padding: const EdgeInsetsDirectional.only(
+                              end: AppSpacing.xs,
+                            ),
+                            child: Text(
+                              item.status!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ),
                   ),
+                  MaterialSaveButton(item: item),
                 ],
               ),
-            ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Byline extends StatelessWidget {
+  const _Byline({required this.author, required this.date});
+
+  final String author;
+  final String? date;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.bodySmall;
+    Text entry(String value, {TextDirection? direction}) => Text(
+      value,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      textDirection: direction,
+      style: style,
+    );
+    final published = date;
+    if (author.isEmpty) return entry(published!);
+    final name = entry(
+      author,
+      direction: Bidi.detectRtlDirectionality(author)
+          ? TextDirection.rtl
+          : TextDirection.ltr,
+    );
+    if (published == null) {
+      return Align(alignment: AlignmentDirectional.centerStart, child: name);
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) => Row(
+        children: [
+          Flexible(child: name),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+            child: ExcludeSemantics(child: Text('·', style: style)),
+          ),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: constraints.maxWidth * 0.6),
+            child: entry(published),
           ),
         ],
       ),

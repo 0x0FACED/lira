@@ -13,8 +13,8 @@ import '../../app_update/presentation/app_update_controller.dart';
 import '../../app_update/presentation/app_update_settings_section.dart';
 import '../../local_sync/presentation/local_sync_screen.dart';
 import '../../search/domain/providers/book_source_clients.dart';
-import '../../search/presentation/zlibrary_mirrors_screen.dart';
 import '../../search/presentation/anna_access_screen.dart';
+import '../../search/presentation/zlibrary_mirrors_screen.dart';
 
 import '../data/interface_font_scale_provider.dart';
 import 'reader_settings_workspace.dart';
@@ -30,6 +30,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _proxyFormKey = GlobalKey<FormState>();
   final _proxyHostController = TextEditingController();
   final _proxyPortController = TextEditingController();
+  late final _packageInfo = PackageInfo.fromPlatform();
   bool _proxyDraftInitialized = false;
   bool _proxyDraftEdited = false;
 
@@ -58,13 +59,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
     final l10n = AppLocalizations.of(context)!;
-    final themeMode = ref.watch(themeModeProvider);
-    final locale = ref.watch(localeProvider);
-    final interfaceFontScale = ref.watch(interfaceFontScaleProvider);
-    final zLibCredentials = ref.watch(zLibraryCredentialsProvider);
+    final hintStyle = Theme.of(context).textTheme.bodySmall;
 
     return Scaffold(
       body: SafeArea(
@@ -83,260 +79,72 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      AppSection(
-                        title: l10n.profile,
-                        children: [
-                          ListTile(
-                            leading: Icon(
-                              Icons.person_outline,
-                              color: colors.onSurfaceVariant,
-                            ),
-                            title: Text(l10n.localProfileTitle),
-                            subtitle: Text(l10n.localProfileHint),
-                          ),
-                        ],
-                      ),
-                      AppSection(
-                        title: l10n.account,
-                        children: [
-                          ListTile(
-                            leading: const Icon(Icons.info_outline),
-                            title: Text(l10n.serverAccountInfoTitle),
-                            subtitle: Text(l10n.serverAccountInfoHint),
-                            trailing: const Icon(Icons.chevron_right),
-                            onTap: () => context.push('/login'),
-                          ),
-                        ],
-                      ),
-                      AppSection(
-                        title: l10n.localSyncTitle,
-                        children: [
-                          ListTile(
-                            leading: const Icon(Icons.qr_code_rounded),
-                            title: Text(l10n.localSyncSettingsAction),
-                            subtitle: Text(l10n.localSyncSettingsHint),
-                            trailing: const Icon(Icons.chevron_right),
-                            onTap: () => Navigator.of(context).push<void>(
-                              MaterialPageRoute(
-                                builder: (_) => const LocalSyncScreen(),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      AppSection(
-                        title: 'Anna’s Archive',
-                        children: [
-                          ListTile(
-                            leading: const Icon(Icons.key_outlined),
-                            title: Text(l10n.annaSessionTitle),
-                            trailing: const Icon(Icons.chevron_right),
-                            onTap: () => Navigator.of(context).push<void>(
-                              MaterialPageRoute(
-                                builder: (_) => const AnnaAccessScreen(),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      AppSection(
-                        title: l10n.zLibrary,
-                        children: [
-                          ListTile(
-                            leading: const Icon(Icons.dns_outlined),
-                            title: Text(l10n.zLibraryMirrors),
-                            subtitle: Text(l10n.zLibraryMirrorsSettingsHint),
-                            trailing: const Icon(Icons.chevron_right),
-                            onTap: () => Navigator.of(context).push<void>(
-                              MaterialPageRoute(
-                                builder: (_) => const ZLibraryMirrorsScreen(),
-                              ),
-                            ),
-                          ),
-                          ListTile(
-                            leading: Icon(
-                              Icons.library_books_outlined,
-                              color: zLibCredentials != null
-                                  ? colors.primary
-                                  : colors.onSurfaceVariant,
-                            ),
-                            title: Text(
-                              zLibCredentials != null
-                                  ? l10n.zLibraryLoggedIn(zLibCredentials.email)
-                                  : l10n.zLibraryNotLoggedIn,
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: AppSpacing.sm,
-                            ),
-                            child: SizedBox(
-                              width: double.infinity,
-                              child: zLibCredentials != null
-                                  ? OutlinedButton.icon(
-                                      onPressed: () {
-                                        ref
-                                            .read(
-                                              zLibraryCredentialsProvider
-                                                  .notifier,
-                                            )
-                                            .clearCredentials();
-                                      },
-                                      icon: const Icon(Icons.logout),
-                                      label: Text(l10n.zLibraryLogout),
-                                    )
-                                  : FilledButton(
-                                      onPressed: () => showAppDialog<void>(
-                                        context: context,
-                                        builder: (_) =>
-                                            const _ZLibraryLoginDialog(),
-                                      ),
-                                      child: Text(l10n.signIn),
-                                    ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      AppSection(
-                        title: l10n.appearance,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: AppSpacing.compact,
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Icon(Icons.text_fields),
-                                    const SizedBox(width: AppSpacing.md),
-                                    Expanded(
-                                      child: Text(
-                                        l10n.interfaceFontSize,
-                                        style: theme.textTheme.titleMedium,
-                                      ),
-                                    ),
-                                  ],
+                      _buildAppearance(context, l10n),
+                      _SettingsGroup(
+                        title: l10n.settingsAccountsSync,
+                        cards: [
+                          _SettingsCard(
+                            children: [
+                              ListTile(
+                                leading: const Icon(Icons.devices_outlined),
+                                title: Text(l10n.localProfileTitle),
+                                subtitle: Text(
+                                  l10n.localProfileHint,
+                                  style: hintStyle,
                                 ),
-                                const SizedBox(height: AppSpacing.xs),
-                                Text(
-                                  l10n.interfaceFontSizeHint,
-                                  style: theme.textTheme.bodySmall,
+                              ),
+                              ListTile(
+                                leading: const Icon(Icons.qr_code_rounded),
+                                title: Text(l10n.localSyncSettingsAction),
+                                subtitle: Text(
+                                  l10n.localSyncSettingsHint,
+                                  style: hintStyle,
                                 ),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: Semantics(
-                                    label: l10n.interfaceFontSize,
-                                    child: DropdownButton<int>(
-                                      value: interfaceFontScale,
-                                      itemHeight: null,
-                                      underline: const SizedBox.shrink(),
-                                      onChanged: (value) {
-                                        if (value != null) {
-                                          ref
-                                              .read(
-                                                interfaceFontScaleProvider
-                                                    .notifier,
-                                              )
-                                              .setPercent(value);
-                                        }
-                                      },
-                                      items: [
-                                        for (final percent
-                                            in interfaceFontScaleOptions)
-                                          DropdownMenuItem(
-                                            value: percent,
-                                            child: Text('$percent%'),
-                                          ),
-                                      ],
-                                    ),
+                                trailing: const Icon(Icons.chevron_right),
+                                onTap: () => Navigator.of(context).push<void>(
+                                  MaterialPageRoute(
+                                    builder: (_) => const LocalSyncScreen(),
                                   ),
                                 ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.sm),
-                          ListTile(
-                            leading: const Icon(Icons.menu_book_outlined),
-                            title: Text(l10n.readerCustomize),
-                            trailing: const Icon(Icons.chevron_right),
-                            onTap: () => Navigator.of(context).push<void>(
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    const ReaderCustomizationScreen(),
                               ),
-                            ),
+                            ],
                           ),
-                          SwitchListTile(
-                            secondary: Icon(
-                              themeMode == ThemeMode.dark
-                                  ? Icons.dark_mode_outlined
-                                  : Icons.light_mode_outlined,
-                            ),
-                            title: Text(l10n.theme),
-                            subtitle: Text(
-                              themeMode == ThemeMode.dark
-                                  ? l10n.themeDark
-                                  : l10n.themeLight,
-                            ),
-                            value: themeMode == ThemeMode.dark,
-                            onChanged: (_) {
-                              ref.read(themeModeProvider.notifier).toggle();
-                            },
-                          ),
-                          ListTile(
-                            leading: const Icon(Icons.language),
-                            title: Text(l10n.language),
-                            subtitle: Text(
-                              locale.languageCode == 'ru'
-                                  ? 'Русский'
-                                  : 'English',
-                            ),
-                            trailing: const Icon(Icons.chevron_right),
-                            onTap: () => showAppDialog<void>(
-                              context: context,
-                              builder: (dialogContext) => SimpleDialog(
-                                title: Text(l10n.language),
-                                children: [
-                                  for (final language in const [
-                                    ('en', 'English'),
-                                    ('ru', 'Русский'),
-                                  ])
-                                    ListTile(
-                                      leading: Icon(
-                                        locale.languageCode == language.$1
-                                            ? Icons.radio_button_checked
-                                            : Icons.radio_button_unchecked,
-                                      ),
-                                      title: Text(language.$2),
-                                      onTap: () {
-                                        ref
-                                            .read(localeProvider.notifier)
-                                            .setLocale(language.$1);
-                                        Navigator.pop(dialogContext);
-                                      },
-                                    ),
-                                ],
+                          _SettingsCard(
+                            children: [
+                              ListTile(
+                                leading: const Icon(Icons.person_outline),
+                                title: Text(l10n.serverAccountInfoTitle),
+                                subtitle: Text(
+                                  l10n.serverAccountInfoHint,
+                                  style: hintStyle,
+                                ),
+                                trailing: const Icon(Icons.chevron_right),
+                                onTap: () => context.push('/login'),
                               ),
-                            ),
+                            ],
                           ),
                         ],
                       ),
-                      _buildProxySection(context, ref),
+                      _buildSources(context, l10n),
+                      _SettingsGroup(
+                        title: l10n.settingsNetwork,
+                        cards: [_buildProxyCard(context, ref)],
+                      ),
                       const AppUpdateSettingsSection(),
-                      AppSection(
+                      _SettingsGroup(
                         title: l10n.about,
-                        children: [
-                          FutureBuilder<PackageInfo>(
-                            future: PackageInfo.fromPlatform(),
-                            builder: (context, snapshot) => ListTile(
-                              leading: const Icon(Icons.info_outline),
-                              title: Text(l10n.version),
-                              subtitle: AppMetadata(
-                                label: snapshot.data?.version ?? '—',
+                        cards: [
+                          _SettingsCard(
+                            children: [
+                              FutureBuilder<PackageInfo>(
+                                future: _packageInfo,
+                                builder: (context, snapshot) => ListTile(
+                                  leading: const Icon(Icons.info_outline),
+                                  title: Text(l10n.version),
+                                  subtitle: Text(snapshot.data?.version ?? '—'),
+                                ),
                               ),
-                            ),
+                            ],
                           ),
                         ],
                       ),
@@ -351,9 +159,242 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildProxySection(BuildContext context, WidgetRef ref) {
+  Widget _buildAppearance(BuildContext context, AppLocalizations l10n) {
+    final isDark = ref.watch(themeModeProvider) == ThemeMode.dark;
+    final locale = ref.watch(localeProvider);
+    final interfaceFontScale = ref.watch(interfaceFontScaleProvider);
+    final theme = Theme.of(context);
+    final valueStyle = theme.textTheme.labelLarge?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+    final textScale = MediaQuery.textScalerOf(context).scale(16) / 16;
+
+    return _SettingsGroup(
+      title: l10n.settingsReadingAppearance,
+      cards: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            // Leave enough room for the row title when text is enlarged.
+            final inline = constraints.maxWidth >= 340 * textScale;
+            return _SettingsCard(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.menu_book_outlined),
+                  title: Text(l10n.readerCustomize),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push<void>(
+                    MaterialPageRoute(
+                      builder: (_) => const ReaderCustomizationScreen(),
+                    ),
+                  ),
+                ),
+                SwitchListTile(
+                  secondary: Icon(
+                    isDark
+                        ? Icons.dark_mode_outlined
+                        : Icons.light_mode_outlined,
+                  ),
+                  title: _SettingValue(
+                    label: l10n.theme,
+                    inline: inline,
+                    value: Text(
+                      isDark ? l10n.themeDark : l10n.themeLight,
+                      style: valueStyle,
+                      textAlign: TextAlign.end,
+                    ),
+                  ),
+                  value: isDark,
+                  onChanged: (_) =>
+                      ref.read(themeModeProvider.notifier).toggle(),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.language),
+                  title: _SettingValue(
+                    label: l10n.language,
+                    inline: inline,
+                    value: Text(
+                      locale.languageCode == 'ru' ? 'Русский' : 'English',
+                      style: valueStyle,
+                      textAlign: TextAlign.end,
+                    ),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => showAppDialog<void>(
+                    context: context,
+                    builder: (dialogContext) => SimpleDialog(
+                      titlePadding: const EdgeInsets.only(top: AppSpacing.lg),
+                      title: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                        ),
+                        child: Text(l10n.language),
+                      ),
+                      children: [
+                        for (final language in const [
+                          ('en', 'English'),
+                          ('ru', 'Русский'),
+                        ])
+                          ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                            ),
+                            leading: Icon(
+                              locale.languageCode == language.$1
+                                  ? Icons.radio_button_checked
+                                  : Icons.radio_button_unchecked,
+                            ),
+                            title: Text(language.$2),
+                            selected: locale.languageCode == language.$1,
+                            onTap: () {
+                              ref
+                                  .read(localeProvider.notifier)
+                                  .setLocale(language.$1);
+                              Navigator.pop(dialogContext);
+                            },
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.text_fields),
+                  title: _SettingValue(
+                    label: l10n.interfaceFontSize,
+                    hint: l10n.interfaceFontSizeHint,
+                    inline: inline,
+                    value: Semantics(
+                      label: l10n.interfaceFontSize,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          minWidth: AppLayout.minTouchTarget,
+                          minHeight: AppLayout.minTouchTarget,
+                        ),
+                        child: DropdownButton<int>(
+                          value: interfaceFontScale,
+                          style: valueStyle,
+                          itemHeight: null,
+                          underline: const SizedBox.shrink(),
+                          onChanged: (value) {
+                            if (value != null) {
+                              ref
+                                  .read(interfaceFontScaleProvider.notifier)
+                                  .setPercent(value);
+                            }
+                          },
+                          items: [
+                            for (final percent in interfaceFontScaleOptions)
+                              DropdownMenuItem(
+                                value: percent,
+                                child: Text('$percent%'),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSources(BuildContext context, AppLocalizations l10n) {
+    final credentials = ref.watch(zLibraryCredentialsProvider);
+    final theme = Theme.of(context);
+    final hintStyle = theme.textTheme.bodySmall;
+    final textScale = MediaQuery.textScalerOf(context).scale(16) / 16;
+    final accountAction = credentials == null
+        ? FilledButton.tonal(
+            style: FilledButton.styleFrom(
+              backgroundColor: theme.colorScheme.surfaceContainerHigh,
+              foregroundColor: theme.colorScheme.onSurface,
+            ),
+            onPressed: () => showAppDialog<void>(
+              context: context,
+              builder: (_) => const _ZLibraryLoginDialog(),
+            ),
+            child: Text(l10n.signIn),
+          )
+        : OutlinedButton.icon(
+            onPressed: () => ref
+                .read(zLibraryCredentialsProvider.notifier)
+                .clearCredentials(),
+            icon: const Icon(Icons.logout),
+            label: Text(l10n.zLibraryLogout),
+          );
+
+    return _SettingsGroup(
+      title: l10n.discoverSources,
+      cards: [
+        _SettingsCard(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.key_outlined),
+              title: Text(l10n.annaSessionTitle),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(builder: (_) => const AnnaAccessScreen()),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.dns_outlined),
+              title: Text(l10n.zLibraryMirrors),
+              subtitle: Text(
+                l10n.zLibraryMirrorsSettingsHint,
+                style: hintStyle,
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => const ZLibraryMirrorsScreen(),
+                ),
+              ),
+            ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final inline = constraints.maxWidth >= 360 * textScale;
+                final account = ListTile(
+                  leading: const Icon(Icons.library_books_outlined),
+                  title: Text(l10n.zLibrary),
+                  subtitle: Text(
+                    credentials == null
+                        ? l10n.zLibraryNotLoggedIn
+                        : l10n.zLibraryLoggedIn(credentials.email),
+                    style: hintStyle,
+                  ),
+                  trailing: inline ? accountAction : null,
+                );
+                if (inline) return account;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    account,
+                    Padding(
+                      padding: const EdgeInsetsDirectional.only(
+                        end: AppSpacing.md,
+                        bottom: AppSpacing.sm,
+                      ),
+                      child: Align(
+                        alignment: AlignmentDirectional.centerEnd,
+                        child: accountAction,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProxyCard(BuildContext context, WidgetRef ref) {
     final proxyConfig = ref.watch(socks5ConfigProvider);
-    final colors = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     if (!_proxyDraftInitialized) {
       _proxyHostController.text = proxyConfig.host;
@@ -375,16 +416,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       await notifier.setPort(port);
     }
 
-    return AppSection(
-      title: 'SOCKS5 Proxy',
+    return _SettingsCard(
       children: [
         SwitchListTile(
-          secondary: Icon(
-            Icons.vpn_lock_outlined,
-            color: proxyConfig.enabled
-                ? colors.primary
-                : colors.onSurfaceVariant,
-          ),
+          secondary: const Icon(Icons.vpn_lock_outlined),
           title: const Text('SOCKS5 Proxy'),
           subtitle: Text(
             proxyConfig.enabled
@@ -399,7 +434,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         if (proxyConfig.enabled)
           Padding(
             key: const ValueKey('proxy-fields'),
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.sm,
+              AppSpacing.md,
+              AppSpacing.compact,
+            ),
             child: Form(
               key: _proxyFormKey,
               autovalidateMode: AutovalidateMode.onUserInteraction,
@@ -441,7 +481,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Align(
-                    alignment: Alignment.centerRight,
+                    alignment: AlignmentDirectional.centerEnd,
                     child: FilledButton(
                       onPressed: applyProxy,
                       child: Text(l10n.save),
@@ -451,6 +491,111 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
           ),
+      ],
+    );
+  }
+}
+
+class _SettingsGroup extends StatelessWidget {
+  const _SettingsGroup({required this.title, required this.cards});
+
+  final String title;
+  final List<Widget> cards;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: AppSpacing.sm,
+        children: [
+          Semantics(
+            header: true,
+            child: Text(title, style: Theme.of(context).textTheme.titleLarge),
+          ),
+          ...cards,
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingsCard extends StatelessWidget {
+  const _SettingsCard({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return AppSurface(
+      color: colors.surfaceContainerLow,
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+      radius: AppRadius.md,
+      child: ListTileTheme.merge(
+        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var index = 0; index < children.length; index++) ...[
+              if (index > 0)
+                Divider(
+                  height: 1,
+                  indent: AppSpacing.md,
+                  endIndent: AppSpacing.md,
+                  color: colors.outlineVariant,
+                ),
+              children[index],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingValue extends StatelessWidget {
+  const _SettingValue({
+    required this.label,
+    required this.inline,
+    required this.value,
+    this.hint,
+  });
+
+  final String label;
+  final bool inline;
+  final Widget value;
+  final String? hint;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = hint == null
+        ? Text(label)
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label),
+              const SizedBox(height: AppSpacing.xs),
+              Text(hint!, style: Theme.of(context).textTheme.bodySmall),
+            ],
+          );
+
+    if (inline) {
+      return Row(
+        children: [
+          Expanded(child: title),
+          const SizedBox(width: AppSpacing.compact),
+          value,
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        title,
+        Align(alignment: AlignmentDirectional.centerEnd, child: value),
       ],
     );
   }

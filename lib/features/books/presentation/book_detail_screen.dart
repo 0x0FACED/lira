@@ -107,23 +107,24 @@ class BookDetailScreen extends ConsumerWidget {
                           _BookIdentity(book: currentBook),
                           const SizedBox(height: AppSpacing.lg),
                           _ReadingAction(book: currentBook),
-                          const SizedBox(height: AppSpacing.lg),
-                          const Divider(height: 1),
+                          const SizedBox(height: AppSpacing.md),
+                          _FileMetadata(book: currentBook),
                           const SizedBox(height: AppSpacing.md),
                           if (organization.genres.isEmpty &&
-                              organization.tags.isEmpty) ...[
-                            Text(
-                              l10n.libraryLabels,
-                              style: theme.textTheme.titleMedium,
-                            ),
-                            const SizedBox(height: AppSpacing.sm),
-                            Text(
-                              l10n.bookLabelsEmpty,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
+                              organization.tags.isEmpty)
+                            Align(
+                              alignment: AlignmentDirectional.centerStart,
+                              child: TextButton.icon(
+                                onPressed: editBook,
+                                style: TextButton.styleFrom(
+                                  foregroundColor:
+                                      theme.colorScheme.onSurfaceVariant,
+                                ),
+                                icon: const Icon(Icons.add),
+                                label: Text(l10n.bookAddLabels),
                               ),
-                            ),
-                          ] else ...[
+                            )
+                          else ...[
                             if (organization.genres.isNotEmpty) ...[
                               Text(
                                 l10n.bookGenres,
@@ -143,37 +144,6 @@ class BookDetailScreen extends ConsumerWidget {
                               _BookLabels(labels: organization.tags),
                             ],
                           ],
-                          const SizedBox(height: AppSpacing.lg),
-                          const Divider(height: 1),
-                          const SizedBox(height: AppSpacing.lg),
-                          Text(
-                            l10n.bookFileInfo,
-                            style: theme.textTheme.titleMedium,
-                          ),
-                          const SizedBox(height: AppSpacing.compact),
-                          _FileInfoRow(
-                            label: l10n.pages,
-                            value: currentBook.pageCount > 0
-                                ? NumberFormat.decimalPattern(
-                                    l10n.localeName,
-                                  ).format(currentBook.pageCount)
-                                : l10n.unknown,
-                          ),
-                          _FileInfoRow(
-                            label: l10n.size,
-                            value: currentBook.fileSizeBytes > 0
-                                ? _formatBytes(
-                                    currentBook.fileSizeBytes,
-                                    l10n.localeName,
-                                  )
-                                : l10n.unknown,
-                          ),
-                          _FileInfoRow(
-                            label: l10n.added,
-                            value: DateFormat.yMMMd(
-                              l10n.localeName,
-                            ).format(currentBook.createdAt.toLocal()),
-                          ),
                         ],
                       ),
                     ),
@@ -185,21 +155,6 @@ class BookDetailScreen extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  String _formatBytes(int bytes, String locale) {
-    const suffixes = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
-    var size = bytes.toDouble();
-    var unit = 0;
-    while (size >= 1024 && unit < suffixes.length - 1) {
-      size /= 1024;
-      unit++;
-    }
-    final number = NumberFormat.decimalPatternDigits(
-      locale: locale,
-      decimalDigits: 1,
-    ).format(size);
-    return '$number ${suffixes[unit]}';
   }
 
   Future<void> _confirmDelete(
@@ -285,8 +240,6 @@ class _BookIdentity extends StatelessWidget {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: AppSpacing.sm),
-            AppMetadata(label: book.format.toUpperCase()),
           ],
         );
         if (stacked) {
@@ -429,48 +382,68 @@ class _BookLabels extends StatelessWidget {
   }
 }
 
-class _FileInfoRow extends StatelessWidget {
-  const _FileInfoRow({required this.label, required this.value});
+class _FileMetadata extends StatelessWidget {
+  const _FileMetadata({required this.book});
 
-  final String label;
-  final String value;
+  final BookDto book;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final labelWidget = Text(
-            label,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          );
-          final valueWidget = Text(value, style: theme.textTheme.bodyMedium);
-          if (constraints.maxWidth <
-              MediaQuery.textScalerOf(context).scale(280)) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                labelWidget,
-                const SizedBox(height: AppSpacing.xs),
-                valueWidget,
-              ],
-            );
-          }
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(width: constraints.maxWidth * 0.36, child: labelWidget),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(child: valueWidget),
-            ],
-          );
-        },
-      ),
+    final style = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
     );
+    final format = book.format.trim().toUpperCase();
+    final pageCount = book.pageCount > 0
+        ? NumberFormat.decimalPattern(l10n.localeName).format(book.pageCount)
+        : null;
+    final size = book.fileSizeBytes > 0
+        ? _formatBytes(book.fileSizeBytes, l10n.localeName)
+        : null;
+    final values = [
+      if (format.isNotEmpty) format,
+      if (pageCount != null) l10n.bookPageCountCompact(pageCount),
+      if (size != null) size,
+    ];
+    final added = DateFormat.yMMMd(
+      l10n.localeName,
+    ).format(book.createdAt.toLocal());
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (values.isNotEmpty) ...[
+          Text(
+            values.join(' · '),
+            style: style,
+            semanticsLabel: [
+              l10n.bookFileInfo,
+              if (format.isNotEmpty) format,
+              if (pageCount != null) '${l10n.pages}: $pageCount',
+              if (size != null) '${l10n.size}: $size',
+            ].join(', '),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+        ],
+        Text('${l10n.added}: $added', style: style),
+      ],
+    );
+  }
+
+  String _formatBytes(int bytes, String locale) {
+    const suffixes = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
+    var size = bytes.toDouble();
+    var unit = 0;
+    while (size >= 1024 && unit < suffixes.length - 1) {
+      size /= 1024;
+      unit++;
+    }
+    final number = NumberFormat.decimalPatternDigits(
+      locale: locale,
+      decimalDigits: 1,
+    ).format(size);
+    return '$number ${suffixes[unit]}';
   }
 }
 

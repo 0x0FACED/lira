@@ -176,6 +176,18 @@ abstract class AppLocalizations {
   /// **'Sort by'**
   String get librarySortBy;
 
+  /// No description provided for @librarySortAndFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort and filter'**
+  String get librarySortAndFilters;
+
+  /// No description provided for @libraryClearLabelFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear label filter'**
+  String get libraryClearLabelFilter;
+
   /// No description provided for @librarySortAdded.
   ///
   /// In en, this message translates to:
@@ -266,6 +278,18 @@ abstract class AppLocalizations {
   /// **'Tags'**
   String get bookTags;
 
+  /// No description provided for @bookAddLabels.
+  ///
+  /// In en, this message translates to:
+  /// **'Add labels'**
+  String get bookAddLabels;
+
+  /// No description provided for @bookPageCountCompact.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} pp.'**
+  String bookPageCountCompact(String count);
+
   /// No description provided for @bookLabelsHint.
   ///
   /// In en, this message translates to:
@@ -307,6 +331,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Settings'**
   String get settings;
+
+  /// No description provided for @settingsReadingAppearance.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading and appearance'**
+  String get settingsReadingAppearance;
+
+  /// No description provided for @settingsAccountsSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Accounts and sync'**
+  String get settingsAccountsSync;
+
+  /// No description provided for @settingsNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Network'**
+  String get settingsNetwork;
 
   /// No description provided for @noBooks.
   ///
@@ -391,12 +433,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Account'**
   String get account;
-
-  /// No description provided for @appearance.
-  ///
-  /// In en, this message translates to:
-  /// **'Appearance'**
-  String get appearance;
 
   /// No description provided for @theme.
   ///
@@ -659,7 +695,7 @@ abstract class AppLocalizations {
   /// No description provided for @zLibraryNotLoggedIn.
   ///
   /// In en, this message translates to:
-  /// **'Not logged in to Z-Library'**
+  /// **'Not signed in'**
   String get zLibraryNotLoggedIn;
 
   /// No description provided for @zLibraryLogout.
@@ -1351,6 +1387,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sources'**
   String get discoverSources;
+
+  /// No description provided for @discoverViewAll.
+  ///
+  /// In en, this message translates to:
+  /// **'View all'**
+  String get discoverViewAll;
+
+  /// No description provided for @discoverViewAllFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'View all publications from {source}'**
+  String discoverViewAllFrom(String source);
 
   /// No description provided for @discoverSearchHint.
   ///
@@ -2195,13 +2243,13 @@ abstract class AppLocalizations {
   /// No description provided for @localSyncSettingsAction.
   ///
   /// In en, this message translates to:
-  /// **'Sync with another device'**
+  /// **'QR sync'**
   String get localSyncSettingsAction;
 
   /// No description provided for @localSyncSettingsHint.
   ///
   /// In en, this message translates to:
-  /// **'Transfer your library and annotations over local Wi-Fi using a QR code. No account needed.'**
+  /// **'Transfer books and reading data over your local network.'**
   String get localSyncSettingsHint;
 
   /// No description provided for @localSyncDescription.
@@ -2572,19 +2620,19 @@ abstract class AppLocalizations {
   /// No description provided for @localProfileHint.
   ///
   /// In en, this message translates to:
-  /// **'Books and reading data are stored on this device. Use QR sync to exchange them with another device.'**
+  /// **'Books and reading data are stored on this device.'**
   String get localProfileHint;
 
   /// No description provided for @serverAccountInfoTitle.
   ///
   /// In en, this message translates to:
-  /// **'Server account information'**
+  /// **'Server account'**
   String get serverAccountInfoTitle;
 
   /// No description provided for @serverAccountInfoHint.
   ///
   /// In en, this message translates to:
-  /// **'Server sign-in is not available. Your local library and QR sync do not require an account.'**
+  /// **'Sign-in is unavailable. Reading and sync do not require an account.'**
   String get serverAccountInfoHint;
 
   /// No description provided for @proxyAppliedEndpoint.

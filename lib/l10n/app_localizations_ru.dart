@@ -48,6 +48,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get librarySortBy => 'Сортировка';
 
   @override
+  String get librarySortAndFilters => 'Сортировка и фильтры';
+
+  @override
+  String get libraryClearLabelFilter => 'Сбросить фильтр по метке';
+
+  @override
   String get librarySortAdded => 'Дата добавления';
 
   @override
@@ -103,6 +109,14 @@ class AppLocalizationsRu extends AppLocalizations {
   String get bookTags => 'Теги';
 
   @override
+  String get bookAddLabels => 'Добавить метки';
+
+  @override
+  String bookPageCountCompact(String count) {
+    return '$count стр.';
+  }
+
+  @override
   String get bookLabelsHint => 'Разделяйте запятыми или переносами строк';
 
   @override
@@ -123,6 +137,15 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get settings => 'Настройки';
+
+  @override
+  String get settingsReadingAppearance => 'Чтение и внешний вид';
+
+  @override
+  String get settingsAccountsSync => 'Аккаунты и синхронизация';
+
+  @override
+  String get settingsNetwork => 'Сеть';
 
   @override
   String get noBooks => 'В библиотеке нет книг';
@@ -168,9 +191,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get account => 'Аккаунт';
-
-  @override
-  String get appearance => 'Внешний вид';
 
   @override
   String get theme => 'Тема';
@@ -305,7 +325,7 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get zLibraryNotLoggedIn => 'Нет входа в Z-Library';
+  String get zLibraryNotLoggedIn => 'Вы не вошли';
 
   @override
   String get zLibraryLogout => 'Выйти';
@@ -708,6 +728,14 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get discoverSources => 'Источники';
+
+  @override
+  String get discoverViewAll => 'Все';
+
+  @override
+  String discoverViewAllFrom(String source) {
+    return 'Все материалы источника «$source»';
+  }
 
   @override
   String get discoverSearchHint => 'Поиск книг, статей и RFC';
@@ -1211,11 +1239,11 @@ class AppLocalizationsRu extends AppLocalizations {
   String get localSyncTitle => 'Локальная синхронизация';
 
   @override
-  String get localSyncSettingsAction => 'Синхронизация с другим устройством';
+  String get localSyncSettingsAction => 'QR-синхронизация';
 
   @override
   String get localSyncSettingsHint =>
-      'Передайте библиотеку и аннотации по локальной сети Wi-Fi с помощью QR-кода. Без аккаунта.';
+      'Книги и данные чтения по локальной сети.';
 
   @override
   String get localSyncDescription =>
@@ -1437,14 +1465,14 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get localProfileHint =>
-      'Книги и данные чтения хранятся на этом устройстве. Обменивайтесь ими с другим устройством через QR-синхронизацию.';
+      'Книги и данные чтения хранятся на этом устройстве.';
 
   @override
-  String get serverAccountInfoTitle => 'Информация о серверном аккаунте';
+  String get serverAccountInfoTitle => 'Серверный аккаунт';
 
   @override
   String get serverAccountInfoHint =>
-      'Вход на сервер недоступен. Для локальной библиотеки и QR-синхронизации аккаунт не нужен.';
+      'Вход недоступен. Для чтения и синхронизации аккаунт не нужен.';
 
   @override
   String proxyAppliedEndpoint(String host, int port) {

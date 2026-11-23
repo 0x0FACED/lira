@@ -28,28 +28,20 @@ class BookCard extends StatelessWidget {
   static const hitInset = 4.0;
   static const _titleSize = 14.0;
   static const _authorSize = 12.0;
+  static const _progressSize = 11.0;
+  static const _progressBarHeight = 2.0;
   static const _lineHeight = 1.3;
 
-  /// A shared budget keeps covers and reading metadata aligned across a shelf.
-  static double metadataExtent(
-    TextScaler textScaler, {
-    required double cardWidth,
-    required int pageCountDigits,
-  }) {
-    final width = cardWidth.clamp(1.0, double.infinity);
-    final metadataLines =
-        (textScaler.scale(11) * (pageCountDigits + 7) * 0.8 / width).ceil();
-    final progressLines = (textScaler.scale(11) * 7 * 0.8 / width).ceil();
-    return AppSpacing.compact +
-        _textLineExtent(textScaler, _titleSize) * 2 +
-        AppSpacing.xs +
-        _textLineExtent(textScaler, _authorSize) +
-        AppSpacing.sm +
-        _textLineExtent(textScaler, 11) * (metadataLines + progressLines) +
-        AppSpacing.xs +
-        AppSpacing.sm +
-        2;
-  }
+  /// Reserve the same caption height for every book in the grid.
+  static double metadataExtent(TextScaler textScaler) =>
+      AppSpacing.compact +
+      _textLineExtent(textScaler, _titleSize) * 2 +
+      AppSpacing.xs +
+      _textLineExtent(textScaler, _authorSize) +
+      AppSpacing.sm +
+      _textLineExtent(textScaler, _progressSize) +
+      AppSpacing.sm +
+      _progressBarHeight;
 
   static double _textLineExtent(TextScaler scaler, double size) =>
       (scaler.scale(size) * _lineHeight).ceilToDouble();
@@ -78,8 +70,9 @@ class BookCard extends StatelessWidget {
             height: _textLineExtent(textScaler, _titleSize) * 2,
             child: Text(
               book.title.trim(),
-              style: theme.textTheme.titleSmall?.copyWith(
+              style: theme.textTheme.titleLarge?.copyWith(
                 fontSize: _titleSize,
+                letterSpacing: 0,
                 fontWeight: FontWeight.w500,
                 height: _lineHeight,
               ),
@@ -181,6 +174,7 @@ class BookCard extends StatelessWidget {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
     final style = theme.textTheme.labelSmall?.copyWith(
+      fontSize: _progressSize,
       fontWeight: FontWeight.w400,
       height: _lineHeight,
       letterSpacing: 0,
@@ -190,6 +184,52 @@ class BookCard extends StatelessWidget {
     final displayed = percentage == null
         ? null
         : formatReadingPercentage(percentage, l10n.localeName, floor: true);
+    final progress = displayed == null
+        ? null
+        : Semantics(
+            label: l10n.libraryReadingProgress,
+            value: displayed,
+            excludeSemantics: true,
+            child: Text(displayed, style: style),
+          );
+    final track = SizedBox(
+      height: _progressBarHeight,
+      child: percentage == null
+          ? null
+          : ExcludeSemantics(
+              child: LinearProgressIndicator(
+                value: percentage / 100,
+                minHeight: _progressBarHeight,
+                color: compact ? null : theme.colorScheme.secondary,
+                borderRadius: BorderRadius.zero,
+                trackGap: 0,
+                stopIndicatorColor: Colors.transparent,
+              ),
+            ),
+    );
+    if (!compact) {
+      if (progress == null) return const SizedBox.shrink();
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            height: _textLineExtent(
+              MediaQuery.textScalerOf(context),
+              _progressSize,
+            ),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: AlignmentDirectional.centerEnd,
+              child: progress,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          track,
+        ],
+      );
+    }
+
     final metadata = Wrap(
       spacing: AppSpacing.xs,
       children: [
@@ -204,18 +244,10 @@ class BookCard extends StatelessWidget {
         ],
       ],
     );
-    final progress = displayed == null
-        ? null
-        : Semantics(
-            label: l10n.libraryReadingProgress,
-            value: displayed,
-            excludeSemantics: true,
-            child: Text(displayed, style: style),
-          );
     return LayoutBuilder(
       builder: (context, constraints) {
         final labelWidth =
-            MediaQuery.textScalerOf(context).scale(11) *
+            MediaQuery.textScalerOf(context).scale(_progressSize) *
             (book.format.length +
                 (book.pageCount > 0 ? '${book.pageCount}'.length + 3 : 0) +
                 (displayed?.length ?? 0)) *
@@ -242,20 +274,7 @@ class BookCard extends StatelessWidget {
                 ],
               ),
             const SizedBox(height: AppSpacing.sm),
-            SizedBox(
-              height: 2,
-              child: percentage == null
-                  ? null
-                  : ExcludeSemantics(
-                      child: LinearProgressIndicator(
-                        value: percentage / 100,
-                        minHeight: 2,
-                        borderRadius: BorderRadius.zero,
-                        trackGap: 0,
-                        stopIndicatorColor: Colors.transparent,
-                      ),
-                    ),
-            ),
+            track,
           ],
         );
       },

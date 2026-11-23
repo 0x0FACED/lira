@@ -235,12 +235,13 @@ class _ReaderSettingsWorkspaceState extends State<ReaderSettingsWorkspace> {
                                       CrossAxisAlignment.stretch,
                                   children: [
                                     Padding(
-                                      padding: const EdgeInsets.fromLTRB(
-                                        16,
-                                        4,
-                                        4,
-                                        0,
-                                      ),
+                                      padding:
+                                          const EdgeInsetsDirectional.fromSTEB(
+                                            AppSpacing.md,
+                                            AppSpacing.xs,
+                                            AppSpacing.xs,
+                                            0,
+                                          ),
                                       child: Row(
                                         children: [
                                           Expanded(

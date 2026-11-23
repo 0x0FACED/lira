@@ -11,6 +11,9 @@ class ReaderPageDimming extends StatelessWidget {
   final double brightness;
   final Widget child;
 
+  static Color shadeFor(double brightness) =>
+      Colors.black.withAlpha(((1 - brightness.clamp(0.2, 1.0)) * 200).round());
+
   @override
   Widget build(BuildContext context) => Stack(
     fit: StackFit.expand,
@@ -18,13 +21,7 @@ class ReaderPageDimming extends StatelessWidget {
       RepaintBoundary(child: child),
       if (brightness < 1)
         Positioned.fill(
-          child: IgnorePointer(
-            child: ColoredBox(
-              color: Colors.black.withAlpha(
-                ((1 - brightness.clamp(0.2, 1.0)) * 200).round(),
-              ),
-            ),
-          ),
+          child: IgnorePointer(child: ColoredBox(color: shadeFor(brightness))),
         ),
     ],
   );

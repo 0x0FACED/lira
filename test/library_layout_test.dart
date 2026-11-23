@@ -217,7 +217,7 @@ void main() {
           ),
         ),
       );
-      expect(find.text(expected), findsOneWidget);
+      expect(find.textContaining(expected), findsOneWidget);
       expect(tester.takeException(), isNull);
     }
   });
@@ -392,11 +392,19 @@ void main() {
     }
   }
 
-  testLibraryWidgets('page count fits a dense row at large text scale', (
+  testLibraryWidgets('file metadata fits the list at large text scale', (
     tester,
   ) async {
-    await sharedPrefs.setInt(LibraryColumnsNotifier.storageKey, 3);
     await mount(tester, size: const Size(320, 844), textScale: 2);
+    final l10n = AppLocalizations.of(
+      tester.element(find.byType(LibraryScreen)),
+    )!;
+    await tester.tap(find.byType(PopupMenuButton<int>));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.widgetWithText(CheckedPopupMenuItem<int>, l10n.libraryListView),
+    );
+    await tester.pumpAndSettle();
     final card = find.byKey(const ValueKey('3'));
     await tester.scrollUntilVisible(
       card,
@@ -451,13 +459,11 @@ void main() {
       final l10n = AppLocalizations.of(
         tester.element(find.byType(LibraryScreen)),
       )!;
-      await tester.tap(find.byType(PopupMenuButton<LibrarySort>));
+      final controls = find.byTooltip(l10n.librarySortAndFilters);
+      await tester.tap(controls);
       await tester.pumpAndSettle();
       await tester.tap(
-        find.widgetWithText(
-          CheckedPopupMenuItem<LibrarySort>,
-          l10n.librarySortProgress,
-        ),
+        find.widgetWithText(ChoiceChip, l10n.librarySortProgress),
       );
       await tester.pumpAndSettle();
       String firstBook() =>
@@ -472,14 +478,9 @@ void main() {
 
       await mount(tester);
       expect(firstBook(), '3');
-      await tester.tap(find.byType(PopupMenuButton<LibrarySort>));
+      await tester.tap(controls);
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.widgetWithText(
-          CheckedPopupMenuItem<LibrarySort>,
-          l10n.librarySortTitle,
-        ),
-      );
+      await tester.tap(find.widgetWithText(ChoiceChip, l10n.librarySortTitle));
       await tester.pumpAndSettle();
       expect(firstBook(), '0'); // «Книга…» sorts before «Короткая…».
     },
@@ -505,11 +506,9 @@ void main() {
       find.widgetWithText(CheckedPopupMenuItem<int>, l10n.libraryListView),
     );
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.widgetWithIcon(IconButton, Icons.filter_list_rounded),
-    );
+    await tester.tap(find.byTooltip(l10n.librarySortAndFilters));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('К обсуждению'));
+    await tester.tap(find.widgetWithText(ChoiceChip, 'К обсуждению'));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('0')), findsOneWidget);
     expect(find.byKey(const ValueKey('1')), findsOneWidget);

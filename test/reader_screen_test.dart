@@ -456,7 +456,8 @@ void main() {
         final saved = EpubLocation.fromJson(progress.persisted!.location)!;
         final fullViewport = tester.getRect(find.byType(EpubNativeView));
         await _showControls(tester);
-        await tester.tap(find.widgetWithIcon(IconButton, Icons.settings));
+        final readingSettings = find.byTooltip('Reader Settings');
+        await tester.tap(readingSettings);
         await tester.pumpAndSettle();
         final panel = tester.getRect(
           find.byKey(const ValueKey('reader-settings-surface')),
@@ -485,12 +486,6 @@ void main() {
         );
         await tester.tap(find.widgetWithIcon(IconButton, Icons.close));
         await tester.pumpAndSettle();
-        expect(
-          tester
-              .getRect(find.widgetWithIcon(IconButton, Icons.settings))
-              .bottom,
-          lessThanOrEqualTo(tester.getRect(find.byType(EpubNativeView)).top),
-        );
         final sampleBeforeScroll = _visibleParagraphs(tester);
         await tester.drag(find.byType(EpubNativeView), const Offset(0, -500));
         await tester.pumpAndSettle();

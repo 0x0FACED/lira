@@ -87,14 +87,8 @@ void main() {
               children: [
                 SizedBox(
                   width: 210,
-                  height:
-                      210 / BookCard.coverAspectRatio +
-                      BookCard.metadataExtent(
-                        TextScaler.noScaling,
-                        cardWidth: 210,
-                        pageCountDigits: 4,
-                      ),
                   child: BookCard(
+                    compact: true,
                     book: book,
                     onTap: () => router.push('/book'),
                     onDelete: () =>

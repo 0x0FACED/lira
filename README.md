@@ -60,7 +60,7 @@ Warm light and dark themes, layouts for phones and desktops, and English and Rus
 | **Linux** | `lira-v<version>-linux.zip` | Extract the archive and run `lira` on a GTK 3 desktop. |
 | **iOS** | `lira-v<version>-ios.ipa` (unsigned) | Sign the IPA with AltStore, Sideloadly, or another signing tool before installation. It is not a TestFlight or App Store download. |
 
-[Browse all releases](https://github.com/0x0FACED/lira/releases) for older builds.
+[Browse all releases](https://github.com/0x0FACED/lira/releases) for older builds, which may use unversioned filenames.
 
 ## Your first chapter
 
@@ -85,7 +85,7 @@ Alongside Cloudflare, GitHub Engineering and the official RFC catalog, Discover 
 | [Aeon](https://aeon.co/) | English | Philosophy, psychology, science and culture |
 | [Mongabay](https://news.mongabay.com/) | English | Wildlife, biodiversity and conservation |
 
-Enabled publication sources appear as horizontal shelves. Tap anywhere on a source heading to open its publications and search only that source. Desktop shelves also support arrow buttons and keyboard navigation. Book catalogs remain search-only rather than displaying invented recommendations.
+Enabled publication sources appear as horizontal shelves. Choose **View all** beside a source to open its publications and search only that source. Desktop shelves also support arrow buttons and keyboard navigation. Book catalogs remain search-only rather than displaying invented recommendations.
 
 Global search separates **Books**, **Articles** and **RFC**. Article search covers the recent publications returned by each feed, not the complete website archive. RFC search uses the official full index, including document numbers, titles, abstracts and authors. Previously loaded publication lists remain available when a refresh fails.
 

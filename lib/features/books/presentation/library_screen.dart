@@ -56,6 +56,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final wide = media.size.width >= AppLayout.desktopBreakpoint;
     final gutter = AppLayout.pageGutter(context);
 
+    Widget initialControls() =>
+        _controls(context, l10n, sort, gutter: gutter, wide: wide);
+
     return Scaffold(
       body: SafeArea(
         bottom: false,
@@ -69,33 +72,19 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 SliverToBoxAdapter(
                   child: AppPageHeader(
                     title: l10n.library,
-                    keepActionsInline: true,
+                    keepActionsInline: media.textScaler.scale(28) <= 40,
                     actions: [
                       _layoutAction(l10n, isPhone, columns, listView),
-                      IconButton(
-                        icon: Semantics(
-                          label: l10n.importBook,
-                          child: const Icon(Icons.add),
+                      IconButton.filled(
+                        tooltip: l10n.importBook,
+                        style: IconButton.styleFrom(
+                          backgroundColor: colors.primary,
+                          foregroundColor: colors.onPrimary,
                         ),
+                        icon: const Icon(Icons.add),
                         onPressed: () => _importBook(context),
                       ),
                     ],
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      gutter,
-                      0,
-                      gutter,
-                      AppSpacing.sm,
-                    ),
-                    child: AppSearchField(
-                      controller: _searchController,
-                      hintText: l10n.searchLibrary,
-                      onChanged: (value) =>
-                          setState(() => _query = _fold(value.trim())),
-                    ),
                   ),
                 ),
                 ...books.when(
@@ -112,6 +101,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     listView: listView,
                   ),
                   loading: () => [
+                    initialControls(),
                     _stateSliver(
                       const Padding(
                         padding: EdgeInsets.all(AppSpacing.compact),
@@ -120,6 +110,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     ),
                   ],
                   error: (error, _) => [
+                    initialControls(),
                     _stateSliver(
                       AppEmptyState(
                         icon: Icons.error_outline,
@@ -152,19 +143,17 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         : Icons.grid_view_outlined;
     if (!isPhone) {
       return IconButton(
-        icon: Semantics(
-          label: listView ? l10n.libraryGridView : l10n.libraryListView,
-          child: Icon(
-            listView ? Icons.grid_view_outlined : Icons.view_list_outlined,
-          ),
+        tooltip: listView ? l10n.libraryGridView : l10n.libraryListView,
+        icon: Icon(
+          listView ? Icons.grid_view_outlined : Icons.view_list_outlined,
         ),
         onPressed: () => view.setListView(!listView),
       );
     }
     return PopupMenuButton<int>(
-      tooltip: '',
+      tooltip: l10n.libraryLayout,
       initialValue: listView ? 0 : columns,
-      icon: Semantics(label: l10n.libraryLayout, child: Icon(icon)),
+      icon: Icon(icon),
       onSelected: (value) async {
         final density = ref.read(libraryColumnsProvider.notifier);
         if (value != 0) await density.setColumns(value);
@@ -219,6 +208,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   }) {
     if (books.isEmpty) {
       return [
+        _controls(context, l10n, sort, gutter: gutter, wide: wide),
         _stateSliver(
           AppEmptyState(
             icon: Icons.local_library_outlined,
@@ -262,82 +252,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           );
 
     return [
-      SliverToBoxAdapter(
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: EdgeInsets.symmetric(horizontal: gutter),
-          child: Row(
-            spacing: AppSpacing.sm,
-            children: [
-              for (final shelf in _Shelf.values)
-                ChoiceChip(
-                  label: Text(_shelfTitle(shelf, l10n)),
-                  selected: _shelf == shelf,
-                  showCheckmark: false,
-                  onSelected: (_) => setState(() => _shelf = shelf),
-                ),
-            ],
-          ),
-        ),
-      ),
-      SliverToBoxAdapter(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            gutter,
-            AppSpacing.xs,
-            gutter,
-            AppSpacing.compact,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      visible == null
-                          ? ''
-                          : l10n.libraryBookCount(visible.length),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    isSelected: activeLabel != null,
-                    onPressed: () =>
-                        _chooseLabel(context, l10n, labels, activeLabel),
-                    icon: Semantics(
-                      label: l10n.libraryLabels,
-                      child: const Icon(Icons.filter_list_rounded),
-                    ),
-                    selectedIcon: Semantics(
-                      label: l10n.libraryLabels,
-                      child: const Icon(Icons.filter_alt),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.xs),
-                  _sortMenu(context, l10n, sort),
-                ],
-              ),
-              if (activeLabel != null)
-                InputChip(
-                  avatar: Icon(
-                    activeLabel.genre
-                        ? Icons.bookmark_border
-                        : Icons.label_outline,
-                    size: 16,
-                  ),
-                  label: Text(
-                    labels[activeLabel]!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  onDeleted: () => setState(() => _label = null),
-                ),
-            ],
-          ),
-        ),
+      _controls(
+        context,
+        l10n,
+        sort,
+        gutter: gutter,
+        wide: wide,
+        labels: labels,
+        activeLabel: activeLabel,
+        bookCount: visible?.length,
       ),
       if (visible == null)
         _stateSliver(
@@ -379,116 +302,213 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     ];
   }
 
-  Widget _sortMenu(
+  Widget _controls(
     BuildContext context,
     AppLocalizations l10n,
-    LibrarySort sort,
-  ) {
+    LibrarySort sort, {
+    required double gutter,
+    required bool wide,
+    Map<_Label, String> labels = const {},
+    _Label? activeLabel,
+    int? bookCount,
+  }) {
     final theme = Theme.of(context);
-    return PopupMenuButton<LibrarySort>(
-      tooltip: '',
-      initialValue: sort,
-      onSelected: ref.read(librarySortProvider.notifier).setSort,
-      itemBuilder: (_) => [
-        for (final option in LibrarySort.values)
-          CheckedPopupMenuItem(
-            value: option,
-            checked: option == sort,
-            child: Text(_sortTitle(option, l10n)),
-          ),
-      ],
-      child: Semantics(
-        label: l10n.librarySortBy,
-        value: _sortTitle(sort, l10n),
-        excludeSemantics: true,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            minHeight: AppLayout.minTouchTarget,
-            maxWidth: MediaQuery.sizeOf(context).width < 480 ? 196 : 248,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.sort_rounded, size: 18),
-                const SizedBox(width: AppSpacing.sm),
-                Flexible(
-                  child: Text(
-                    _sortTitle(sort, l10n),
-                    style: theme.textTheme.labelLarge,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
+    final colors = theme.colorScheme;
+    final search = Row(
+      spacing: AppSpacing.sm,
+      children: [
+        Expanded(
+          child: AppSearchField(
+            controller: _searchController,
+            hintText: l10n.searchLibrary,
+            onChanged: (value) => setState(() => _query = _fold(value.trim())),
           ),
         ),
+        IconButton.outlined(
+          tooltip: l10n.librarySortAndFilters,
+          style: IconButton.styleFrom(side: BorderSide(color: colors.outline)),
+          onPressed: () => _showSortAndFilters(context, l10n, sort, labels),
+          icon: const Icon(Icons.tune_rounded),
+        ),
+      ],
+    );
+    final shelfOptions = [
+      for (final shelf in _Shelf.values)
+        ChoiceChip(
+          label: Text(_shelfTitle(shelf, l10n)),
+          selected: _shelf == shelf,
+          showCheckmark: false,
+          labelPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+          onSelected: (_) => setState(() => _shelf = shelf),
+        ),
+    ];
+    final labelChip = activeLabel == null
+        ? null
+        : InputChip(
+            avatar: Icon(
+              activeLabel.genre ? Icons.bookmark_border : Icons.label_outline,
+              size: 16,
+            ),
+            backgroundColor: colors.secondaryContainer,
+            deleteButtonTooltipMessage: l10n.libraryClearLabelFilter,
+            label: Text(
+              labels[activeLabel]!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            onDeleted: () => setState(() => _label = null),
+          );
+    final Widget content;
+    if (wide) {
+      final shelves = Wrap(
+        spacing: AppSpacing.xs,
+        runSpacing: AppSpacing.xs,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [...shelfOptions, ?labelChip],
+      );
+      content = AppSurface(
+        color: colors.surface,
+        radius: AppRadius.md,
+        padding: const EdgeInsets.all(AppSpacing.compact),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final inline =
+                constraints.maxWidth >=
+                MediaQuery.textScalerOf(context).scale(800);
+            if (!inline) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                spacing: AppSpacing.xs,
+                children: [search, shelves],
+              );
+            }
+            return Row(
+              spacing: AppSpacing.md,
+              children: [
+                SizedBox(width: constraints.maxWidth * 0.38, child: search),
+                Expanded(child: shelves),
+                if (bookCount != null)
+                  Text(
+                    l10n.libraryBookCount(bookCount),
+                    style: theme.textTheme.bodySmall,
+                  ),
+              ],
+            );
+          },
+        ),
+      );
+    } else {
+      content = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        spacing: AppSpacing.sm,
+        children: [
+          search,
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(spacing: AppSpacing.xs, children: shelfOptions),
+          ),
+          ?labelChip,
+        ],
+      );
+    }
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(gutter, 0, gutter, AppSpacing.md),
+        child: content,
       ),
     );
   }
 
-  Future<void> _chooseLabel(
+  Future<void> _showSortAndFilters(
     BuildContext context,
     AppLocalizations l10n,
+    LibrarySort sort,
     Map<_Label, String> labels,
-    _Label? current,
-  ) async {
+  ) {
     final ordered = labels.entries.toList()
       ..sort((a, b) => _fold(a.value).compareTo(_fold(b.value)));
-    final picked = await showAppBottomSheet<(_Label?,)>(
+    return showAppBottomSheet<void>(
       context: context,
-      builder: (sheet) => SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.md,
-            AppSpacing.lg,
-            AppSpacing.lg,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                l10n.libraryLabels,
-                style: Theme.of(sheet).textTheme.titleLarge,
-              ),
-              if (ordered.isEmpty) ...[
-                const SizedBox(height: AppSpacing.sm),
-                Text(l10n.bookLabelsEmpty),
-              ],
-              for (final genre in [true, false])
-                if (ordered.any((entry) => entry.key.genre == genre)) ...[
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    genre ? l10n.bookGenres : l10n.bookTags,
-                    style: Theme.of(sheet).textTheme.titleSmall,
+      builder: (sheet) {
+        final text = Theme.of(sheet).textTheme;
+        return SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.lg,
+              AppSpacing.lg,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Semantics(
+                  header: true,
+                  child: Text(
+                    l10n.librarySortAndFilters,
+                    style: text.titleLarge,
                   ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Wrap(
-                    spacing: AppSpacing.sm,
-                    runSpacing: AppSpacing.xs,
-                    children: [
-                      for (final entry in ordered)
-                        if (entry.key.genre == genre)
-                          ChoiceChip(
-                            label: Text(entry.value),
-                            selected: entry.key == current,
-                            onSelected: (selected) => Navigator.pop(sheet, (
-                              selected ? entry.key : null,
-                            )),
-                          ),
-                    ],
-                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(l10n.librarySortBy, style: text.titleMedium),
+                const SizedBox(height: AppSpacing.xs),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.xs,
+                  children: [
+                    for (final option in LibrarySort.values)
+                      ChoiceChip(
+                        label: Text(_sortTitle(option, l10n)),
+                        selected: option == sort,
+                        onSelected: (_) {
+                          Navigator.pop(sheet);
+                          ref
+                              .read(librarySortProvider.notifier)
+                              .setSort(option);
+                        },
+                      ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                if (ordered.isEmpty) ...[
+                  Text(l10n.libraryLabels, style: text.titleMedium),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(l10n.bookLabelsEmpty),
                 ],
-            ],
+                for (final genre in [true, false])
+                  if (ordered.any((entry) => entry.key.genre == genre)) ...[
+                    const SizedBox(height: AppSpacing.compact),
+                    Text(
+                      genre ? l10n.bookGenres : l10n.bookTags,
+                      style: text.titleSmall,
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.xs,
+                      children: [
+                        for (final entry in ordered)
+                          if (entry.key.genre == genre)
+                            ChoiceChip(
+                              label: Text(entry.value),
+                              selected: entry.key == _label,
+                              onSelected: (selected) {
+                                setState(() {
+                                  _label = selected ? entry.key : null;
+                                });
+                                Navigator.pop(sheet);
+                              },
+                            ),
+                      ],
+                    ),
+                  ],
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
-    if (mounted && picked != null) setState(() => _label = picked.$1);
   }
 
   List<BookDto> _visibleBooks(
@@ -583,12 +603,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     if (listView) {
       sliver = SliverList(delegate: delegate);
     } else {
-      var maxPages = 0;
-      for (final book in books) {
-        if (book.pageCount > maxPages) maxPages = book.pageCount;
-      }
-      final pageCountDigits = maxPages.toString().length;
-      final textScaler = MediaQuery.textScalerOf(context);
+      final captionExtent = BookCard.metadataExtent(
+        MediaQuery.textScalerOf(context),
+      );
       sliver = SliverGrid(
         gridDelegate: ResponsiveGridDelegate(
           crossAxisCount: columns,
@@ -601,27 +618,28 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           crossAxisSpacing: (wide ? AppSpacing.lg : AppSpacing.md) - extraHit,
           mainAxisSpacing: (wide ? AppSpacing.xl : AppSpacing.lg) - extraHit,
           childAspectRatio: BookCard.coverAspectRatio,
-          mainAxisExtraExtentForWidth: (width) =>
-              BookCard.metadataExtent(
-                textScaler,
-                cardWidth: width - extraHit,
-                pageCountDigits: pageCountDigits,
-              ) +
-              extraHit -
-              extraHit / BookCard.coverAspectRatio,
+          mainAxisExtraExtentForWidth: (_) =>
+              captionExtent + extraHit - extraHit / BookCard.coverAspectRatio,
         ),
         delegate: delegate,
       );
     }
-    return SliverPadding(
-      padding: EdgeInsets.fromLTRB(
-        gutter - BookCard.hitInset,
-        0,
-        gutter - BookCard.hitInset,
-        AppSpacing.xl,
-      ),
+    Widget inset(double horizontal) => SliverPadding(
+      padding: EdgeInsets.fromLTRB(horizontal, 0, horizontal, AppSpacing.xl),
       sliver: sliver,
     );
+
+    final minInset = gutter - BookCard.hitInset;
+    if (wide && listView) {
+      return SliverLayoutBuilder(
+        builder: (context, constraints) {
+          final centeredInset =
+              (constraints.crossAxisExtent - AppLayout.formMaxWidth) / 2;
+          return inset(centeredInset > minInset ? centeredInset : minInset);
+        },
+      );
+    }
+    return inset(minInset);
   }
 
   void _clearFilters() {
