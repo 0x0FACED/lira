@@ -152,6 +152,150 @@ abstract class AppLocalizations {
   /// **'3 books per row'**
   String get libraryThreeBooksPerRow;
 
+  /// No description provided for @libraryLayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Library layout'**
+  String get libraryLayout;
+
+  /// No description provided for @libraryGridView.
+  ///
+  /// In en, this message translates to:
+  /// **'Covers'**
+  String get libraryGridView;
+
+  /// No description provided for @libraryListView.
+  ///
+  /// In en, this message translates to:
+  /// **'List'**
+  String get libraryListView;
+
+  /// No description provided for @librarySortBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort by'**
+  String get librarySortBy;
+
+  /// No description provided for @librarySortAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Date added'**
+  String get librarySortAdded;
+
+  /// No description provided for @librarySortRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Last opened'**
+  String get librarySortRecent;
+
+  /// No description provided for @librarySortProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress'**
+  String get librarySortProgress;
+
+  /// No description provided for @librarySortTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get librarySortTitle;
+
+  /// No description provided for @librarySortAuthor.
+  ///
+  /// In en, this message translates to:
+  /// **'Author'**
+  String get librarySortAuthor;
+
+  /// No description provided for @libraryAllBooks.
+  ///
+  /// In en, this message translates to:
+  /// **'All books'**
+  String get libraryAllBooks;
+
+  /// No description provided for @libraryUnread.
+  ///
+  /// In en, this message translates to:
+  /// **'Not started'**
+  String get libraryUnread;
+
+  /// No description provided for @libraryInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading'**
+  String get libraryInProgress;
+
+  /// No description provided for @libraryFinished.
+  ///
+  /// In en, this message translates to:
+  /// **'Finished'**
+  String get libraryFinished;
+
+  /// No description provided for @libraryLabels.
+  ///
+  /// In en, this message translates to:
+  /// **'Genres and tags'**
+  String get libraryLabels;
+
+  /// No description provided for @libraryClearFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear filters'**
+  String get libraryClearFilters;
+
+  /// No description provided for @libraryNoMatchingBooks.
+  ///
+  /// In en, this message translates to:
+  /// **'No books in this view'**
+  String get libraryNoMatchingBooks;
+
+  /// No description provided for @libraryBookCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 book} other{{count} books}}'**
+  String libraryBookCount(int count);
+
+  /// No description provided for @bookGenres.
+  ///
+  /// In en, this message translates to:
+  /// **'Genres'**
+  String get bookGenres;
+
+  /// No description provided for @bookTags.
+  ///
+  /// In en, this message translates to:
+  /// **'Tags'**
+  String get bookTags;
+
+  /// No description provided for @bookLabelsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Separate entries with commas or new lines'**
+  String get bookLabelsHint;
+
+  /// No description provided for @bookLabelsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Add genres and tags to find this book in your library.'**
+  String get bookLabelsEmpty;
+
+  /// No description provided for @bookEditError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save book details.'**
+  String get bookEditError;
+
+  /// No description provided for @bookContinueReading.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue reading'**
+  String get bookContinueReading;
+
+  /// No description provided for @bookFileInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'File information'**
+  String get bookFileInfo;
+
   /// No description provided for @search.
   ///
   /// In en, this message translates to:

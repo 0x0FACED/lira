@@ -47,7 +47,7 @@ class EpubStyleResolver {
       final type = element.attributes['type']?.trim().toLowerCase();
       if (type != null && type.isNotEmpty && type != 'text/css') continue;
       if (element.localName == 'style') {
-        _addSheet(css_parser.parse(element.text), documentPath, <String>{});
+        _addSheet(_parseReaderCss(element.text), documentPath, <String>{});
       } else {
         final relationships = (element.attributes['rel'] ?? '')
             .toLowerCase()
@@ -88,7 +88,7 @@ class EpubStyleResolver {
     }
     final inline = element.attributes['style'];
     if (inline != null && inline.trim().isNotEmpty) {
-      final sheet = css_parser.parse('* {$inline}');
+      final sheet = _parseReaderCss('* {$inline}');
       for (final rule in sheet.topLevels.whereType<css.RuleSet>()) {
         for (final declaration in _declarations(rule.declarationGroup)) {
           _offer(winners, declaration, const _Specificity(inline: true));
@@ -262,7 +262,7 @@ class EpubStyleResolver {
     if (source == null || !importing.add(path)) return;
     final sheet = _parsedStylesheets.putIfAbsent(
       path,
-      () => css_parser.parse(source),
+      () => _parseReaderCss(source),
     );
     _addSheet(sheet, path, importing);
     importing.remove(path);
@@ -317,6 +317,119 @@ class EpubStyleResolver {
     // choice while leaving em/rem/% relative to their already-scaled parents.
     return length * (root.textStyle.fontSize ?? 16) / 16;
   }
+}
+
+// Page-box styles don't apply to native EPUB layout. Skip them before csslib:
+// malformed preludes such as `@page, body, div` can stall its margin parser.
+css.StyleSheet _parseReaderCss(String source) {
+  if (!source.contains('@')) return css_parser.parse(source);
+  StringBuffer? retained;
+  var keepFrom = 0;
+  var skipping = false;
+  var blocks = 0;
+  var groups = 0;
+  var atBoundary = true;
+  var index = 0;
+  while (index < source.length) {
+    index = _skipCssTrivia(source, index);
+    if (index == source.length) break;
+    final start = index;
+    final code = source.codeUnitAt(index++);
+    if (!skipping && atBoundary && code == 0x40 /* @ */ ) {
+      final name = _pageRuleName.matchAsPrefix(
+        source,
+        _skipCssTrivia(source, index),
+      );
+      if (name != null) {
+        (retained ??= StringBuffer())
+          ..write(source.substring(keepFrom, start))
+          ..write(' ');
+        skipping = true;
+        index = name.end;
+        continue;
+      }
+    }
+    if (code == 0x22 /* " */ || code == 0x27 /* ' */ ) {
+      index = _skipCssString(source, index, code);
+      atBoundary = false;
+    } else if (code == 0x5c /* \ */ ) {
+      if (index < source.length) index++;
+      atBoundary = false;
+    } else if (code == 0x28 /* ( */ || code == 0x5b /* [ */ ) {
+      groups++;
+      atBoundary = false;
+    } else if (groups > 0) {
+      if (code == 0x29 /* ) */ || code == 0x5d /* ] */ ) groups--;
+    } else if (code == 0x7b /* { */ ) {
+      if (skipping) blocks++;
+      atBoundary = true;
+    } else if (code == 0x7d /* } */ ) {
+      if (skipping && blocks == 0) {
+        // No page block was opened, so this brace belongs to the outer rule.
+        keepFrom = start;
+        skipping = false;
+      } else if (skipping && --blocks == 0) {
+        // csslib consumes an optional semicolon after a directive.
+        final next = _skipCssTrivia(source, index);
+        if (next < source.length && source.codeUnitAt(next) == 0x3b) {
+          index = next + 1;
+        }
+        keepFrom = index;
+        skipping = false;
+      }
+      atBoundary = true;
+    } else if (code == 0x3b /* ; */ ) {
+      if (skipping && blocks == 0) {
+        keepFrom = index;
+        skipping = false;
+      }
+      atBoundary = true;
+    } else {
+      atBoundary = false;
+    }
+  }
+  if (retained == null) return css_parser.parse(source);
+  if (!skipping) retained.write(source.substring(keepFrom));
+  return css_parser.parse(retained.toString());
+}
+
+final _pageRuleName = RegExp(
+  r'page(?![a-z0-9_\\\u00a0-\uffff-])',
+  caseSensitive: false,
+);
+
+int _skipCssTrivia(String source, int index) {
+  while (index < source.length) {
+    final code = source.codeUnitAt(index);
+    if (code == 0x20 || (code >= 0x09 && code <= 0x0d)) {
+      index++;
+    } else if (code == 0x2f && source.startsWith('/*', index)) {
+      final end = source.indexOf('*/', index + 2);
+      index = end < 0 ? source.length : end + 2;
+    } else if (code == 0x3c && source.startsWith('<!--', index)) {
+      final end = source.indexOf('-->', index + 4);
+      index = end < 0 ? source.length : end + 3;
+    } else {
+      break;
+    }
+  }
+  return index;
+}
+
+int _skipCssString(String source, int index, int quote) {
+  while (index < source.length) {
+    final code = source.codeUnitAt(index++);
+    if (code == quote || code == 0x0a || code == 0x0c || code == 0x0d) break;
+    if (code == 0x5c && index < source.length) {
+      final escaped = source.codeUnitAt(index++);
+      if (escaped == 0x0d &&
+          index < source.length &&
+          source.codeUnitAt(index) == 0x0a) {
+        index++;
+      }
+    }
+  }
+  return index;
 }
 
 class _StyleRule {

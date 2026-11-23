@@ -28,6 +28,11 @@ class _ProgressStore implements ReadingProgressLocalRepository {
   ReadingProgressDto? persisted;
   bool failWrites = false;
   Completer<void>? writeGate;
+
+  @override
+  Stream<Map<String, ReadingProgressDto>> watchLibraryProgress() =>
+      throw UnsupportedError('The isolated reader does not watch the library');
+
   @override
   Future<ReadingProgressDto?> getProgress(String bookId) async => persisted;
   @override

@@ -11,6 +11,12 @@ class _ProgressStore implements ReadingProgressLocalRepository {
   final pending = <(ReadingProgressDto, Completer<void>)>[];
 
   @override
+  Stream<Map<String, ReadingProgressDto>> watchLibraryProgress() =>
+      throw UnsupportedError(
+        'The isolated progress controller does not watch the library',
+      );
+
+  @override
   Future<ReadingProgressDto?> getProgress(String bookId) async => persisted;
 
   @override

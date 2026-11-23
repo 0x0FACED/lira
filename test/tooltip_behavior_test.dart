@@ -17,6 +17,7 @@ import 'package:lira/features/discover/presentation/discover_widgets.dart';
 import 'package:lira/features/discover/presentation/material_detail_screen.dart';
 import 'package:lira/features/search/domain/models/search_result_item.dart';
 import 'package:lira/features/search/presentation/widgets/search_book_card.dart';
+import 'package:lira/features/progress/data/repositories/reading_progress_local_repository.dart';
 import 'package:lira/features/settings/data/settings_provider.dart';
 import 'package:lira/l10n/app_localizations.dart';
 import 'package:lira/main.dart';
@@ -62,6 +63,7 @@ void main() {
     final database = AppDatabase.forTesting(NativeDatabase.memory());
     final repository = BooksLocalRepository(database);
     getIt.registerSingleton<BooksLocalRepository>(repository);
+    getIt.registerSingleton(ReadingProgressLocalRepository(database));
     await repository.saveBook(book);
     addTearDown(() async {
       await getIt.reset();

@@ -13,6 +13,7 @@ class BookCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onDelete;
   final double? readingPercentage;
+  final bool compact;
 
   const BookCard({
     super.key,
@@ -20,9 +21,11 @@ class BookCard extends StatelessWidget {
     required this.onTap,
     required this.onDelete,
     this.readingPercentage,
+    this.compact = false,
   });
 
   static const coverAspectRatio = BookCover.aspectRatio;
+  static const hitInset = 4.0;
   static const _titleSize = 14.0;
   static const _authorSize = 12.0;
   static const _lineHeight = 1.3;
@@ -55,23 +58,69 @@ class BookCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
-    final textScaler = MediaQuery.textScalerOf(context);
-    return Material(
-      type: MaterialType.transparency,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        hoverColor: Colors.transparent,
-        mouseCursor: SystemMouseCursors.click,
+    if (compact) {
+      return _BookCardInteraction(
         onTap: onTap,
         onLongPress: () => _confirmDelete(context),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            BookCover(book: book),
-            const SizedBox(height: AppSpacing.compact),
-            SizedBox(
-              height: _textLineExtent(textScaler, _titleSize) * 2,
-              child: Text(
+        child: _buildCompactContent(context),
+      );
+    }
+    final textScaler = MediaQuery.textScalerOf(context);
+    return _BookCardInteraction(
+      onTap: onTap,
+      onLongPress: () => _confirmDelete(context),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          BookCover(book: book),
+          const SizedBox(height: AppSpacing.compact),
+          SizedBox(
+            height: _textLineExtent(textScaler, _titleSize) * 2,
+            child: Text(
+              book.title.trim(),
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontSize: _titleSize,
+                fontWeight: FontWeight.w500,
+                height: _lineHeight,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          SizedBox(
+            height: _textLineExtent(textScaler, _authorSize),
+            child: Text(
+              bookAuthorLabel(book.author, l10n),
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: _authorSize,
+                height: _lineHeight,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Expanded(child: _buildFooter(context)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompactContent(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(width: 48, child: BookCover(book: book)),
+        const SizedBox(width: AppSpacing.compact),
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
                 book.title.trim(),
                 style: theme.textTheme.titleSmall?.copyWith(
                   fontSize: _titleSize,
@@ -81,11 +130,8 @@ class BookCard extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            SizedBox(
-              height: _textLineExtent(textScaler, _authorSize),
-              child: Text(
+              const SizedBox(height: AppSpacing.xs),
+              Text(
                 bookAuthorLabel(book.author, l10n),
                 style: theme.textTheme.bodySmall?.copyWith(
                   fontSize: _authorSize,
@@ -94,12 +140,12 @@ class BookCard extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Expanded(child: _buildFooter(context)),
-          ],
+              const SizedBox(height: AppSpacing.sm),
+              _buildFooter(context),
+            ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -215,4 +261,32 @@ class BookCard extends StatelessWidget {
       },
     );
   }
+}
+
+class _BookCardInteraction extends StatelessWidget {
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
+  final Widget child;
+
+  const _BookCardInteraction({
+    required this.onTap,
+    required this.onLongPress,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) => Material(
+    type: MaterialType.transparency,
+    child: InkWell(
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      hoverColor: Colors.transparent,
+      mouseCursor: SystemMouseCursors.click,
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: Padding(
+        padding: const EdgeInsets.all(BookCard.hitInset),
+        child: child,
+      ),
+    ),
+  );
 }

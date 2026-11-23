@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:drift/native.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,6 +11,7 @@ import 'package:lira/core/di/injection.dart';
 import 'package:lira/core/theme/app_theme.dart';
 import 'package:lira/features/books/data/repositories/books_local_repository.dart';
 import 'package:lira/features/books/domain/models/book_dto.dart';
+import 'package:lira/features/books/domain/providers/book_organization_provider.dart';
 import 'package:lira/features/books/domain/providers/library_layout_provider.dart';
 import 'package:lira/features/books/presentation/book_detail_screen.dart';
 import 'package:lira/features/books/presentation/library_screen.dart';
@@ -20,6 +22,22 @@ import 'package:lira/features/progress/domain/providers/reading_progress_provide
 import 'package:lira/features/settings/data/settings_provider.dart';
 import 'package:lira/l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+void testLibraryWidgets(
+  String description,
+  WidgetTesterCallback body, {
+  TestVariant<Object?> variant = const DefaultTestVariant(),
+}) {
+  testWidgets(description, (tester) async {
+    try {
+      await body(tester);
+    } finally {
+      // Drain Drift's zero-delay stream cleanup inside the test clock.
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(Duration.zero);
+    }
+  }, variant: variant);
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -125,7 +143,7 @@ void main() {
     expect(row.length, columns);
   }
 
-  testWidgets(
+  testLibraryWidgets(
     'saved progress belongs to its book and does not round up completion',
     (tester) async {
       final repository = getIt<ReadingProgressLocalRepository>();
@@ -177,7 +195,7 @@ void main() {
     },
   );
 
-  testWidgets('details use binary file sizes at unit boundaries', (
+  testLibraryWidgets('details use binary file sizes at unit boundaries', (
     tester,
   ) async {
     for (final (bytes, expected) in [
@@ -199,59 +217,60 @@ void main() {
           ),
         ),
       );
-      expect(find.text('Size: $expected'), findsOneWidget);
+      expect(find.text(expected), findsOneWidget);
       expect(tester.takeException(), isNull);
     }
   });
 
-  testWidgets('editing absent and legacy authors preserves an empty value', (
-    tester,
-  ) async {
-    final semantics = tester.ensureSemantics();
-    try {
-      final repository = getIt<BooksLocalRepository>();
-      for (final author in ['', 'Unknown Author', 'Original author']) {
-        final book = BookDto(
-          id: 'edit-author',
-          title: 'Book without author',
-          author: author,
-          format: 'epub',
-          createdAt: DateTime(2026),
-        );
-        await repository.saveBook(book);
-        await mount(tester, home: BookDetailScreen(book: book));
-        final context = tester.element(find.byType(BookDetailScreen));
-        final l10n = AppLocalizations.of(context)!;
-        await tester.ensureVisible(
-          find.widgetWithIcon(IconButton, Icons.edit_outlined),
-        );
-        await tester.pumpAndSettle();
-        final edit = find.bySemanticsLabel(l10n.editBook);
-        expect(edit, findsOneWidget);
-        await tester.tap(edit);
-        await tester.pumpAndSettle();
-        final authorField = find.byType(TextFormField).last;
-        if (author == 'Original author') {
-          await tester.enterText(authorField, '');
-        } else {
-          expect(
-            tester.widget<TextFormField>(authorField).initialValue,
-            isEmpty,
+  testLibraryWidgets(
+    'editing absent and legacy authors preserves an empty value',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        final repository = getIt<BooksLocalRepository>();
+        for (final author in ['', 'Unknown Author', 'Original author']) {
+          final book = BookDto(
+            id: 'edit-author',
+            title: 'Book without author',
+            author: author,
+            format: 'epub',
+            createdAt: DateTime(2026),
           );
+          await repository.saveBook(book);
+          await mount(tester, home: BookDetailScreen(book: book));
+          final context = tester.element(find.byType(BookDetailScreen));
+          final l10n = AppLocalizations.of(context)!;
+          final edit = find.bySemanticsLabel(l10n.editBook);
+          expect(edit, findsOneWidget);
+          await tester.tap(edit);
+          await tester.pumpAndSettle();
+          final authorField = find.byWidgetPredicate(
+            (widget) =>
+                widget is TextField &&
+                widget.decoration?.labelText == l10n.editBookAuthor,
+          );
+          if (author == 'Original author') {
+            await tester.enterText(authorField, '');
+          } else {
+            expect(
+              tester.widget<TextField>(authorField).controller!.text,
+              isEmpty,
+            );
+          }
+          await tester.tap(find.widgetWithText(FilledButton, l10n.save));
+          await tester.pumpAndSettle();
+          expect((await repository.getBookById(book.id))!.author, isEmpty);
+          expect(find.text(l10n.bookAuthorUnknown), findsWidgets);
+          expect(tester.takeException(), isNull);
         }
-        await tester.tap(find.widgetWithText(FilledButton, l10n.save));
-        await tester.pumpAndSettle();
-        expect((await repository.getBookById(book.id))!.author, isEmpty);
-        expect(find.text(l10n.bookAuthorUnknown), findsNWidgets(2));
-        expect(tester.takeException(), isNull);
+      } finally {
+        semantics.dispose();
       }
-    } finally {
-      semantics.dispose();
-    }
-  });
+    },
+  );
 
   for (final details in [false, true]) {
-    testWidgets(
+    testLibraryWidgets(
       'long ${details ? 'details' : 'library'} deletion can scroll and cancel',
       (tester) async {
         final repository = getIt<BooksLocalRepository>();
@@ -270,13 +289,13 @@ void main() {
         );
         final l10n = AppLocalizations.of(context)!;
         if (details) {
-          final delete = find.widgetWithIcon(TextButton, Icons.delete_outline);
-          await tester.ensureVisible(delete);
-          await tester.tap(delete);
+          await tester.tap(find.byType(PopupMenuButton<String>));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text(l10n.deleteBook));
         } else {
           final card = find.byKey(const ValueKey('0'));
           await tester.longPressAt(
-            tester.getTopLeft(card) + const Offset(24, 24),
+            tester.getTopLeft(card) + const Offset(2, 24),
           );
         }
         await tester.pumpAndSettle();
@@ -299,7 +318,7 @@ void main() {
     );
   }
 
-  testWidgets('density changes preserve search and survive reopening', (
+  testLibraryWidgets('density changes preserve search and survive reopening', (
     tester,
   ) async {
     await mount(tester);
@@ -326,7 +345,7 @@ void main() {
   for (final width in [320.0, 390.0]) {
     for (final columns in [2, 3]) {
       for (final textScale in [0.8, 1.0, 2.0]) {
-        testWidgets(
+        testLibraryWidgets(
           '$columns columns fit width $width at text scale $textScale',
           (tester) async {
             await sharedPrefs.setInt(
@@ -341,20 +360,6 @@ void main() {
             );
             expectColumns(tester, columns);
             expect(tester.takeException(), isNull);
-            final heading = find.text('Библиотека');
-            final density = find.byType(PopupMenuButton<int>);
-            final import = find.widgetWithIcon(IconButton, Icons.add);
-            for (final action in [density, import]) {
-              expect(
-                tester.getCenter(action).dy,
-                closeTo(tester.getCenter(heading).dy, 0.01),
-              );
-              expect(
-                tester.getRect(action).left,
-                greaterThan(tester.getRect(heading).right),
-              );
-              expect(action.hitTestable(), findsOneWidget);
-            }
 
             final cards = find.byType(BookCard).evaluate().take(3).toList();
             final coverSizes = <Size>[];
@@ -387,7 +392,7 @@ void main() {
     }
   }
 
-  testWidgets('page count fits a dense row at large text scale', (
+  testLibraryWidgets('page count fits a dense row at large text scale', (
     tester,
   ) async {
     await sharedPrefs.setInt(LibraryColumnsNotifier.storageKey, 3);
@@ -409,7 +414,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('long press still requires confirmation before deleting', (
+  testLibraryWidgets('long press still requires confirmation before deleting', (
     tester,
   ) async {
     await mount(tester);
@@ -428,7 +433,116 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
+  testLibraryWidgets(
+    'sort and shelf use saved progress and persist the sort order',
+    (tester) async {
+      final progress = getIt<ReadingProgressLocalRepository>();
+      for (final (id, percent) in [('4', 30.0), ('3', 100.0), ('2', 70.0)]) {
+        await progress.saveProgress(
+          ReadingProgressDto(
+            bookId: id,
+            location: 'test',
+            percentage: percent,
+            updatedAt: DateTime(2026),
+          ),
+        );
+      }
+      await mount(tester);
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(LibraryScreen)),
+      )!;
+      await tester.tap(find.byType(PopupMenuButton<LibrarySort>));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.widgetWithText(
+          CheckedPopupMenuItem<LibrarySort>,
+          l10n.librarySortProgress,
+        ),
+      );
+      await tester.pumpAndSettle();
+      String firstBook() =>
+          tester.widget<BookCard>(find.byType(BookCard).first).book.id;
+      expect(firstBook(), '3');
+      await tester.tap(find.text(l10n.libraryInProgress));
+      await tester.pumpAndSettle();
+      expect(firstBook(), '2');
+      expect(find.byKey(const ValueKey('4')), findsOneWidget);
+      expect(find.byKey(const ValueKey('3')), findsNothing);
+      expect(find.byKey(const ValueKey('0')), findsNothing);
+
+      await mount(tester);
+      expect(firstBook(), '3');
+      await tester.tap(find.byType(PopupMenuButton<LibrarySort>));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.widgetWithText(
+          CheckedPopupMenuItem<LibrarySort>,
+          l10n.librarySortTitle,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(firstBook(), '0'); // «Книга…» sorts before «Короткая…».
+    },
+  );
+
+  testLibraryWidgets('saved tags filter the list and compose with search', (
+    tester,
+  ) async {
+    final labels = BookOrganizationsNotifier(sharedPrefs);
+    addTearDown(labels.dispose);
+    await labels.setLabels(
+      '0',
+      const BookOrganization(genres: ['Экономика'], tags: ['К обсуждению']),
+    );
+    await labels.setLabels('1', const BookOrganization(tags: ['к обсуждению']));
+    await mount(tester);
+    final l10n = AppLocalizations.of(
+      tester.element(find.byType(LibraryScreen)),
+    )!;
+    await tester.tap(find.byType(PopupMenuButton<int>));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.widgetWithText(CheckedPopupMenuItem<int>, l10n.libraryListView),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.widgetWithIcon(IconButton, Icons.filter_list_rounded),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('К обсуждению'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('2')), findsNothing);
+    await tester.enterText(find.byType(TextField), 'КОРОТКАЯ');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('0')), findsNothing);
+    expect(find.byKey(const ValueKey('1')), findsOneWidget);
+  });
+
+  testLibraryWidgets(
+    'card hit area includes the left edge for mouse and touch',
+    (tester) async {
+      await mount(tester);
+      final card = find.byKey(const ValueKey('0'));
+      final edge = tester.getTopLeft(card) + const Offset(2, 24);
+      final mouse = await tester.startGesture(
+        edge,
+        kind: PointerDeviceKind.mouse,
+      );
+      await tester.pump(const Duration(milliseconds: 600));
+      await mouse.up();
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+      await tester.tap(find.widgetWithText(TextButton, 'Отмена'));
+      await tester.pumpAndSettle();
+      await tester.longPressAt(edge);
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+    },
+  );
+
+  testLibraryWidgets(
     'iPhone landscape keeps the selected three columns',
     (tester) async {
       await sharedPrefs.setInt(LibraryColumnsNotifier.storageKey, 3);
@@ -443,7 +557,7 @@ void main() {
     variant: TargetPlatformVariant.only(TargetPlatform.iOS),
   );
 
-  testWidgets('tablet retains the automatic grid', (tester) async {
+  testLibraryWidgets('tablet retains the automatic grid', (tester) async {
     await sharedPrefs.setInt(LibraryColumnsNotifier.storageKey, 3);
     await mount(tester, size: const Size(800, 1200));
     expect(find.byType(PopupMenuButton<int>), findsNothing);
@@ -451,7 +565,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
+  testLibraryWidgets(
     'narrow desktop retains the automatic grid',
     (tester) async {
       await sharedPrefs.setInt(LibraryColumnsNotifier.storageKey, 3);

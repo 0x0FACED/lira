@@ -22,6 +22,7 @@ import '../../../search/domain/models/search_result_item.dart';
 import '../models/book_dto.dart';
 import '../../data/repositories/books_local_repository.dart';
 import '../../../search/domain/providers/download_provider.dart';
+import 'book_organization_provider.dart';
 
 final booksControllerProvider =
     AsyncNotifierProvider<BooksController, List<BookDto>>(() {
@@ -506,9 +507,11 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
   }
 
   Future<void> removeBook(String id) async {
+    final organizations = ref.read(bookOrganizationsProvider.notifier);
     await _repository.deleteBook(id);
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() => _repository.getAllBooks());
+    await organizations.removeLabels(id);
   }
 
   Future<String?> _downloadCoverToPath(

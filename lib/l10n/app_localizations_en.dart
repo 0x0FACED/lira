@@ -37,6 +37,87 @@ class AppLocalizationsEn extends AppLocalizations {
   String get libraryThreeBooksPerRow => '3 books per row';
 
   @override
+  String get libraryLayout => 'Library layout';
+
+  @override
+  String get libraryGridView => 'Covers';
+
+  @override
+  String get libraryListView => 'List';
+
+  @override
+  String get librarySortBy => 'Sort by';
+
+  @override
+  String get librarySortAdded => 'Date added';
+
+  @override
+  String get librarySortRecent => 'Last opened';
+
+  @override
+  String get librarySortProgress => 'Progress';
+
+  @override
+  String get librarySortTitle => 'Title';
+
+  @override
+  String get librarySortAuthor => 'Author';
+
+  @override
+  String get libraryAllBooks => 'All books';
+
+  @override
+  String get libraryUnread => 'Not started';
+
+  @override
+  String get libraryInProgress => 'Reading';
+
+  @override
+  String get libraryFinished => 'Finished';
+
+  @override
+  String get libraryLabels => 'Genres and tags';
+
+  @override
+  String get libraryClearFilters => 'Clear filters';
+
+  @override
+  String get libraryNoMatchingBooks => 'No books in this view';
+
+  @override
+  String libraryBookCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count books',
+      one: '1 book',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get bookGenres => 'Genres';
+
+  @override
+  String get bookTags => 'Tags';
+
+  @override
+  String get bookLabelsHint => 'Separate entries with commas or new lines';
+
+  @override
+  String get bookLabelsEmpty =>
+      'Add genres and tags to find this book in your library.';
+
+  @override
+  String get bookEditError => 'Could not save book details.';
+
+  @override
+  String get bookContinueReading => 'Continue reading';
+
+  @override
+  String get bookFileInfo => 'File information';
+
+  @override
   String get search => 'Search';
 
   @override

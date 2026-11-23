@@ -6,6 +6,11 @@ import '../../../../core/di/injection.dart';
 import '../../data/repositories/reading_progress_local_repository.dart';
 import '../models/reading_progress_dto.dart';
 
+final libraryReadingProgressProvider =
+    StreamProvider.autoDispose<Map<String, ReadingProgressDto>>((ref) {
+      return getIt<ReadingProgressLocalRepository>().watchLibraryProgress();
+    });
+
 final readingProgressControllerProvider =
     AsyncNotifierProvider.family<
       ReadingProgressController,

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Skip unsupported CSS `@page` rules before parsing inline and local stylesheets, so malformed page rules cannot stall the reader or discard adjacent styles.
 - Replace whole-book synchronous pagination with target-first, frame-budgeted page generation and two-turn lookahead; cancel stale layouts, preserve canonical spread pairing and exact restoration, and resume missing chapter-boundary turns without skipping text. Shape long paragraphs in adaptive page-sized windows; reuse linguistic offsets and lean native hyphen probes instead of allocating full coordinate maps for every trial.
 - Fix justified first-line overflow with paragraph indentation and hyphenation: reserve a real glyph advance instead of leading letter spacing, without changing source offsets or line height. Cover glyph bounds using the bundled reader fonts in both reading modes.
 - Add first-line indent, paragraph spacing/alignment, reader font weight and language-aware EN/RU hyphenation using bundled TeX patterns; retain source UTF-16 coordinates for selection, copy, links, search, pagination and reflow.

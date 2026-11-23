@@ -79,6 +79,18 @@ class TypographicBookCover extends StatelessWidget {
       child: MediaQuery.withNoTextScaling(
         child: LayoutBuilder(
           builder: (context, constraints) {
+            if (constraints.maxWidth < 64) {
+              return ColoredBox(
+                color: paper,
+                child: Center(
+                  child: Icon(
+                    Icons.menu_book_outlined,
+                    size: constraints.maxWidth / 2,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              );
+            }
             final inset = (constraints.maxWidth * 0.1).clamp(8.0, 24.0);
             return ColoredBox(
               color: paper,

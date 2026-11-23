@@ -36,6 +36,89 @@ class AppLocalizationsRu extends AppLocalizations {
   String get libraryThreeBooksPerRow => '3 книги в ряд';
 
   @override
+  String get libraryLayout => 'Вид библиотеки';
+
+  @override
+  String get libraryGridView => 'Обложки';
+
+  @override
+  String get libraryListView => 'Список';
+
+  @override
+  String get librarySortBy => 'Сортировка';
+
+  @override
+  String get librarySortAdded => 'Дата добавления';
+
+  @override
+  String get librarySortRecent => 'Последнее открытие';
+
+  @override
+  String get librarySortProgress => 'Прогресс';
+
+  @override
+  String get librarySortTitle => 'Название';
+
+  @override
+  String get librarySortAuthor => 'Автор';
+
+  @override
+  String get libraryAllBooks => 'Все книги';
+
+  @override
+  String get libraryUnread => 'Не начаты';
+
+  @override
+  String get libraryInProgress => 'Читаю';
+
+  @override
+  String get libraryFinished => 'Прочитаны';
+
+  @override
+  String get libraryLabels => 'Жанры и теги';
+
+  @override
+  String get libraryClearFilters => 'Сбросить фильтры';
+
+  @override
+  String get libraryNoMatchingBooks => 'В этой подборке нет книг';
+
+  @override
+  String libraryBookCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count книги',
+      many: '$count книг',
+      few: '$count книги',
+      one: '$count книга',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get bookGenres => 'Жанры';
+
+  @override
+  String get bookTags => 'Теги';
+
+  @override
+  String get bookLabelsHint => 'Разделяйте запятыми или переносами строк';
+
+  @override
+  String get bookLabelsEmpty =>
+      'Добавьте жанры и теги, чтобы быстрее находить книгу в библиотеке.';
+
+  @override
+  String get bookEditError => 'Не удалось сохранить информацию о книге.';
+
+  @override
+  String get bookContinueReading => 'Продолжить чтение';
+
+  @override
+  String get bookFileInfo => 'Информация о файле';
+
+  @override
   String get search => 'Поиск';
 
   @override

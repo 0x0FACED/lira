@@ -1,3 +1,5 @@
+import 'dart:isolate';
+
 import 'package:epub_engine/src/epub_styles.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -151,6 +153,26 @@ void main() {
       final inline = _styleFor(resolver, document.querySelector('#inline')!);
       expect(inline.textStyle.fontSize, 29 * 20 / 16);
       expect(inline.textStyle.fontStyle, FontStyle.normal);
+    },
+  );
+  test(
+    'broken page rules do not block reading or hide surrounding styles',
+    () async {
+      // A synchronous csslib loop must fail this test without hanging the suite.
+      final results = ReceivePort();
+      addTearDown(results.close);
+      final worker = await Isolate.spawn(
+        _resolveStylesAroundPageRules,
+        results.sendPort,
+        onError: results.sendPort,
+      );
+      addTearDown(worker.kill);
+      expect(await results.first.timeout(const Duration(seconds: 5)), (
+        true,
+        true,
+        true,
+        const Color(0xFF123456),
+      ));
     },
   );
 
@@ -516,6 +538,42 @@ void main() {
       }
     },
   );
+}
+
+void _resolveStylesAroundPageRules(SendPort result) {
+  final document = html_parser.parse('''
+    <link rel="stylesheet" href="book.css">
+    <style>
+      p { font-weight: bold; }
+      @page, body, div, img {
+        /* } @page { */
+        @top-center { content: "}"; }
+        @bottom-center { content: '{'; }
+      }
+      p { text-align: center; }
+    </style>
+    <p>Still readable</p>
+  ''');
+  final resolver = _resolver(
+    document,
+    const TextStyle(),
+    stylesheets: const {
+      'OPS/book.css': '@import "imported.css";',
+      'OPS/imported.css': '''
+        @media screen {
+          @PAGE, body { margin: 0; } /* optional separator */;
+          p { font-style: italic; color: #123456; }
+        }
+      ''',
+    },
+  );
+  final style = _styleFor(resolver, document.querySelector('p')!);
+  result.send((
+    style.textStyle.fontWeight == FontWeight.bold,
+    style.textAlign == TextAlign.center,
+    style.textStyle.fontStyle == FontStyle.italic,
+    style.textStyle.color,
+  ));
 }
 
 EpubStyleResolver _resolver(
