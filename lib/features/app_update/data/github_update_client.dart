@@ -28,7 +28,7 @@ class GitHubUpdateClient {
   }
 
   static const _repository = ['0x0FACED', 'lira'];
-  static String _apkName(String tag) => 'lira-android-$tag.apk';
+  static String _apkName(String tag) => 'lira-$tag-android.apk';
   static const _connectionTimeout = Duration(seconds: 15);
   static const _readTimeout = Duration(seconds: 30);
   static const _metadataLimit = 1024 * 1024;

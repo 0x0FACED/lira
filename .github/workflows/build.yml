@@ -28,13 +28,9 @@ jobs:
     uses: ./.github/workflows/ci.yml
 
   build-android:
-    name: Build Android (${{ matrix.package }})
+    name: Build Android
     needs: verify
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        package: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.build_type == 'debug' && '["apk"]' || '["apk","appbundle"]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -63,10 +59,8 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: python3 scripts/configure_android_signing.py
 
-      - name: Build Android package
-        env:
-          PACKAGE: ${{ matrix.package }}
-        run: flutter build "$PACKAGE" --"$BUILD_TYPE" --no-pub
+      - name: Build Android APK
+        run: flutter build apk --"$BUILD_TYPE" --no-pub
 
       - name: Remove signing files
         if: always()
@@ -75,8 +69,8 @@ jobs:
       - name: Upload Android artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.package == 'apk' && 'android-apk' || 'android-aab' }}
-          path: ${{ matrix.package == 'apk' && format('build/app/outputs/flutter-apk/app-{0}.apk', env.BUILD_TYPE) || 'build/app/outputs/bundle/release/app-release.aab' }}
+          name: android-apk
+          path: build/app/outputs/flutter-apk/app-${{ env.BUILD_TYPE }}.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -259,23 +253,21 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         working-directory: release-artifacts
         run: |
-          mv app-release.apk "lira-android-$RELEASE_TAG.apk"
-          mv app-release.aab "lira-android-$RELEASE_TAG.aab"
-          mv lira-linux.zip "lira-linux-$RELEASE_TAG.zip"
-          mv lira-windows.zip "lira-windows-$RELEASE_TAG.zip"
-          mv Lira.dmg "lira-macos-$RELEASE_TAG.dmg"
-          mv lira-ios-unsigned.ipa "lira-ios-$RELEASE_TAG.ipa"
+          mv app-release.apk "lira-$RELEASE_TAG-android.apk"
+          mv lira-linux.zip "lira-$RELEASE_TAG-linux.zip"
+          mv lira-windows.zip "lira-$RELEASE_TAG-windows.zip"
+          mv Lira.dmg "lira-$RELEASE_TAG-macos.dmg"
+          mv lira-ios-unsigned.ipa "lira-$RELEASE_TAG-ios.ipa"
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            release-artifacts/lira-android-${{ github.ref_name }}.apk
-            release-artifacts/lira-android-${{ github.ref_name }}.aab
-            release-artifacts/lira-linux-${{ github.ref_name }}.zip
-            release-artifacts/lira-windows-${{ github.ref_name }}.zip
-            release-artifacts/lira-macos-${{ github.ref_name }}.dmg
-            release-artifacts/lira-ios-${{ github.ref_name }}.ipa
+            release-artifacts/lira-${{ github.ref_name }}-android.apk
+            release-artifacts/lira-${{ github.ref_name }}-linux.zip
+            release-artifacts/lira-${{ github.ref_name }}-windows.zip
+            release-artifacts/lira-${{ github.ref_name }}-macos.dmg
+            release-artifacts/lira-${{ github.ref_name }}-ios.ipa
           fail_on_unmatched_files: true
           body_path: ${{ runner.temp }}/release-notes.md
           draft: false

@@ -54,13 +54,13 @@ Warm light and dark themes, layouts for phones and desktops, and English and Rus
 
 | Your device | Download | Before you open it |
 | --- | --- | --- |
-| **Android** | `lira-android-v<version>.apk` | Install the APK directly on your device. You may need to allow installation from your browser or file manager. |
-| **Windows** | `lira-windows-v<version>.zip` | Extract the archive and launch the app. |
-| **macOS** | `lira-macos-v<version>.dmg` | Requires macOS 11 or later. The app is not Developer ID-signed or notarized; Gatekeeper may require you to allow it in Privacy & Security. |
-| **Linux** | `lira-linux-v<version>.zip` | Extract the archive and run `lira` on a GTK 3 desktop. |
-| **iOS** | `lira-ios-v<version>.ipa` (unsigned) | Sign the IPA with AltStore, Sideloadly, or another signing tool before installation. It is not a TestFlight or App Store download. |
+| **Android** | `lira-v<version>-android.apk` | Install the APK directly on your device. You may need to allow installation from your browser or file manager. |
+| **Windows** | `lira-v<version>-windows.zip` | Extract the archive and launch the app. |
+| **macOS** | `lira-v<version>-macos.dmg` | Requires macOS 11 or later. The app is not Developer ID-signed or notarized; Gatekeeper may require you to allow it in Privacy & Security. |
+| **Linux** | `lira-v<version>-linux.zip` | Extract the archive and run `lira` on a GTK 3 desktop. |
+| **iOS** | `lira-v<version>-ios.ipa` (unsigned) | Sign the IPA with AltStore, Sideloadly, or another signing tool before installation. It is not a TestFlight or App Store download. |
 
-[Browse all releases](https://github.com/0x0FACED/lira/releases) for older builds and the Android App Bundle.
+[Browse all releases](https://github.com/0x0FACED/lira/releases) for older builds.
 
 ## Your first chapter
 
