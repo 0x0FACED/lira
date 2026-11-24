@@ -56,3 +56,4 @@ android/key.properties
 build_dist/
 lira-icon-last.png
 
+/test_data

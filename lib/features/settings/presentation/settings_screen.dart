@@ -11,6 +11,7 @@ import '../../../core/widgets/app_components.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../app_update/presentation/app_update_controller.dart';
 import '../../app_update/presentation/app_update_settings_section.dart';
+import '../../books/domain/providers/open_library_preferences.dart';
 import '../../local_sync/presentation/local_sync_screen.dart';
 import '../../search/domain/providers/book_source_clients.dart';
 import '../../search/presentation/anna_access_screen.dart';
@@ -120,6 +121,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 ),
                                 trailing: const Icon(Icons.chevron_right),
                                 onTap: () => context.push('/login'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      _SettingsGroup(
+                        title: l10n.openLibrarySettingsGroup,
+                        cards: [
+                          _SettingsCard(
+                            children: [
+                              SwitchListTile(
+                                secondary: const Icon(
+                                  Icons.auto_stories_outlined,
+                                ),
+                                title: Text(l10n.openLibraryAutoTitle),
+                                subtitle: Text(
+                                  l10n.openLibraryAutoHint,
+                                  style: hintStyle,
+                                ),
+                                value: ref.watch(openLibraryAutoProvider),
+                                onChanged: (enabled) => ref
+                                    .read(openLibraryAutoProvider.notifier)
+                                    .setEnabled(enabled),
                               ),
                             ],
                           ),

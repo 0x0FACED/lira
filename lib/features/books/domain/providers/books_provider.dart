@@ -20,9 +20,14 @@ import '../../../../core/network/proxy_http_overrides.dart';
 import '../../../search/domain/providers/book_source_clients.dart';
 import '../../../search/domain/models/search_result_item.dart';
 import '../models/book_dto.dart';
+import '../../data/open_library_client.dart';
+import '../../data/open_library_covers.dart';
 import '../../data/repositories/books_local_repository.dart';
 import '../../../search/domain/providers/download_provider.dart';
+import '../open_library_genres.dart';
 import 'book_organization_provider.dart';
+import 'open_library_preferences.dart';
+import 'open_library_provider.dart';
 
 final booksControllerProvider =
     AsyncNotifierProvider<BooksController, List<BookDto>>(() {
@@ -57,7 +62,7 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
       throw Exception('Unsupported file format: $extension');
     }
 
-    final title = p.basenameWithoutExtension(file.path);
+    var title = p.basenameWithoutExtension(file.path);
 
     // Copy file to local app directory
     final appDocDir = await getApplicationDocumentsDirectory();
@@ -72,6 +77,8 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
 
     // Extract cover and metadata
     String author = '';
+    String? isbn;
+    var usedFilename = true;
     String? coverPath;
     int pageCount = 0;
     int fileSizeBytes = await File(file.path).length();
@@ -81,6 +88,12 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
         final bytes = await File(newFilePath).readAsBytes();
         final parsed = await EpubParser.parse(bytes);
         author = _authorMetadata(parsed.author);
+        final embeddedTitle = parsed.title.trim();
+        if (embeddedTitle.isNotEmpty && embeddedTitle != 'Unknown Title') {
+          title = embeddedTitle;
+          usedFilename = false;
+        }
+        isbn = _singleIsbn(parsed.identifiers);
 
         // Estimate page count based on total characters (~1800 chars/page)
         final totalChars = parsed.chapters.fold<int>(
@@ -123,7 +136,7 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
             if (!await coversDir.exists()) {
               await coversDir.create(recursive: true);
             }
-            coverPath = p.join(coversDir.path, '$bookId.png');
+            final path = p.join(coversDir.path, '$bookId.png');
             // Encode RGBA pixels to PNG
             final pngBytes = await _encodePng(
               pdfImage.pixels,
@@ -131,7 +144,8 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
               pdfImage.height,
             );
             if (pngBytes != null) {
-              await File(coverPath).writeAsBytes(pngBytes);
+              await File(path).writeAsBytes(pngBytes);
+              coverPath = path;
               // ignore: avoid_print
               print('PDF cover saved: $coverPath');
             }
@@ -161,6 +175,9 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
     // Update state
     final currentBooks = state.value ?? [];
     state = AsyncData([...currentBooks, newBook]);
+    if (isbn != null) {
+      unawaited(_autoEnrich(newBook, isbn, replaceFilename: usedFilename));
+    }
   }
 
   Future<void> downloadAndImportBook(SearchResultItem book) async {
@@ -486,7 +503,9 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
     );
 
     await _repository.saveBook(newBook);
-    state = AsyncData([...currentBooks, newBook]);
+    state = AsyncData([...(state.value ?? []), newBook]);
+    final isbn = parsed == null ? null : _singleIsbn(parsed.identifiers);
+    if (isbn != null) unawaited(_autoEnrich(newBook, isbn));
   }
 
   String _authorMetadata(String value) {
@@ -494,24 +513,174 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
     return author == 'Unknown Author' ? '' : author;
   }
 
+  Future<({String? isbn, String? language})> openLibraryHints(
+    BookDto book,
+  ) async {
+    final path = book.fileUrl;
+    if (book.format == 'epub' && path != null && path.isNotEmpty) {
+      try {
+        final metadata = await EpubParser.readBibliographicMetadata(
+          await File(path).readAsBytes(),
+        );
+        final language = metadata.language.trim();
+        return (
+          isbn: _singleIsbn(metadata.identifiers),
+          language: language.isEmpty ? null : language,
+        );
+      } on Exception {
+        // An unreadable local file does not prevent manual search.
+      }
+    }
+    return (isbn: null, language: null);
+  }
+
+  String? _singleIsbn(Iterable<String> identifiers) {
+    String? result;
+    for (final identifier in identifiers) {
+      final isbn = normalizeIsbn(identifier);
+      if (isbn == null) continue;
+      if (result != null && result != isbn) return null;
+      result = isbn;
+    }
+    return result;
+  }
+
+  Future<void> _autoEnrich(
+    BookDto expected,
+    String isbn, {
+    bool replaceFilename = false,
+  }) async {
+    try {
+      if (!ref.read(openLibraryAutoProvider)) return;
+      final client = ref.read(openLibraryClientProvider);
+      final matches = await client.search(isbn: isbn);
+      if (matches.length != 1) return;
+      final candidate = matches.single;
+      if (candidate.editionKey == null || !candidate.isbns.contains(isbn)) {
+        return;
+      }
+      final cover = await findAutomaticOpenLibraryCover(
+        client,
+        candidate,
+        expected.coverUrl,
+      );
+      await _applyOpenLibraryMetadata(
+        expected,
+        candidate,
+        title: replaceFilename,
+        author: _authorMetadata(expected.author).isEmpty,
+        genres: true,
+        cover: cover,
+        automatic: true,
+      );
+    } on Exception {
+      // Optional background enrichment never makes a local import fail.
+    } on StateError {
+      // The book changed or the controller was disposed while looking it up.
+    }
+  }
+
+  Future<void> applyOpenLibraryMetadata(
+    BookDto expected,
+    OpenLibraryCandidate candidate, {
+    required bool title,
+    required bool author,
+    required bool genres,
+    OpenLibraryCover? cover,
+  }) => _applyOpenLibraryMetadata(
+    expected,
+    candidate,
+    title: title,
+    author: author,
+    genres: genres,
+    cover: cover,
+  );
+
+  Future<void> _applyOpenLibraryMetadata(
+    BookDto expected,
+    OpenLibraryCandidate candidate, {
+    required bool title,
+    required bool author,
+    required bool genres,
+    OpenLibraryCover? cover,
+    bool automatic = false,
+  }) async {
+    if (automatic && !ref.read(openLibraryAutoProvider)) return;
+    final authorName = candidate.author;
+    final additions = genres
+        ? openLibraryGenres(
+            candidate.subjects,
+            russian: ref.read(localeProvider).languageCode == 'ru',
+          )
+        : const <String>[];
+    File? newCover;
+    BookDto? updated;
+    try {
+      if (cover != null) {
+        newCover = await newOpenLibraryCoverFile(expected.id);
+        await newCover.writeAsBytes(cover.bytes);
+      }
+      if (automatic && !ref.read(openLibraryAutoProvider)) return;
+      updated = await _repository.applyCatalogMetadata(
+        expected,
+        title: title && candidate.title.isNotEmpty ? candidate.title : null,
+        author: author && authorName.isNotEmpty ? authorName : null,
+        coverUrl: newCover?.path,
+      );
+      if (updated == null) throw StateError('Book changed since lookup');
+    } finally {
+      if (updated == null && newCover != null) {
+        await deleteOpenLibraryCover(expected.id, newCover.path);
+      }
+    }
+
+    final currentBooks = state.value;
+    if (currentBooks != null) {
+      state = AsyncData([
+        for (final book in currentBooks)
+          if (book.id == updated.id) updated else book,
+      ]);
+    }
+    if (newCover != null) {
+      unawaited(deleteOpenLibraryCover(expected.id, expected.coverUrl));
+    }
+    if (additions.isNotEmpty) {
+      final organizations = ref.read(bookOrganizationsProvider.notifier);
+      final organization = ref.read(bookOrganizationProvider(expected.id));
+      if (!automatic || organization.genres.isEmpty) {
+        final merged = mergeOpenLibraryGenres(organization.genres, additions);
+        if (merged.length != organization.genres.length) {
+          await organizations.setLabels(
+            expected.id,
+            BookOrganization(genres: merged, tags: organization.tags),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> updateBook(BookDto updatedBook) async {
     await _repository.updateBook(updatedBook);
 
     // Update local state by replacing the old book
     final currentBooks = state.value ?? [];
-    state = AsyncData(
-      currentBooks
-          .map((b) => b.id == updatedBook.id ? updatedBook : b)
-          .toList(),
-    );
+    state = AsyncData([
+      for (final book in currentBooks)
+        if (book.id == updatedBook.id)
+          book.copyWith(title: updatedBook.title, author: updatedBook.author)
+        else
+          book,
+    ]);
   }
 
   Future<void> removeBook(String id) async {
     final organizations = ref.read(bookOrganizationsProvider.notifier);
+    final book = await _repository.getBookById(id);
     await _repository.deleteBook(id);
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() => _repository.getAllBooks());
     await organizations.removeLabels(id);
+    await deleteOpenLibraryCover(id, book?.coverUrl);
   }
 
   Future<String?> _downloadCoverToPath(

@@ -109,6 +109,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get bookTags => 'Теги';
 
   @override
+  String get bookAddGenre => 'Добавить жанр';
+
+  @override
+  String get bookAddTag => 'Добавить тег';
+
+  @override
   String get bookAddLabels => 'Добавить метки';
 
   @override
@@ -117,14 +123,116 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get bookLabelsHint => 'Разделяйте запятыми или переносами строк';
-
-  @override
   String get bookLabelsEmpty =>
       'Добавьте жанры и теги, чтобы быстрее находить книгу в библиотеке.';
 
   @override
   String get bookEditError => 'Не удалось сохранить информацию о книге.';
+
+  @override
+  String get openLibraryFind => 'Найти в Open Library';
+
+  @override
+  String get openLibrarySettingsGroup => 'Метаданные библиотеки';
+
+  @override
+  String get openLibraryAutoTitle => 'Дополнять сведения из Open Library';
+
+  @override
+  String get openLibraryAutoHint =>
+      'По умолчанию выключено. Для поиска недостающих сведений автоматически отправляется только ISBN. Файл книги никогда не загружается.';
+
+  @override
+  String get openLibrarySearchHint =>
+      'ISBN поможет найти конкретное издание. Если его нет, ищите по названию и автору. Изменения сохранятся только после проверки и подтверждения.';
+
+  @override
+  String get openLibrarySearchByIsbn => 'ISBN';
+
+  @override
+  String get openLibrarySearchByText => 'Название и автор';
+
+  @override
+  String get openLibraryIsbnInvalid => 'Введите корректный ISBN-10 или ISBN-13';
+
+  @override
+  String get openLibrarySearchRequired => 'Введите название или автора';
+
+  @override
+  String get openLibrarySearching => 'Поиск в Open Library…';
+
+  @override
+  String get openLibraryNoResults =>
+      'Совпадений нет. Попробуйте поиск по названию и автору или другой ISBN.';
+
+  @override
+  String get openLibraryNetworkError =>
+      'Не удалось связаться с Open Library. Проверьте соединение и повторите поиск.';
+
+  @override
+  String get openLibraryHintsError =>
+      'Не удалось прочитать ISBN книги. Можно искать по названию и автору.';
+
+  @override
+  String get openLibraryWork => 'Произведение';
+
+  @override
+  String get openLibraryEdition => 'Издание';
+
+  @override
+  String get openLibraryPreview => 'Проверка сведений о книге';
+
+  @override
+  String get openLibraryPreviewHint =>
+      'Выберите сведения для применения. Существующие жанры и теги сохранятся, невыбранные поля не изменятся.';
+
+  @override
+  String get openLibraryCurrent => 'Сейчас';
+
+  @override
+  String get openLibraryNew => 'Из Open Library';
+
+  @override
+  String get openLibraryNoData => 'Нет данных';
+
+  @override
+  String get openLibraryUnchanged => 'Уже совпадает';
+
+  @override
+  String get openLibraryCover => 'Обложка';
+
+  @override
+  String get openLibraryCoverLoading => 'Загрузка обложки…';
+
+  @override
+  String get openLibraryCoverMissing =>
+      'Обложка недоступна. Остальные сведения можно применить.';
+
+  @override
+  String get openLibraryCoverError =>
+      'Не удалось загрузить обложку. Остальные сведения можно применить.';
+
+  @override
+  String get openLibraryCoverRetry => 'Повторить загрузку обложки';
+
+  @override
+  String get openLibrarySource => 'Открыть источник в Open Library';
+
+  @override
+  String get openLibrarySourceError => 'Не удалось открыть ссылку на источник';
+
+  @override
+  String get openLibraryBack => 'К результатам';
+
+  @override
+  String get openLibraryApply => 'Применить выбранное';
+
+  @override
+  String get openLibrarySaving => 'Сохранение…';
+
+  @override
+  String get openLibrarySaveError =>
+      'Не удалось применить сведения. Возможно, книга изменена или удалена. Закройте окно и откройте его заново перед повторной попыткой.';
 
   @override
   String get bookContinueReading => 'Продолжить чтение';

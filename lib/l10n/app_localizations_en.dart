@@ -108,6 +108,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookTags => 'Tags';
 
   @override
+  String get bookAddGenre => 'Add genre';
+
+  @override
+  String get bookAddTag => 'Add tag';
+
+  @override
   String get bookAddLabels => 'Add labels';
 
   @override
@@ -116,14 +122,116 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get bookLabelsHint => 'Separate entries with commas or new lines';
-
-  @override
   String get bookLabelsEmpty =>
       'Add genres and tags to find this book in your library.';
 
   @override
   String get bookEditError => 'Could not save book details.';
+
+  @override
+  String get openLibraryFind => 'Find in Open Library';
+
+  @override
+  String get openLibrarySettingsGroup => 'Library metadata';
+
+  @override
+  String get openLibraryAutoTitle => 'Fill missing details from Open Library';
+
+  @override
+  String get openLibraryAutoHint =>
+      'Off by default. Only the ISBN is sent automatically to find missing book details. Your book file is never uploaded.';
+
+  @override
+  String get openLibrarySearchHint =>
+      'Search by ISBN for a specific edition, or use title and author. Nothing changes until you review and apply.';
+
+  @override
+  String get openLibrarySearchByIsbn => 'ISBN';
+
+  @override
+  String get openLibrarySearchByText => 'Title and author';
+
+  @override
+  String get openLibraryIsbnInvalid => 'Enter a valid ISBN-10 or ISBN-13';
+
+  @override
+  String get openLibrarySearchRequired => 'Enter a title or author';
+
+  @override
+  String get openLibrarySearching => 'Searching Open Library…';
+
+  @override
+  String get openLibraryNoResults =>
+      'No matches. Try title and author, or another ISBN.';
+
+  @override
+  String get openLibraryNetworkError =>
+      'Could not reach Open Library. Check your connection and try again.';
+
+  @override
+  String get openLibraryHintsError =>
+      'Could not read the book’s ISBN. You can still search by title and author.';
+
+  @override
+  String get openLibraryWork => 'Work';
+
+  @override
+  String get openLibraryEdition => 'Edition';
+
+  @override
+  String get openLibraryPreview => 'Review book details';
+
+  @override
+  String get openLibraryPreviewHint =>
+      'Choose which details to apply. Existing genres and tags are kept; unchecked fields stay unchanged.';
+
+  @override
+  String get openLibraryCurrent => 'Current';
+
+  @override
+  String get openLibraryNew => 'From Open Library';
+
+  @override
+  String get openLibraryNoData => 'No data';
+
+  @override
+  String get openLibraryUnchanged => 'Already matches';
+
+  @override
+  String get openLibraryCover => 'Cover';
+
+  @override
+  String get openLibraryCoverLoading => 'Loading cover…';
+
+  @override
+  String get openLibraryCoverMissing =>
+      'No cover available. Other details can still be applied.';
+
+  @override
+  String get openLibraryCoverError =>
+      'Could not load the cover. Other details can still be applied.';
+
+  @override
+  String get openLibraryCoverRetry => 'Retry cover';
+
+  @override
+  String get openLibrarySource => 'View source on Open Library';
+
+  @override
+  String get openLibrarySourceError => 'Could not open the source link';
+
+  @override
+  String get openLibraryBack => 'Back to results';
+
+  @override
+  String get openLibraryApply => 'Apply selected';
+
+  @override
+  String get openLibrarySaving => 'Applying…';
+
+  @override
+  String get openLibrarySaveError =>
+      'Could not apply details. The book may have changed or been deleted. Close this dialog and reopen it before trying again.';
 
   @override
   String get bookContinueReading => 'Continue reading';

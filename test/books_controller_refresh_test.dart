@@ -87,6 +87,7 @@ void main() {
         .read(booksControllerProvider)
         .requireValue
         .single;
+    expect(imported.title, 'Anonymous book');
     expect(imported.author, isEmpty);
     expect(imported.pageCount, greaterThan(0));
     expect((await repository.getBookById(imported.id))!.author, isEmpty);

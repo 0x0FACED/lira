@@ -50,44 +50,72 @@ class BooksLocalRepository {
     });
   }
 
+  /// Changes only selected fields, and only if they still match the lookup
+  /// snapshot. A network response must not overwrite a newer local edit.
+  Future<BookDto?> applyCatalogMetadata(
+    BookDto expected, {
+    String? title,
+    String? author,
+    String? coverUrl,
+  }) => _db.transaction(() async {
+    final entry =
+        await (_db.select(_db.books)..where(
+              (row) => row.id.equals(expected.id) & row.isSaved.equals(true),
+            ))
+            .getSingleOrNull();
+    if (entry == null ||
+        entry.fileUrl != expected.fileUrl ||
+        (title != null && entry.title != expected.title) ||
+        (author != null && entry.author != expected.author) ||
+        (coverUrl != null && entry.coverUrl != expected.coverUrl)) {
+      return null;
+    }
+    if (title != null || author != null || coverUrl != null) {
+      await (_db.update(
+        _db.books,
+      )..where((row) => row.id.equals(entry.id))).write(
+        BooksCompanion(
+          title: title == null ? const Value.absent() : Value(title),
+          author: author == null ? const Value.absent() : Value(author),
+          coverUrl: coverUrl == null ? const Value.absent() : Value(coverUrl),
+        ),
+      );
+      if (title != null || author != null) {
+        await SyncChangeTracker(_db).captureBook(entry.id);
+      }
+    }
+    return _toDto(entry).copyWith(
+      title: title ?? entry.title,
+      author: author ?? entry.author,
+      coverUrl: coverUrl ?? entry.coverUrl,
+    );
+  });
+
   Future<List<BookDto>> getAllBooks() async {
     final entries = await (_db.select(
       _db.books,
     )..where((book) => book.isSaved.equals(true))).get();
-    return entries
-        .map(
-          (e) => BookDto(
-            id: e.id,
-            title: e.title,
-            author: e.author,
-            format: e.format,
-            coverUrl: e.coverUrl,
-            fileUrl: e.fileUrl,
-            createdAt: e.createdAt,
-            pageCount: e.pageCount,
-            fileSizeBytes: e.fileSizeBytes,
-          ),
-        )
-        .toList();
+    return entries.map(_toDto).toList();
   }
 
   Future<BookDto?> getBookById(String id) async {
     final entry = await (_db.select(
       _db.books,
     )..where((t) => t.id.equals(id))).getSingleOrNull();
-    if (entry == null) return null;
-    return BookDto(
-      id: entry.id,
-      title: entry.title,
-      author: entry.author,
-      format: entry.format,
-      coverUrl: entry.coverUrl,
-      fileUrl: entry.fileUrl,
-      createdAt: entry.createdAt,
-      pageCount: entry.pageCount,
-      fileSizeBytes: entry.fileSizeBytes,
-    );
+    return entry == null ? null : _toDto(entry);
   }
+
+  BookDto _toDto(BookEntity entry) => BookDto(
+    id: entry.id,
+    title: entry.title,
+    author: entry.author,
+    format: entry.format,
+    coverUrl: entry.coverUrl,
+    fileUrl: entry.fileUrl,
+    createdAt: entry.createdAt,
+    pageCount: entry.pageCount,
+    fileSizeBytes: entry.fileSizeBytes,
+  );
 
   Future<void> markSaved(String id) async {
     final tracker = SyncChangeTracker(_db);

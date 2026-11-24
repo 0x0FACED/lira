@@ -29,37 +29,37 @@ final bookOrganizationProvider = Provider.family<BookOrganization, String>(
   ),
 );
 
+final _labelWhitespace = RegExp(r'\s+');
+
+/// Retains the first spelling of each nonempty label in display order.
+List<String> normalizeBookLabels(Iterable<Object?> labels) {
+  final seen = <String>{};
+  final normalized = <String>[];
+  for (final label in labels) {
+    if (label is! String) continue;
+    final display = label.trim().replaceAll(_labelWhitespace, ' ');
+    if (display.isNotEmpty && seen.add(display.toLowerCase())) {
+      normalized.add(display);
+    }
+  }
+  return normalized.isEmpty ? const [] : List<String>.unmodifiable(normalized);
+}
+
 class BookOrganizationsNotifier
     extends StateNotifier<Map<String, BookOrganization>> {
   BookOrganizationsNotifier(this._prefs) : super(_load(_prefs));
 
   static const storageKey = 'book_organizations_v1';
-  static final _whitespace = RegExp(r'\s+');
 
   final SharedPreferences _prefs;
   Future<void> _writes = Future<void>.value();
-
-  static List<String> _normalize(Iterable<Object?> labels) {
-    final seen = <String>{};
-    final normalized = <String>[];
-    for (final label in labels) {
-      if (label is! String) continue;
-      final display = label.trim().replaceAll(_whitespace, ' ');
-      if (display.isNotEmpty && seen.add(display.toLowerCase())) {
-        normalized.add(display);
-      }
-    }
-    return normalized.isEmpty
-        ? const []
-        : List<String>.unmodifiable(normalized);
-  }
 
   static BookOrganization _labels(
     Iterable<Object?> genres,
     Iterable<Object?> tags,
   ) {
-    final normalizedGenres = _normalize(genres);
-    final normalizedTags = _normalize(tags);
+    final normalizedGenres = normalizeBookLabels(genres);
+    final normalizedTags = normalizeBookLabels(tags);
     if (normalizedGenres.isEmpty && normalizedTags.isEmpty) {
       return _emptyOrganization;
     }

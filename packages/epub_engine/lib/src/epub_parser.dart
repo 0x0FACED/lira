@@ -11,6 +11,7 @@ class ParsedEpub {
   final String title;
   final String author;
   final String? language;
+  final List<String> identifiers;
   final Uint8List? coverImage;
   final List<EpubChapter> chapters;
   final List<TOCItem> toc;
@@ -21,11 +22,31 @@ class ParsedEpub {
     required this.title,
     required this.author,
     this.language,
+    this.identifiers = const [],
     this.coverImage,
     required this.chapters,
     required this.toc,
     required this.images,
     this.stylesheets = const {},
+  });
+}
+
+/// Bibliographic metadata read without decoding chapters or other resources.
+class EpubBibliographicMetadata {
+  final String title;
+  final String author;
+
+  /// Empty when the package does not specify a language.
+  final String language;
+
+  /// Raw package identifiers; callers validate and normalize ISBNs.
+  final List<String> identifiers;
+
+  const EpubBibliographicMetadata({
+    required this.title,
+    required this.author,
+    required this.language,
+    this.identifiers = const [],
   });
 }
 
@@ -74,7 +95,22 @@ class EpubParser {
     return _parseWithArchive(data);
   }
 
-  static ParsedEpub _parseWithArchive(Uint8List data) {
+  /// Read only the container and OPF, without requiring readable chapters.
+  static Future<EpubBibliographicMetadata> readBibliographicMetadata(
+    Uint8List bytes,
+  ) async {
+    final package = _readPackage(bytes);
+    return _readMetadata(
+      _firstDescendantByLocalName(package.document, 'metadata'),
+    );
+  }
+
+  static ({
+    Map<String, ArchiveFile> files,
+    String opfPath,
+    XmlDocument document,
+  })
+  _readPackage(Uint8List data) {
     final archive = ZipDecoder().decodeBytes(data, verify: false);
     final fileByPath = <String, ArchiveFile>{};
 
@@ -107,6 +143,14 @@ class EpubParser {
     final opfDocument = XmlDocument.parse(
       _decodeTextFile(fileByPath[opfPath]!),
     );
+    return (files: fileByPath, opfPath: opfPath, document: opfDocument);
+  }
+
+  static ParsedEpub _parseWithArchive(Uint8List data) {
+    final package = _readPackage(data);
+    final fileByPath = package.files;
+    final opfPath = package.opfPath;
+    final opfDocument = package.document;
     final metadataNode = _firstDescendantByLocalName(opfDocument, 'metadata');
     final manifestNode = _firstDescendantByLocalName(opfDocument, 'manifest');
     final spineNode = _firstDescendantByLocalName(opfDocument, 'spine');
@@ -115,10 +159,7 @@ class EpubParser {
       throw Exception('EPUB manifest is missing');
     }
 
-    final title =
-        _firstDescendantText(metadataNode, 'title') ?? 'Unknown Title';
-    final author =
-        _firstDescendantText(metadataNode, 'creator') ?? 'Unknown Author';
+    final metadata = _readMetadata(metadataNode);
 
     final manifestItems = <_ManifestItem>[];
     final manifestById = <String, _ManifestItem>{};
@@ -258,14 +299,49 @@ class EpubParser {
               .toList(growable: false);
 
     return ParsedEpub(
-      title: title,
-      author: author,
-      language: _firstDescendantText(metadataNode, 'language'),
+      title: metadata.title,
+      author: metadata.author,
+      language: metadata.language.isEmpty ? null : metadata.language,
+      identifiers: metadata.identifiers,
       coverImage: coverImage,
       chapters: flatChapters,
       toc: normalizedToc,
       images: images,
       stylesheets: stylesheets,
+    );
+  }
+
+  static EpubBibliographicMetadata _readMetadata(XmlElement? metadataNode) {
+    final identifiers = <String>[];
+    if (metadataNode != null) {
+      for (final node in metadataNode.descendants.whereType<XmlElement>()) {
+        final name = node.name.local.toLowerCase();
+        if (name == 'identifier') {
+          final value = node.innerText.trim();
+          if (value.isNotEmpty) identifiers.add(value);
+        }
+        // Only explicitly named ISBN fields qualify; never infer an ISBN from
+        // package IDs, filenames, resource URLs, or unrelated numeric values.
+        final isbn = _attributeValue(node, 'isbn')?.trim();
+        if (isbn != null && isbn.isNotEmpty) identifiers.add(isbn);
+        if (name == 'meta') {
+          final field =
+              (_attributeValue(node, 'name') ??
+                      _attributeValue(node, 'property'))
+                  ?.toLowerCase();
+          if (field == 'isbn') {
+            final value = (_attributeValue(node, 'content') ?? node.innerText)
+                .trim();
+            if (value.isNotEmpty) identifiers.add(value);
+          }
+        }
+      }
+    }
+    return EpubBibliographicMetadata(
+      title: _firstDescendantText(metadataNode, 'title') ?? 'Unknown Title',
+      author: _firstDescendantText(metadataNode, 'creator') ?? 'Unknown Author',
+      language: _firstDescendantText(metadataNode, 'language') ?? '',
+      identifiers: identifiers,
     );
   }
 

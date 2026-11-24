@@ -70,6 +70,18 @@ Warm light and dark themes, layouts for phones and desktops, and English and Rus
 
 You can also open **Settings → Customize reader** to try the controls on the bundled Russian/English EPUB without importing a book. Warm evening colors are a comfort option, not a promise of sleep; see the [reader notes and research](READER.md#палитры-и-вечернее-чтение).
 
+### Edit a saved book
+
+Open its details and select the pencil. Edit the title and author in place. Use **+** next to **Genres** or **Tags** to add a chip; the chip grows as you type. Tap an existing chip to rename it, or use its **×** to remove it. Press **Save** in the header to apply the changes, or **×** in the header to discard the draft. File details and reading progress are read-only.
+
+### Fill in book details with Open Library
+
+Open a saved book's details and choose **Find in Open Library**. Search by ISBN for a specific edition, or edit the title and author to look for candidates. Select a result to compare it with the local entry, then choose which fields and cover to apply. Lira adds recognized genres without replacing your genres or tags. The saved cover is available offline.
+
+**Settings → Library metadata → Fill missing details from Open Library** is off by default. When enabled, Lira looks up new EPUB imports and downloads only if the file contains one valid ISBN and the catalog confirms one edition. The lookup runs after the book is saved. It fills missing details without replacing titles from the file or overwriting local edits. It only replaces a usable embedded cover automatically if the same edition has a substantially larger image and the original was small.
+
+Automatic matching sends the ISBN, not the book file. Manual searches send the ISBN or the title and author you enter. Open Library is optional: importing and reading still work without it.
+
 ### Discover books, articles and RFCs
 
 Open **Discover → Sources** to enable sources and arrange their order. The same selection controls the overview and global search. Sources are searchable by name or description and can be filtered by **topic**, **content language** and **selected only**. These filters combine without changing your saved selection or order. New sources are opt-in: updating preserves existing choices, including an intentionally empty selection. Turning a source off never removes saved materials.

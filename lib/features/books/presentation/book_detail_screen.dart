@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,117 +13,264 @@ import '../domain/models/book_dto.dart';
 import '../domain/providers/book_organization_provider.dart';
 import '../domain/providers/books_provider.dart';
 import 'book_labels.dart';
+import 'open_library_dialog.dart';
 import 'widgets/book_cover.dart';
+import 'widgets/inline_book_labels.dart';
 
-class BookDetailScreen extends ConsumerWidget {
+class BookDetailScreen extends ConsumerStatefulWidget {
   final BookDto book;
 
   const BookDetailScreen({super.key, required this.book});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<BookDetailScreen> createState() => _BookDetailScreenState();
+}
+
+class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
+  _BookDraft? _draft;
+  bool _saving = false;
+  bool _saveFailed = false;
+
+  BookDto _currentBook(AsyncValue<List<BookDto>> books) =>
+      books.valueOrNull?.firstWhere(
+        (book) => book.id == widget.book.id,
+        orElse: () => widget.book,
+      ) ??
+      widget.book;
+
+  void _startEdit(BookDto book, BookOrganization organization) {
+    setState(() => _draft = _BookDraft(book, organization));
+  }
+
+  void _finishEdit() {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _draft = null;
+      _saving = false;
+      _saveFailed = false;
+    });
+  }
+
+  Future<void> _save() async {
+    final draft = _draft!;
+    final book = _currentBook(ref.read(booksControllerProvider));
+    final enteredTitle = draft.title.trim();
+    final enteredAuthor = draft.author.trim();
+    final title =
+        enteredTitle.isNotEmpty && enteredTitle != draft.originalTitle.trim()
+        ? enteredTitle
+        : book.title;
+    final author =
+        enteredAuthor != draft.originalAuthor ||
+            book.author.trim() == 'Unknown Author'
+        ? enteredAuthor
+        : book.author;
+    final genresChanged = !listEquals(
+      draft.genres,
+      draft.originalLabels.genres,
+    );
+    final tagsChanged = !listEquals(draft.tags, draft.originalLabels.tags);
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _saving = true;
+      _saveFailed = false;
+    });
+
+    try {
+      if (title != book.title || author != book.author) {
+        await ref
+            .read(booksControllerProvider.notifier)
+            .updateBook(book.copyWith(title: title, author: author));
+      }
+      if (!mounted) return;
+      if (genresChanged || tagsChanged) {
+        final current = ref.read(bookOrganizationProvider(book.id));
+        await ref
+            .read(bookOrganizationsProvider.notifier)
+            .setLabels(
+              book.id,
+              BookOrganization(
+                genres: genresChanged ? draft.genres : current.genres,
+                tags: tagsChanged ? draft.tags : current.tags,
+              ),
+            );
+      }
+      if (mounted) _finishEdit();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _saveFailed = true;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final currentBook =
-        ref
-            .watch(booksControllerProvider)
-            .valueOrNull
-            ?.firstWhere((b) => b.id == book.id, orElse: () => book) ??
-        book;
-    final organization = ref.watch(bookOrganizationProvider(currentBook.id));
+    final book = _currentBook(ref.watch(booksControllerProvider));
+    final organization = ref.watch(bookOrganizationProvider(book.id));
+    final draft = _draft;
     final gutter = AppLayout.pageGutter(context);
-    void editBook() => showAppDialog<void>(
-      context: context,
-      builder: (_) =>
-          _BookEditDialog(book: currentBook, organization: organization),
+    final editBook = () => _startEdit(book, organization);
+    final padding = EdgeInsets.fromLTRB(
+      gutter,
+      AppSpacing.lg,
+      gutter,
+      AppSpacing.lg,
     );
 
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 880),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: gutter,
-                    vertical: AppSpacing.sm,
-                  ),
-                  child: Row(
-                    children: [
-                      MergeSemantics(
-                        child: Semantics(
-                          label: MaterialLocalizations.of(
-                            context,
-                          ).backButtonTooltip,
-                          child: BackButton(onPressed: () => context.pop()),
+    return PopScope(
+      canPop: draft == null,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _draft != null && !_saving) _finishEdit();
+      },
+      child: Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: AppLayout.contentMaxWidth,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: gutter,
+                      vertical: AppSpacing.sm,
+                    ),
+                    child: Row(
+                      children: [
+                        if (draft == null)
+                          MergeSemantics(
+                            child: Semantics(
+                              label: MaterialLocalizations.of(
+                                context,
+                              ).backButtonTooltip,
+                              child: BackButton(onPressed: () => context.pop()),
+                            ),
+                          )
+                        else
+                          IconButton(
+                            tooltip: l10n.cancel,
+                            onPressed: _saving ? null : _finishEdit,
+                            icon: Icon(Icons.close, semanticLabel: l10n.cancel),
+                          ),
+                        Expanded(
+                          child: Text(
+                            draft == null ? l10n.library : l10n.editBook,
+                            style: theme.textTheme.titleMedium,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          l10n.library,
-                          style: theme.textTheme.titleMedium,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: editBook,
-                        icon: Semantics(
-                          label: l10n.editBook,
-                          child: const Icon(Icons.edit_outlined),
-                        ),
-                      ),
-                      PopupMenuButton<String>(
-                        tooltip: MaterialLocalizations.of(
-                          context,
-                        ).showMenuTooltip,
-                        onSelected: (_) =>
-                            _confirmDelete(context, ref, currentBook),
-                        itemBuilder: (_) => [
-                          PopupMenuItem(
-                            value: 'delete',
-                            child: Text(l10n.deleteBook),
+                        if (draft != null)
+                          FilledButton(
+                            onPressed: _saving ? null : _save,
+                            child: Text(l10n.save),
+                          )
+                        else ...[
+                          IconButton(
+                            tooltip: l10n.editBook,
+                            onPressed: editBook,
+                            icon: Icon(
+                              Icons.edit_outlined,
+                              semanticLabel: l10n.editBook,
+                            ),
+                          ),
+                          PopupMenuButton<String>(
+                            tooltip: MaterialLocalizations.of(
+                              context,
+                            ).showMenuTooltip,
+                            onSelected: (_) =>
+                                _confirmDelete(context, ref, book),
+                            itemBuilder: (_) => [
+                              PopupMenuItem(
+                                value: 'delete',
+                                child: Text(l10n.deleteBook),
+                              ),
+                            ],
                           ),
                         ],
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.fromLTRB(
-                      gutter,
-                      AppSpacing.sm,
-                      gutter,
-                      AppSpacing.xl,
+                      ],
                     ),
-                    child: AppSurface(
-                      radius: AppRadius.lg,
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: padding,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _BookIdentity(book: currentBook),
-                          const SizedBox(height: AppSpacing.lg),
-                          _ReadingAction(book: currentBook),
-                          const SizedBox(height: AppSpacing.md),
-                          _FileMetadata(book: currentBook),
-                          const SizedBox(height: AppSpacing.md),
-                          if (organization.genres.isEmpty &&
-                              organization.tags.isEmpty)
-                            Align(
-                              alignment: AlignmentDirectional.centerStart,
-                              child: TextButton.icon(
-                                onPressed: editBook,
-                                style: TextButton.styleFrom(
-                                  foregroundColor:
-                                      theme.colorScheme.onSurfaceVariant,
+                          _BookIdentity(
+                            book: book,
+                            draft: draft,
+                            saving: _saving,
+                          ),
+                          if (_saveFailed) ...[
+                            const SizedBox(height: AppSpacing.sm),
+                            Semantics(
+                              liveRegion: true,
+                              child: Text(
+                                l10n.bookEditError,
+                                style: TextStyle(
+                                  color: theme.colorScheme.error,
                                 ),
-                                icon: const Icon(Icons.add),
-                                label: Text(l10n.bookAddLabels),
                               ),
+                            ),
+                          ],
+                          const SizedBox(height: AppSpacing.lg),
+                          _ReadingAction(book: book, enabled: draft == null),
+                          const SizedBox(height: AppSpacing.md),
+                          TextButton.icon(
+                            onPressed: draft != null
+                                ? null
+                                : () => showAppDialog<void>(
+                                    context: context,
+                                    builder: (_) => OpenLibraryDialog(
+                                      book: book,
+                                      organization: organization,
+                                    ),
+                                  ),
+                            style: TextButton.styleFrom(
+                              alignment: AlignmentDirectional.centerStart,
+                            ),
+                            icon: const Icon(Icons.manage_search_outlined),
+                            label: Text(l10n.openLibraryFind),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          _FileMetadata(book: book),
+                          const SizedBox(height: AppSpacing.md),
+                          if (draft != null) ...[
+                            InlineBookLabels(
+                              key: const ValueKey('book-genres'),
+                              title: l10n.bookGenres,
+                              addLabelTooltip: l10n.bookAddGenre,
+                              initialLabels: draft.originalLabels.genres,
+                              enabled: !_saving,
+                              onChanged: (genres) => draft.genres = genres,
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                            InlineBookLabels(
+                              key: const ValueKey('book-tags'),
+                              title: l10n.bookTags,
+                              addLabelTooltip: l10n.bookAddTag,
+                              initialLabels: draft.originalLabels.tags,
+                              enabled: !_saving,
+                              onChanged: (tags) => draft.tags = tags,
+                            ),
+                          ] else if (organization.genres.isEmpty &&
+                              organization.tags.isEmpty)
+                            TextButton.icon(
+                              onPressed: editBook,
+                              style: TextButton.styleFrom(
+                                alignment: AlignmentDirectional.centerStart,
+                                foregroundColor:
+                                    theme.colorScheme.onSurfaceVariant,
+                              ),
+                              icon: const Icon(Icons.add),
+                              label: Text(l10n.bookAddLabels),
                             )
                           else ...[
                             if (organization.genres.isNotEmpty) ...[
@@ -148,8 +296,8 @@ class BookDetailScreen extends ConsumerWidget {
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -200,9 +348,15 @@ class BookDetailScreen extends ConsumerWidget {
 }
 
 class _BookIdentity extends StatelessWidget {
-  const _BookIdentity({required this.book});
+  const _BookIdentity({
+    required this.book,
+    required this.draft,
+    required this.saving,
+  });
 
   final BookDto book;
+  final _BookDraft? draft;
+  final bool saving;
 
   @override
   Widget build(BuildContext context) {
@@ -221,25 +375,51 @@ class _BookIdentity extends StatelessWidget {
           width: coverWidth,
           child: BookCover(book: book),
         );
+        final titleStyle = compact && !stacked
+            ? theme.textTheme.titleLarge
+            : theme.textTheme.headlineMedium;
+        final authorStyle = theme.textTheme.bodyLarge?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        );
+        final draft = this.draft;
         final identity = Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Semantics(
-              header: true,
-              child: Text(
-                book.title,
-                style: compact && !stacked
-                    ? theme.textTheme.titleLarge
-                    : theme.textTheme.headlineMedium,
+            if (draft == null)
+              Semantics(
+                header: true,
+                child: Text(book.title, style: titleStyle),
+              )
+            else
+              TextFormField(
+                initialValue: draft.title,
+                onChanged: (value) => draft.title = value,
+                enabled: !saving,
+                style: titleStyle,
+                decoration: InputDecoration(
+                  labelText: l10n.editBookTitle,
+                  isDense: true,
+                ),
+                textCapitalization: TextCapitalization.sentences,
+                minLines: 1,
+                maxLines: 3,
               ),
-            ),
             const SizedBox(height: AppSpacing.sm),
-            Text(
-              bookAuthorLabel(book.author, l10n),
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+            if (draft == null)
+              Text(bookAuthorLabel(book.author, l10n), style: authorStyle)
+            else
+              TextFormField(
+                initialValue: draft.author,
+                onChanged: (value) => draft.author = value,
+                enabled: !saving,
+                style: authorStyle,
+                decoration: InputDecoration(
+                  labelText: l10n.editBookAuthor,
+                  isDense: true,
+                ),
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.done,
               ),
-            ),
           ],
         );
         if (stacked) {
@@ -266,9 +446,10 @@ class _BookIdentity extends StatelessWidget {
 }
 
 class _ReadingAction extends ConsumerWidget {
-  const _ReadingAction({required this.book});
+  const _ReadingAction({required this.book, required this.enabled});
 
   final BookDto book;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -289,66 +470,62 @@ class _ReadingAction extends ConsumerWidget {
         : percentage > 0
         ? l10n.libraryInProgress
         : l10n.libraryUnread;
-    return Align(
-      alignment: AlignmentDirectional.centerStart,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 360),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            FilledButton.icon(
-              onPressed: () => context.push('/reader', extra: book),
-              icon: const Icon(Icons.menu_book_outlined),
-              label: Text(
-                percentage > 0
-                    ? l10n.bookContinueReading
-                    : book.format == 'epub'
-                    ? l10n.readBook
-                    : l10n.openBook,
-                textAlign: TextAlign.center,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            if (progress.hasError)
-              Text(
-                l10n.errorLoadingProgress,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.error,
-                ),
-              )
-            else if (progress.isLoading && !progress.hasValue)
-              LinearProgressIndicator(
-                minHeight: 2,
-                semanticsLabel: l10n.libraryReadingProgress,
-              )
-            else ...[
-              Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                spacing: AppSpacing.md,
-                runSpacing: AppSpacing.xs,
-                children: [
-                  Text(
-                    status,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  Text(percentLabel, style: theme.textTheme.bodySmall),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              LinearProgressIndicator(
-                value: percentage / 100,
-                minHeight: 2,
-                color: theme.colorScheme.onSurfaceVariant,
-                backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                semanticsLabel: l10n.libraryReadingProgress,
-                semanticsValue: '${percentage.floor()}',
-              ),
-            ],
-          ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FilledButton.icon(
+          onPressed: enabled
+              ? () => context.push('/reader', extra: book)
+              : null,
+          icon: const Icon(Icons.menu_book_outlined),
+          label: Text(
+            percentage > 0
+                ? l10n.bookContinueReading
+                : book.format == 'epub'
+                ? l10n.readBook
+                : l10n.openBook,
+            textAlign: TextAlign.center,
+          ),
         ),
-      ),
+        const SizedBox(height: AppSpacing.md),
+        if (progress.hasError)
+          Text(
+            l10n.errorLoadingProgress,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.error,
+            ),
+          )
+        else if (progress.isLoading && !progress.hasValue)
+          LinearProgressIndicator(
+            minHeight: 2,
+            semanticsLabel: l10n.libraryReadingProgress,
+          )
+        else ...[
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            spacing: AppSpacing.md,
+            runSpacing: AppSpacing.xs,
+            children: [
+              Text(
+                status,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              Text(percentLabel, style: theme.textTheme.bodySmall),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          LinearProgressIndicator(
+            value: percentage / 100,
+            minHeight: 2,
+            color: theme.colorScheme.onSurfaceVariant,
+            backgroundColor: theme.colorScheme.surfaceContainerHighest,
+            semanticsLabel: l10n.libraryReadingProgress,
+            semanticsValue: '${percentage.floor()}',
+          ),
+        ],
+      ],
     );
   }
 }
@@ -447,157 +624,22 @@ class _FileMetadata extends StatelessWidget {
   }
 }
 
-class _BookEditDialog extends ConsumerStatefulWidget {
-  const _BookEditDialog({required this.book, required this.organization});
+class _BookDraft {
+  _BookDraft(BookDto book, this.originalLabels)
+    : originalTitle = book.title,
+      originalAuthor = book.author.trim() == 'Unknown Author'
+          ? ''
+          : book.author.trim(),
+      title = book.title,
+      author = book.author.trim() == 'Unknown Author' ? '' : book.author,
+      genres = originalLabels.genres,
+      tags = originalLabels.tags;
 
-  final BookDto book;
-  final BookOrganization organization;
-
-  @override
-  ConsumerState<_BookEditDialog> createState() => _BookEditDialogState();
-}
-
-class _BookEditDialogState extends ConsumerState<_BookEditDialog> {
-  late final _title = TextEditingController(text: widget.book.title);
-  late final _author = TextEditingController(
-    text: widget.book.author.trim() == 'Unknown Author'
-        ? ''
-        : widget.book.author,
-  );
-  late final _genres = TextEditingController(
-    text: widget.organization.genres.join(', '),
-  );
-  late final _tags = TextEditingController(
-    text: widget.organization.tags.join(', '),
-  );
-  bool _saving = false;
-  bool _failed = false;
-
-  @override
-  void dispose() {
-    _title.dispose();
-    _author.dispose();
-    _genres.dispose();
-    _tags.dispose();
-    super.dispose();
-  }
-
-  List<String> _parseLabels(String value) => value
-      .split(RegExp(r'[,\r\n]+'))
-      .map((label) => label.trim())
-      .where((label) => label.isNotEmpty)
-      .toList();
-
-  Future<void> _save() async {
-    setState(() {
-      _saving = true;
-      _failed = false;
-    });
-    try {
-      final title = _title.text.trim();
-      final updatedBook = widget.book.copyWith(
-        title: title.isEmpty ? widget.book.title : title,
-        author: _author.text.trim(),
-      );
-      await ref.read(booksControllerProvider.notifier).updateBook(updatedBook);
-      await ref
-          .read(bookOrganizationsProvider.notifier)
-          .setLabels(
-            widget.book.id,
-            BookOrganization(
-              genres: _parseLabels(_genres.text),
-              tags: _parseLabels(_tags.text),
-            ),
-          );
-      if (mounted) Navigator.pop(context);
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _saving = false;
-          _failed = true;
-        });
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    return PopScope(
-      canPop: !_saving,
-      child: AlertDialog(
-        scrollable: true,
-        title: Text(l10n.editBook),
-        content: SizedBox(
-          width: AppLayout.formMaxWidth,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextField(
-                controller: _title,
-                enabled: !_saving,
-                decoration: InputDecoration(labelText: l10n.editBookTitle),
-                textCapitalization: TextCapitalization.sentences,
-                minLines: 1,
-                maxLines: 3,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              TextField(
-                controller: _author,
-                enabled: !_saving,
-                decoration: InputDecoration(labelText: l10n.editBookAuthor),
-                textCapitalization: TextCapitalization.words,
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              Text(
-                l10n.bookLabelsHint,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              TextField(
-                controller: _genres,
-                enabled: !_saving,
-                decoration: InputDecoration(labelText: l10n.bookGenres),
-                textCapitalization: TextCapitalization.words,
-                minLines: 1,
-                maxLines: 4,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              TextField(
-                controller: _tags,
-                enabled: !_saving,
-                decoration: InputDecoration(labelText: l10n.bookTags),
-                textCapitalization: TextCapitalization.sentences,
-                minLines: 1,
-                maxLines: 4,
-              ),
-              if (_failed) ...[
-                const SizedBox(height: AppSpacing.md),
-                Semantics(
-                  liveRegion: true,
-                  child: Text(
-                    l10n.bookEditError,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: _saving ? null : () => Navigator.pop(context),
-            child: Text(l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: _saving ? null : _save,
-            child: Text(l10n.save),
-          ),
-        ],
-      ),
-    );
-  }
+  final String originalTitle;
+  final String originalAuthor;
+  final BookOrganization originalLabels;
+  String title;
+  String author;
+  List<String> genres;
+  List<String> tags;
 }

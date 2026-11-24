@@ -278,6 +278,18 @@ abstract class AppLocalizations {
   /// **'Tags'**
   String get bookTags;
 
+  /// No description provided for @bookAddGenre.
+  ///
+  /// In en, this message translates to:
+  /// **'Add genre'**
+  String get bookAddGenre;
+
+  /// No description provided for @bookAddTag.
+  ///
+  /// In en, this message translates to:
+  /// **'Add tag'**
+  String get bookAddTag;
+
   /// No description provided for @bookAddLabels.
   ///
   /// In en, this message translates to:
@@ -290,12 +302,6 @@ abstract class AppLocalizations {
   /// **'{count} pp.'**
   String bookPageCountCompact(String count);
 
-  /// No description provided for @bookLabelsHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Separate entries with commas or new lines'**
-  String get bookLabelsHint;
-
   /// No description provided for @bookLabelsEmpty.
   ///
   /// In en, this message translates to:
@@ -307,6 +313,198 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not save book details.'**
   String get bookEditError;
+
+  /// No description provided for @openLibraryFind.
+  ///
+  /// In en, this message translates to:
+  /// **'Find in Open Library'**
+  String get openLibraryFind;
+
+  /// No description provided for @openLibrarySettingsGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Library metadata'**
+  String get openLibrarySettingsGroup;
+
+  /// No description provided for @openLibraryAutoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill missing details from Open Library'**
+  String get openLibraryAutoTitle;
+
+  /// No description provided for @openLibraryAutoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Off by default. Only the ISBN is sent automatically to find missing book details. Your book file is never uploaded.'**
+  String get openLibraryAutoHint;
+
+  /// No description provided for @openLibrarySearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by ISBN for a specific edition, or use title and author. Nothing changes until you review and apply.'**
+  String get openLibrarySearchHint;
+
+  /// No description provided for @openLibrarySearchByIsbn.
+  ///
+  /// In en, this message translates to:
+  /// **'ISBN'**
+  String get openLibrarySearchByIsbn;
+
+  /// No description provided for @openLibrarySearchByText.
+  ///
+  /// In en, this message translates to:
+  /// **'Title and author'**
+  String get openLibrarySearchByText;
+
+  /// No description provided for @openLibraryIsbnInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid ISBN-10 or ISBN-13'**
+  String get openLibraryIsbnInvalid;
+
+  /// No description provided for @openLibrarySearchRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a title or author'**
+  String get openLibrarySearchRequired;
+
+  /// No description provided for @openLibrarySearching.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching Open Library…'**
+  String get openLibrarySearching;
+
+  /// No description provided for @openLibraryNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No matches. Try title and author, or another ISBN.'**
+  String get openLibraryNoResults;
+
+  /// No description provided for @openLibraryNetworkError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not reach Open Library. Check your connection and try again.'**
+  String get openLibraryNetworkError;
+
+  /// No description provided for @openLibraryHintsError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read the book’s ISBN. You can still search by title and author.'**
+  String get openLibraryHintsError;
+
+  /// No description provided for @openLibraryWork.
+  ///
+  /// In en, this message translates to:
+  /// **'Work'**
+  String get openLibraryWork;
+
+  /// No description provided for @openLibraryEdition.
+  ///
+  /// In en, this message translates to:
+  /// **'Edition'**
+  String get openLibraryEdition;
+
+  /// No description provided for @openLibraryPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Review book details'**
+  String get openLibraryPreview;
+
+  /// No description provided for @openLibraryPreviewHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose which details to apply. Existing genres and tags are kept; unchecked fields stay unchanged.'**
+  String get openLibraryPreviewHint;
+
+  /// No description provided for @openLibraryCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Current'**
+  String get openLibraryCurrent;
+
+  /// No description provided for @openLibraryNew.
+  ///
+  /// In en, this message translates to:
+  /// **'From Open Library'**
+  String get openLibraryNew;
+
+  /// No description provided for @openLibraryNoData.
+  ///
+  /// In en, this message translates to:
+  /// **'No data'**
+  String get openLibraryNoData;
+
+  /// No description provided for @openLibraryUnchanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Already matches'**
+  String get openLibraryUnchanged;
+
+  /// No description provided for @openLibraryCover.
+  ///
+  /// In en, this message translates to:
+  /// **'Cover'**
+  String get openLibraryCover;
+
+  /// No description provided for @openLibraryCoverLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading cover…'**
+  String get openLibraryCoverLoading;
+
+  /// No description provided for @openLibraryCoverMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'No cover available. Other details can still be applied.'**
+  String get openLibraryCoverMissing;
+
+  /// No description provided for @openLibraryCoverError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the cover. Other details can still be applied.'**
+  String get openLibraryCoverError;
+
+  /// No description provided for @openLibraryCoverRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry cover'**
+  String get openLibraryCoverRetry;
+
+  /// No description provided for @openLibrarySource.
+  ///
+  /// In en, this message translates to:
+  /// **'View source on Open Library'**
+  String get openLibrarySource;
+
+  /// No description provided for @openLibrarySourceError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the source link'**
+  String get openLibrarySourceError;
+
+  /// No description provided for @openLibraryBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to results'**
+  String get openLibraryBack;
+
+  /// No description provided for @openLibraryApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply selected'**
+  String get openLibraryApply;
+
+  /// No description provided for @openLibrarySaving.
+  ///
+  /// In en, this message translates to:
+  /// **'Applying…'**
+  String get openLibrarySaving;
+
+  /// No description provided for @openLibrarySaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not apply details. The book may have changed or been deleted. Close this dialog and reopen it before trying again.'**
+  String get openLibrarySaveError;
 
   /// No description provided for @bookContinueReading.
   ///

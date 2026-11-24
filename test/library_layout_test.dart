@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lira/core/database/app_database.dart';
 import 'package:lira/core/di/injection.dart';
 import 'package:lira/core/theme/app_theme.dart';
+import 'package:lira/core/theme/app_tokens.dart';
 import 'package:lira/features/books/data/repositories/books_local_repository.dart';
 import 'package:lira/features/books/domain/models/book_dto.dart';
 import 'package:lira/features/books/domain/providers/book_organization_provider.dart';
@@ -221,6 +222,145 @@ void main() {
       expect(tester.takeException(), isNull);
     }
   });
+
+  testLibraryWidgets('details actions share the capped page width', (
+    tester,
+  ) async {
+    final book = (await getIt<BooksLocalRepository>().getBookById('1'))!;
+    for (final size in [const Size(500, 980), const Size(1440, 860)]) {
+      await mount(
+        tester,
+        size: size,
+        home: BookDetailScreen(book: book),
+      );
+      final context = tester.element(find.byType(BookDetailScreen));
+      final gutter = AppLayout.pageGutter(context);
+      final l10n = AppLocalizations.of(context)!;
+      final read = tester.getRect(
+        find.byWidgetPredicate((widget) => widget is FilledButton),
+      );
+      final progress = tester.getRect(find.byType(LinearProgressIndicator));
+      final lookup = tester.getRect(
+        find.ancestor(
+          of: find.text(l10n.openLibraryFind),
+          matching: find.byWidgetPredicate((widget) => widget is TextButton),
+        ),
+      );
+      final pageWidth = size.width.clamp(0.0, AppLayout.contentMaxWidth);
+      expect(read.width, pageWidth - 2 * gutter);
+      expect(read.center.dx, size.width / 2);
+      expect(progress.left, read.left);
+      expect(progress.right, read.right);
+      expect(lookup.left, read.left);
+      expect(lookup.right, read.right);
+    }
+  });
+
+  testLibraryWidgets(
+    'inline editing saves metadata and an unconfirmed genre, and cancel restores it',
+    (tester) async {
+      final repository = getIt<BooksLocalRepository>();
+      final book = (await repository.getBookById('1'))!;
+      await mount(
+        tester,
+        size: const Size(360, 660),
+        textScale: 1.5,
+        home: BookDetailScreen(book: book),
+      );
+      final context = tester.element(find.byType(BookDetailScreen));
+      final l10n = AppLocalizations.of(context)!;
+      final container = ProviderScope.containerOf(context);
+      const draftGenre = 'Научная фантастика';
+      Finder field(String label) => find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField && widget.decoration?.labelText == label,
+      );
+      Finder control(String group, String key) => find.descendant(
+        of: find.byKey(ValueKey(group)),
+        matching: find.byKey(ValueKey(key)),
+      );
+      Future<void> tapVisible(Finder target) async {
+        await tester.ensureVisible(target);
+        await tester.tap(target);
+        await tester.pumpAndSettle();
+      }
+
+      await container
+          .read(bookOrganizationsProvider.notifier)
+          .setLabels(
+            book.id,
+            const BookOrganization(genres: ['Проза'], tags: ['Избранное']),
+          );
+      await tester.pumpAndSettle();
+      await tapVisible(find.byTooltip(l10n.editBook));
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(TextField), findsNWidgets(2));
+      expect(find.textContaining('${l10n.added}:'), findsOneWidget);
+
+      await tester.ensureVisible(field(l10n.editBookTitle));
+      await tester.enterText(field(l10n.editBookTitle), 'Новое название');
+      await tester.ensureVisible(field(l10n.editBookAuthor));
+      await tester.enterText(field(l10n.editBookAuthor), 'Новый автор');
+
+      final add = find.byTooltip(l10n.bookAddGenre);
+      await tapVisible(add);
+      final editor = control('book-genres', 'inline-label-editor');
+      final chip = control('book-genres', 'inline-label-editor-chip');
+      await tester.ensureVisible(editor);
+      final emptyWidth = tester.getSize(chip).width;
+      final input = tester
+          .state<EditableTextState>(
+            find.descendant(of: editor, matching: find.byType(EditableText)),
+          )
+          .renderEditable;
+      final caret = input.localToGlobal(
+        input.getLocalRectForCaret(const TextPosition(offset: 0)).center,
+      );
+      final confirm = control('book-genres', 'inline-label-confirm');
+      final cancel = control('book-genres', 'inline-label-cancel');
+      expect(caret.dx, closeTo(tester.getCenter(editor).dx, 3));
+      expect(caret.dy, closeTo(tester.getCenter(confirm).dy, 3));
+      await tester.enterText(editor, 'Космос');
+      await tester.pumpAndSettle();
+      final shortWidth = tester.getSize(chip).width;
+      expect(shortWidth, greaterThan(emptyWidth));
+      await tester.enterText(editor, List.filled(12, draftGenre).join(' '));
+      await tester.pumpAndSettle();
+      final cappedWidth = tester.getSize(chip).width;
+      expect(cappedWidth, greaterThan(shortWidth));
+      expect(confirm.hitTestable(), findsOneWidget);
+      expect(cancel.hitTestable(), findsOneWidget);
+      await tester.enterText(editor, 'Космос');
+      await tester.pumpAndSettle();
+      expect(tester.getSize(chip).width, shortWidth);
+      await tester.enterText(editor, '  $draftGenre  ');
+      await tester.pumpAndSettle();
+      expect(container.read(bookOrganizationProvider(book.id)).genres, [
+        'Проза',
+      ]);
+      await tester.tap(find.widgetWithText(FilledButton, l10n.save));
+      await tester.pumpAndSettle();
+      final saved = (await repository.getBookById(book.id))!;
+      expect((saved.title, saved.author), ('Новое название', 'Новый автор'));
+      final organization = container.read(bookOrganizationProvider(book.id));
+      expect(organization.genres, ['Проза', draftGenre]);
+      expect(organization.tags, ['Избранное']);
+      expect(find.byType(TextField), findsNothing);
+
+      await tapVisible(find.byTooltip(l10n.editBook));
+      await tapVisible(find.text(draftGenre));
+      await tester.ensureVisible(editor);
+      await tester.enterText(editor, 'Не сохранять');
+      await tester.tap(find.byTooltip(l10n.cancel).first);
+      await tester.pumpAndSettle();
+      expect(find.text(draftGenre), findsOneWidget);
+      expect(find.text('Не сохранять'), findsNothing);
+      expect(container.read(bookOrganizationProvider(book.id)).genres, [
+        'Проза',
+        draftGenre,
+      ]);
+    },
+  );
 
   testLibraryWidgets(
     'editing absent and legacy authors preserves an empty value',
