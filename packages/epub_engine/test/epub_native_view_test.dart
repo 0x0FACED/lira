@@ -28,6 +28,23 @@ ParsedEpub _book() => ParsedEpub(
   images: const {},
 );
 
+class _ObservedChapter extends EpubChapter {
+  final VoidCallback onRead;
+
+  _ObservedChapter({
+    required super.title,
+    required super.fileName,
+    required super.htmlContent,
+    required this.onRead,
+  });
+
+  @override
+  String get htmlContent {
+    onRead();
+    return super.htmlContent;
+  }
+}
+
 ParsedEpub _paginationBook() => ParsedEpub(
   title: 'Incremental pagination',
   author: 'Lira',
@@ -278,6 +295,306 @@ Future<void> _selectTextRange(
 }
 
 void main() {
+  testWidgets(
+    'deep resume reports the saved locator before the exact percentage',
+    (tester) async {
+      final reads = List.filled(40, 0);
+      final html = [
+        for (var chapter = 0; chapter < reads.length; chapter++)
+          '<p>CHAPTER $chapter. ${'Readable content. ' * (100 + chapter)}</p>',
+      ];
+      final weights = [
+        for (final source in html)
+          XhtmlParser(
+            html: source,
+            images: const {},
+            baseStyle: const TextStyle(fontSize: 18),
+          ).parse().last.charEnd,
+      ];
+      final book = ParsedEpub(
+        title: 'Scalar progress index',
+        author: 'Lira',
+        chapters: [
+          for (var chapter = 0; chapter < reads.length; chapter++)
+            _ObservedChapter(
+              title: 'Chapter $chapter',
+              fileName: '$chapter.xhtml',
+              htmlContent: html[chapter],
+              onRead: () => reads[chapter]++,
+            ),
+        ],
+        toc: const [],
+        images: const {},
+      );
+      final reports = <(EpubLocation, double)>[];
+      final earlyPositions = <EpubLocation>[];
+      await tester.pumpWidget(
+        _frame(
+          EpubNativeView(
+            epub: book,
+            initialLocation: EpubLocation.fromPosition(
+              chapterIndex: 30,
+              charOffset: 100,
+              hasExactCharOffset: true,
+            ),
+            settings: const ReaderSettings(enableDualPageSpread: false),
+            theme: ThemeData.dark(),
+            onLocationChanged: (location, value) =>
+                reports.add((location, value)),
+            onPositionBeforeProgress: earlyPositions.add,
+          ),
+        ),
+      );
+      expect(reads.first, 0, reason: 'Deep resume must not parse chapter zero');
+      expect(
+        reports,
+        isEmpty,
+        reason: 'Never publish a provisional percentage',
+      );
+      expect(earlyPositions, hasLength(1));
+      expect(earlyPositions.single.chapterIndex, 30);
+      expect(earlyPositions.single.charOffset, 100);
+      expect(
+        earlyPositions.single.scrollFraction,
+        closeTo(100 / weights[30], 1e-9),
+      );
+      await tester.pumpAndSettle();
+      final expected =
+          (weights.take(30).fold(0, (sum, weight) => sum + weight) + 100) /
+          weights.fold(0, (sum, weight) => sum + weight) *
+          100;
+      expect(reports, isNotEmpty);
+      for (final (location, percentage) in reports) {
+        expect(location.chapterIndex, 30);
+        expect(location.charOffset, 100);
+        expect(percentage, closeTo(expected, 1e-9));
+      }
+    },
+  );
+
+  for (final mode in ReadingMode.values) {
+    testWidgets('legacy weighted restoration waits for exact index in $mode', (
+      tester,
+    ) async {
+      final book = ParsedEpub(
+        title: 'Legacy weighted fraction',
+        author: 'Lira',
+        chapters: [
+          for (var chapter = 0; chapter < 5; chapter++)
+            EpubChapter(
+              title: 'Chapter $chapter',
+              fileName: '$chapter.xhtml',
+              htmlContent:
+                  '<p style="display:none">${'Hidden text. ' * 100}</p>'
+                  '<p>CHAPTER $chapter. ${'Readable content. ' * (100 + chapter * 50)}</p>',
+            ),
+        ],
+        toc: const [],
+        images: const {},
+      );
+      final weights = [
+        for (final chapter in book.chapters)
+          XhtmlParser(
+            html: chapter.htmlContent,
+            images: const {},
+            baseStyle: const TextStyle(fontSize: 18),
+          ).parse().last.charEnd,
+      ];
+      final total = weights.fold(0, (sum, weight) => sum + weight);
+      final absolute = (total * 0.6).round();
+      var chapter = 0;
+      var preceding = 0;
+      while (absolute >= preceding + weights[chapter]) {
+        preceding += weights[chapter++];
+      }
+      final reports = <(EpubLocation, double)>[];
+      await tester.pumpWidget(
+        _frame(
+          EpubNativeView(
+            epub: book,
+            initialLocation: EpubLocation.fromPosition(
+              chapterIndex: 0,
+              bookScrollFraction: 0.6,
+            ),
+            settings: ReaderSettings(
+              readingMode: mode,
+              enableDualPageSpread: false,
+            ),
+            theme: ThemeData.dark(),
+            onLocationChanged: (location, value) =>
+                reports.add((location, value)),
+          ),
+        ),
+      );
+      expect(_renderedText(tester), isNot(contains('CHAPTER 0')));
+      expect(reports, isEmpty);
+      await tester.pumpAndSettle();
+      expect(reports, isNotEmpty);
+      for (final (location, percentage) in reports) {
+        expect(location.hasExactCharOffset, isTrue);
+        expect(location.chapterIndex, chapter);
+        expect(location.charOffset, absolute - preceding);
+        expect(percentage, closeTo(absolute / total * 100, 1e-9));
+      }
+    });
+  }
+
+  testWidgets('preview without progress consumer does not index the book', (
+    tester,
+  ) async {
+    final reads = List.filled(20, 0);
+    await tester.pumpWidget(
+      _frame(
+        EpubNativeView(
+          epub: ParsedEpub(
+            title: 'Preview',
+            author: 'Lira',
+            chapters: [
+              for (var chapter = 0; chapter < reads.length; chapter++)
+                _ObservedChapter(
+                  title: 'Chapter $chapter',
+                  fileName: '$chapter.xhtml',
+                  htmlContent: '<p>${'Chapter $chapter content. ' * 200}</p>',
+                  onRead: () => reads[chapter]++,
+                ),
+            ],
+            toc: const [],
+            images: const {},
+          ),
+          initialLocation: EpubLocation.fromPosition(
+            chapterIndex: 18,
+            hasExactCharOffset: true,
+          ),
+          settings: const ReaderSettings(),
+          theme: ThemeData.dark(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(reads.first, 0);
+    expect(reads[10], 0);
+    expect(reads[18], 1);
+  });
+
+  testWidgets('replacing or disposing a book cancels pending progress slices', (
+    tester,
+  ) async {
+    final reads = List.filled(40, 0);
+    final oldBook = ParsedEpub(
+      title: 'Old index',
+      author: 'Lira',
+      chapters: [
+        for (var chapter = 0; chapter < reads.length; chapter++)
+          _ObservedChapter(
+            title: 'Old $chapter',
+            fileName: '$chapter.xhtml',
+            htmlContent: '<p>${'Old $chapter content. ' * 100}</p>',
+            onRead: () => reads[chapter]++,
+          ),
+      ],
+      toc: const [],
+      images: const {},
+    );
+    final newBook = _book();
+    final reports = <EpubLocation>[];
+    final key = GlobalKey<EpubNativeViewState>();
+    Widget view(ParsedEpub book, int chapter) => _frame(
+      EpubNativeView(
+        key: key,
+        epub: book,
+        initialLocation: EpubLocation.fromPosition(
+          chapterIndex: chapter,
+          hasExactCharOffset: true,
+        ),
+        settings: const ReaderSettings(),
+        theme: ThemeData.dark(),
+        onLocationChanged: (location, _) => reports.add(location),
+      ),
+    );
+    await tester.pumpWidget(view(oldBook, 30));
+    expect(reports, isEmpty);
+    await tester.pumpWidget(view(newBook, 1));
+    final afterReplacement = List.of(reads);
+    await tester.pumpAndSettle();
+    expect(reads, afterReplacement);
+    expect(reports, isNotEmpty);
+    expect(reports.every((location) => location.chapterIndex == 1), isTrue);
+
+    reports.clear();
+    await tester.pumpWidget(view(oldBook, 30));
+    await tester.pumpWidget(const SizedBox.shrink());
+    final afterDisposal = List.of(reads);
+    await tester.pumpAndSettle();
+    expect(reads, afterDisposal);
+    expect(reports, isEmpty);
+  });
+
+  testWidgets('reflow during indexing reports the newest exact navigation', (
+    tester,
+  ) async {
+    final book = ParsedEpub(
+      title: 'Pending progress navigation',
+      author: 'Lira',
+      chapters: [
+        for (var chapter = 0; chapter < 40; chapter++)
+          EpubChapter(
+            title: 'Chapter $chapter',
+            fileName: '$chapter.xhtml',
+            htmlContent:
+                '<p>${'Chapter $chapter readable content. ' * 150}</p>',
+          ),
+      ],
+      toc: const [],
+      images: const {},
+    );
+    final key = GlobalKey<EpubNativeViewState>();
+    final early = <EpubLocation>[];
+    final reports = <EpubLocation>[];
+    var settings = const ReaderSettings();
+    late StateSetter rebuild;
+    await tester.pumpWidget(
+      _frame(
+        StatefulBuilder(
+          builder: (context, setState) {
+            rebuild = setState;
+            return EpubNativeView(
+              key: key,
+              epub: book,
+              initialLocation: EpubLocation.fromPosition(
+                chapterIndex: 30,
+                charOffset: 100,
+                hasExactCharOffset: true,
+              ),
+              settings: settings,
+              theme: ThemeData.dark(),
+              onPositionBeforeProgress: early.add,
+              onLocationChanged: (location, _) => reports.add(location),
+            );
+          },
+        ),
+      ),
+    );
+    expect(early.single.chapterIndex, 30);
+    expect(reports, isEmpty);
+    key.currentState!.goToLocation(
+      EpubLocation.fromPosition(
+        chapterIndex: 25,
+        charOffset: 140,
+        hasExactCharOffset: true,
+      ),
+    );
+    rebuild(() {
+      settings = settings.copyWith(fontSize: 22, lineHeight: 1.8);
+    });
+    await tester.pumpAndSettle();
+    expect(reports, isNotEmpty);
+    for (final location in reports) {
+      expect(location.hasExactCharOffset, isTrue);
+      expect(location.chapterIndex, 25);
+      expect(location.charOffset, 140);
+    }
+  });
+
   for (final mode in ReadingMode.values) {
     testWidgets('end of long book reaches 100 in $mode', (tester) async {
       final book = _book();

@@ -8,7 +8,12 @@ import '../models/book_location.dart';
 import '../models/book_search.dart';
 
 class EpubBookReaderEngine implements BookReaderEngine {
+  EpubBookReaderEngine({this.onPositionBeforeProgress});
+
+  final ValueChanged<BookLocation>? onPositionBeforeProgress;
+
   ParsedEpub? _epub;
+  int _loadGeneration = 0;
   final Map<int, _EpubSearchChapter> _searchChapters = {};
   Map<String, List<({String title, String? anchor})>>? _searchToc;
   final GlobalKey<EpubNativeViewState> _readerKey =
@@ -18,11 +23,20 @@ class EpubBookReaderEngine implements BookReaderEngine {
   String get supportedFormat => 'epub';
 
   @override
-  Future<void> loadBook(Uint8List bookData) async {
+  Future<void> loadBook(Uint8List bookData) =>
+      _load(() => EpubParser.parse(bookData));
+
+  /// Open a native EPUB without reading or parsing its ZIP on the UI isolate.
+  Future<void> loadBookFile(String path) =>
+      _load(() => EpubParser.parseFile(path));
+
+  Future<void> _load(Future<ParsedEpub> Function() parse) async {
+    final generation = ++_loadGeneration;
     _epub = null;
     _searchChapters.clear();
     _searchToc = null;
-    _epub = await EpubParser.parse(bookData);
+    final epub = await parse();
+    if (generation == _loadGeneration) _epub = epub;
   }
 
   @override
@@ -50,6 +64,11 @@ class EpubBookReaderEngine implements BookReaderEngine {
       settings: settings,
       theme: theme,
       highlights: highlights,
+      onPositionBeforeProgress: onPositionBeforeProgress == null
+          ? null
+          : (location) => onPositionBeforeProgress!(
+              BookLocation(locator: location.toJson()),
+            ),
       onLocationChanged: (epubLocation, percentage) {
         onProgressChanged(
           BookLocation(locator: epubLocation.toJson()),
@@ -205,6 +224,7 @@ class EpubBookReaderEngine implements BookReaderEngine {
 
   @override
   void dispose() {
+    ++_loadGeneration;
     _epub = null;
     _searchChapters.clear();
     _searchToc = null;

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
@@ -10,6 +11,48 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:xml/xml.dart';
 
 void main() {
+  test(
+    'file parser keeps reader resources usable after the file is gone',
+    () async {
+      final directory = await Directory.systemTemp.createTemp('epub-path-');
+      try {
+        final file = File('${directory.path}/Книга с пробелом.epub');
+        const chapter = 'Text/chapter.xhtml';
+        const css = 'p { font-weight: bold; }';
+        await file.writeAsBytes(
+          _epub(
+            documents: {
+              chapter: _document('Chapter', '<p id="start">Глава 📖</p>'),
+            },
+            spine: [chapter],
+            textEndian: Endian.little,
+            navigation:
+                '<nav epub:type="toc"><ol><li>'
+                '<a href="$chapter#start">Entry</a>'
+                '</li></ol></nav>',
+            images: {
+              'Images/cover.png': [7, 8, 9],
+            },
+            coverImage: 'Images/cover.png',
+            stylesheets: {'Styles/book.css': css},
+          ),
+        );
+
+        final epub = await EpubParser.parseFile(file.path);
+        await file.delete();
+
+        expect(epub.chapters.single.htmlContent, contains('Глава 📖'));
+        expect(epub.chapters.single.title, 'Entry');
+        expect(epub.toc.single.fileName, 'OEBPS/$chapter#start');
+        expect(epub.stylesheets['OEBPS/Styles/book.css'], css);
+        expect(epub.images['OEBPS/Images/cover.png'], [7, 8, 9]);
+        expect(epub.coverImage, [7, 8, 9]);
+      } finally {
+        await directory.delete(recursive: true);
+      }
+    },
+  );
+
   group('EpubParser reading order', () {
     test('does not discard stockholm.xhtml as a TOC file', () async {
       final documents = {

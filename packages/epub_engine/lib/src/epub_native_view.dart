@@ -429,6 +429,10 @@ class EpubNativeView extends StatefulWidget {
   final ThemeData theme;
   final void Function(EpubLocation location, double percentage)?
   onLocationChanged;
+
+  /// Exact position while the weighted book percentage is still being indexed.
+  /// Consumers can persist this locator with their last known percentage.
+  final ValueChanged<EpubLocation>? onPositionBeforeProgress;
   final void Function(String text, String location)? onTextSelected;
   final VoidCallback? onCenterTapped;
   final List<Map<String, dynamic>> highlights;
@@ -440,6 +444,7 @@ class EpubNativeView extends StatefulWidget {
     required this.settings,
     required this.theme,
     this.onLocationChanged,
+    this.onPositionBeforeProgress,
     this.onTextSelected,
     this.onCenterTapped,
     this.highlights = const [],
@@ -477,6 +482,9 @@ class EpubNativeViewState extends State<EpubNativeView>
   final GlobalKey _viewportKey = GlobalKey();
   final Map<int, List<HighlightRange>> _highlightsByChapter = {};
   List<int>? _bookOffsets;
+  final Map<int, int> _chapterWeights = {};
+  List<int>? _indexOffsets;
+  int? _progressFrameCallback;
   final Map<int, Map<String, int>> _chapterAnchors = {};
   final Map<int, List<ContentLink>> _chapterLinks = {};
   final Set<_SelectionScopeData> _selectionScopes = {};
@@ -539,10 +547,6 @@ class EpubNativeViewState extends State<EpubNativeView>
         widget.initialLocation ??
         EpubLocation.fromPosition(chapterIndex: 0, hasExactCharOffset: true);
     _readHighlights();
-
-    if (widget.epub.chapters.isNotEmpty) {
-      _parseChapter(0);
-    }
   }
 
   @override
@@ -589,7 +593,9 @@ class EpubNativeViewState extends State<EpubNativeView>
         image.stopListening();
       }
       _rasterImages.clear();
+      _cancelProgressIndex();
       _bookOffsets = null;
+      _chapterWeights.clear();
       _logicalLocation = null;
       _pendingRestore =
           widget.initialLocation ??
@@ -621,6 +627,7 @@ class EpubNativeViewState extends State<EpubNativeView>
 
   @override
   void dispose() {
+    _cancelProgressIndex();
     _cancelPaginationCallback();
     _pageTurnController.dispose();
     _pageTurnImage?.dispose();
@@ -1155,13 +1162,23 @@ class EpubNativeViewState extends State<EpubNativeView>
 
   void _reportProgress() {
     final location = _logicalLocation;
-    if (location == null) return;
+    if (location == null ||
+        _pendingRestore != null ||
+        (widget.onLocationChanged == null &&
+            widget.onPositionBeforeProgress == null)) {
+      return;
+    }
     final weight = _chapterWeight(location.chapterIndex);
     final fraction = weight > 0
         ? (location.charOffset / weight).clamp(0.0, 1.0)
         : 0.0;
+    final reported = location.copyWith(scrollFraction: fraction);
+    if (widget.onLocationChanged == null || !_ensureBookOffsets()) {
+      widget.onPositionBeforeProgress?.call(reported);
+      return;
+    }
     widget.onLocationChanged?.call(
-      location.copyWith(scrollFraction: fraction),
+      reported,
       _isBookEndVisible()
           ? 100.0
           : _computeBookFraction(location.chapterIndex, fraction) * 100,
@@ -1169,7 +1186,7 @@ class EpubNativeViewState extends State<EpubNativeView>
   }
 
   bool _isBookEndVisible() {
-    final offsets = _contentBookOffsets;
+    final offsets = _bookOffsets!;
     if (offsets.last == 0) return false;
     final viewport = _viewportKey.currentContext?.findRenderObject();
     if (viewport is! RenderBox || !viewport.hasSize) return false;
@@ -1204,8 +1221,13 @@ class EpubNativeViewState extends State<EpubNativeView>
   }
 
   void _reportProgressAfterLayout() {
+    final generation = _layoutGeneration;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _pendingRestore == null) _reportProgress();
+      if (mounted &&
+          generation == _layoutGeneration &&
+          _pendingRestore == null) {
+        _reportProgress();
+      }
     });
   }
 
@@ -1213,6 +1235,7 @@ class EpubNativeViewState extends State<EpubNativeView>
     if (chapterIndex < 0 || chapterIndex >= widget.epub.chapters.length) {
       return 0;
     }
+    if (_chapterWeights[chapterIndex] case final weight?) return weight;
     _parseChapter(chapterIndex);
     final elements = _parsedChapters[chapterIndex]!;
     return elements.isEmpty ? 0 : elements.last.charEnd;
@@ -1240,17 +1263,60 @@ class EpubNativeViewState extends State<EpubNativeView>
         : 0;
   }
 
-  List<int> get _contentBookOffsets {
-    if (_bookOffsets case final offsets?) return offsets;
-    final offsets = <int>[0];
-    for (var chapter = 0; chapter < widget.epub.chapters.length; chapter++) {
-      offsets.add(offsets.last + _chapterWeight(chapter));
+  void _cancelProgressIndex() {
+    final callback = _progressFrameCallback;
+    if (callback != null) {
+      WidgetsBinding.instance.cancelFrameCallbackWithId(callback);
+      _progressFrameCallback = null;
     }
-    return _bookOffsets = offsets;
+    _indexOffsets = null;
+  }
+
+  // Use the rendering parser, including author CSS and image availability.
+  // Never retain its trees for chapters that have not been mounted. Sharing
+  // image references here also avoids copying the archive's raster/SVG bytes
+  // to a second isolate just to count content offsets.
+  bool _ensureBookOffsets() {
+    if (_bookOffsets != null) return true;
+    if (_progressFrameCallback != null) return false;
+    final offsets = _indexOffsets ??= <int>[0];
+    _progressFrameCallback = WidgetsBinding.instance.scheduleFrameCallback((_) {
+      _progressFrameCallback = null;
+      if (!mounted || !identical(offsets, _indexOffsets)) return;
+      final watch = Stopwatch()..start();
+      while (offsets.length <= widget.epub.chapters.length) {
+        final chapter = offsets.length - 1;
+        var weight = _chapterWeights[chapter];
+        if (weight == null) {
+          // A single spine document is indivisible in XhtmlParser. Bound
+          // aggregate work between documents, not progress to one vsync each.
+          if (watch.elapsedMicroseconds >= 2000) break;
+          final elements = _chapterParser(chapter).parse();
+          weight = elements.isEmpty ? 0 : elements.last.charEnd;
+          _chapterWeights[chapter] = weight;
+        }
+        offsets.add(offsets.last + weight);
+      }
+      if (offsets.length <= widget.epub.chapters.length) {
+        _ensureBookOffsets();
+        return;
+      }
+      _indexOffsets = null;
+      _bookOffsets = offsets;
+      if (_pendingRestore != null) {
+        // Legacy whole-book fractions cannot seed a provisional chapter-zero
+        // viewport or publish an incorrect location while the index is pending.
+        setState(() {});
+      } else {
+        _reportProgressAfterLayout();
+        WidgetsBinding.instance.ensureVisualUpdate();
+      }
+    });
+    return false;
   }
 
   double _computeBookFraction(int chapterIndex, double chapterFraction) {
-    final offsets = _contentBookOffsets;
+    final offsets = _bookOffsets!;
     if (offsets.last == 0 ||
         chapterIndex < 0 ||
         chapterIndex + 1 >= offsets.length)
@@ -1261,16 +1327,27 @@ class EpubNativeViewState extends State<EpubNativeView>
         .clamp(0.0, 1.0);
   }
 
+  bool _needsLegacyFractionIndex(EpubLocation location) {
+    return !location.hasExactCharOffset &&
+        !location.cfi.hasRange &&
+        location.chapterIndex == 0 &&
+        location.anchor == null &&
+        location.charOffset == 0 &&
+        location.scrollFraction == 0 &&
+        location.bookScrollOffset == null &&
+        (location.bookScrollFraction ?? 0) > 0;
+  }
+
+  bool get _waitingForRestoreIndex {
+    final restore = _pendingRestore;
+    return restore != null &&
+        _needsLegacyFractionIndex(restore) &&
+        !_ensureBookOffsets();
+  }
+
   EpubLocation _resolveLegacyFraction(EpubLocation location) {
-    if (location.hasExactCharOffset || location.cfi.hasRange) return location;
-    if (location.chapterIndex != 0 ||
-        location.anchor != null ||
-        location.charOffset != 0 ||
-        location.scrollFraction != 0 ||
-        location.bookScrollOffset != null ||
-        (location.bookScrollFraction ?? 0) <= 0)
-      return location;
-    final offsets = _contentBookOffsets;
+    if (!_needsLegacyFractionIndex(location)) return location;
+    final offsets = _bookOffsets!;
     final absolute =
         (offsets.last * location.bookScrollFraction!.clamp(0.0, 1.0)).round();
     for (var chapter = 0; chapter + 1 < offsets.length; chapter++) {
@@ -1304,23 +1381,25 @@ class EpubNativeViewState extends State<EpubNativeView>
     if (_parsedChapters.containsKey(index)) return;
     if (index < 0 || index >= widget.epub.chapters.length) return;
 
+    final parser = _chapterParser(index);
+    final elements = parser.parse();
+    _parsedChapters[index] = elements;
+    _chapterWeights[index] = elements.isEmpty ? 0 : elements.last.charEnd;
+    _chapterAnchors[index] = Map.of(parser.anchors);
+    _chapterLinks[index] = List.of(parser.links);
+  }
+
+  XhtmlParser _chapterParser(int index) {
     final chapter = widget.epub.chapters[index];
-
-    final baseStyle = _baseTextStyle;
-
-    final parser = XhtmlParser(
+    return XhtmlParser(
       html: chapter.htmlContent,
       images: widget.epub.images,
       documentPath: chapter.fileName,
       stylesheets: widget.epub.stylesheets,
       highlights: const [],
       language: widget.epub.language,
-      baseStyle: baseStyle,
+      baseStyle: _baseTextStyle,
     );
-
-    _parsedChapters[index] = parser.parse();
-    _chapterAnchors[index] = Map.of(parser.anchors);
-    _chapterLinks[index] = List.of(parser.links);
   }
 
   List<int> _hyphenationFor(TextBlock block) {
@@ -1480,15 +1559,22 @@ class EpubNativeViewState extends State<EpubNativeView>
 
   void _scheduleRestore() {
     if (_pendingRestore == null || _restoreScheduled) return;
+    if (_waitingForRestoreIndex) return;
     if (widget.epub.chapters.isNotEmpty &&
         widget.settings.readingMode == ReadingMode.horizontal &&
         !_paginationReadyFor(_restoreTarget(_pendingRestore!))) {
       return;
     }
+    final generation = _layoutGeneration;
     _restoreScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _restoreScheduled = false;
-      if (!mounted || _pendingRestore == null) return;
+      if (!mounted || _pendingRestore == null || _waitingForRestoreIndex)
+        return;
+      if (generation != _layoutGeneration) {
+        _scheduleRestore();
+        return;
+      }
       final location = _pendingRestore!;
       if (widget.epub.chapters.isEmpty) {
         _pendingRestore = null;
@@ -1839,6 +1925,7 @@ class EpubNativeViewState extends State<EpubNativeView>
 
   int? _paginationDemand(_PaginationWork work) {
     if (work.isComplete || widget.epub.chapters.isEmpty) return null;
+    if (_waitingForRestoreIndex) return null;
     final target = _restoreTarget(
       _pendingRestore ??
           _logicalLocation ??
@@ -1978,7 +2065,9 @@ class EpubNativeViewState extends State<EpubNativeView>
       }
       work.pages.insert(low, page);
     } while (watch.elapsedMicroseconds < 4000);
-    if (anchor != null && widget.epub.chapters.isNotEmpty) {
+    if (anchor != null &&
+        widget.epub.chapters.isNotEmpty &&
+        !_waitingForRestoreIndex) {
       final index = _pageIndexForLocation(_restoreTarget(anchor));
       if (index != null) {
         _currentPageIndex = _isDualPage ? (index ~/ 2) * 2 : index;
@@ -2706,6 +2795,12 @@ class EpubNativeViewState extends State<EpubNativeView>
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        if (_waitingForRestoreIndex) {
+          return ColoredBox(
+            color: Color(widget.settings.backgroundColor),
+            child: Center(child: CircularProgressIndicator(color: _textColor)),
+          );
+        }
         final viewportSize = constraints.biggest;
         if (_lastViewportSize != null && _lastViewportSize != viewportSize) {
           _pendingRestore ??= _captureLocation(widget.settings.readingMode);

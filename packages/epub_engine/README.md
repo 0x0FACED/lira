@@ -6,6 +6,8 @@ Native Flutter EPUB rendering for Lira. No WebView or embedded JavaScript; EPUB 
 
 `EpubParser.parse(bytes)` reads ZIP/container/OPF, preserves spine reading order and builds a separate NCX/EPUB3 navigation tree. Spine documents are not filtered by filename. UTF-8 and UTF-16 text are decoded without silent replacement of malformed characters.
 
+For a local file, use `EpubParser.parseFile(path)` on native platforms. It reads a file-backed ZIP on a worker isolate without allocating a whole-archive buffer, then hands decoded chapters, styles and images to the renderer. Chapter render trees are prepared on demand.
+
 `XhtmlParser` produces styled text, image, table and divider blocks with character ranges, anchors and links. Valid XHTML and recovered HTML share one traversal. `EpubNativeView` renders them with native Flutter text selection:
 
 - chapter-indexed vertical scrolling;
@@ -50,6 +52,8 @@ Horizontal turns follow touch/stylus drags and settle or roll back on release. E
 `EpubLocation` serializes an application-specific JSON locator. Despite its historical `EpubCfi` class name, it is not a standard EPUB CFI string. New renderer positions include `v:2` and an exact parsed-content UTF-16 offset. Legacy JSON remains readable; `hasExactCharOffset` must be explicit when constructing an exact offset programmatically.
 
 The renderer captures the current logical text position before layout invalidation. Horizontal mode shows a themed loading indicator until the target page/spread is measured, never chapter zero as a provisional destination; loading does not publish reading progress. Vertical lists initialize at the measured target before their first paint. A page number or previous pixel offset is not the primary reflow anchor. Selection ranges use start-inclusive/end-exclusive text offsets.
+
+Exact percentages use cumulative rendered-content offsets. The reader indexes offscreen chapter lengths in frame slices (2 ms checked between spine documents) and keeps only their lengths, not their render trees. A current exact locator can be reported before the percentage is ready. A legacy locator with only a whole-book fraction waits for that index; it never displays chapter zero as a substitute. Parsing or laying out an individual large chapter is still indivisible.
 
 Display-only indent/discretionary-hyphen insertions never enter stored coordinates or copied text. Geometry consumers must map source offsets with `readerDisplayOffset(span, sourceOffset)` before querying a `RenderParagraph`, and map display positions back with `readerSourceOffset(span, displayOffset)`. Default `toPlainText()` returns source text through empty insertion semantics labels; `includeSemanticsLabels: false` exposes layout text.
 

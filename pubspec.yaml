@@ -1,6 +1,6 @@
 name: lira
 description: "Lira is your free feature-rich library"
-publish_to: 'none'
+publish_to: "none"
 
 version: 0.8.0+22
 
@@ -18,7 +18,7 @@ dependencies:
   path_provider: ^2.1.5
   get_it: ^9.2.1
   # Откатываемся на стабильный стек, чтобы не ловить конфликты SDK
-  flutter_riverpod: ^2.6.1 
+  flutter_riverpod: ^2.6.1
   riverpod_annotation: ^2.3.6
   injectable: ^2.7.1
   dio: ^5.9.2
@@ -26,12 +26,12 @@ dependencies:
   intl: ^0.20.2 # Стабильная версия для текущих SDK
   freezed_annotation: ^3.1.0
   json_annotation: ^4.9.0
-  
+
   epub_engine:
     path: packages/epub_engine
   pdf_engine:
     path: packages/pdf_engine
-  
+
   # БД
   drift: ^2.20.0
   sqlite3_flutter_libs: ^0.5.24

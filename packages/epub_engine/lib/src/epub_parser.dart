@@ -4,6 +4,9 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:xml/xml.dart';
 
+import 'epub_file_parser_stub.dart'
+    if (dart.library.io) 'epub_file_parser_io.dart'
+    as file_parser;
 import 'epub_paths.dart';
 
 /// Parsed EPUB content ready for rendering
@@ -92,14 +95,25 @@ class EpubParser {
   /// The package spine defines reading order; the TOC is only navigation and
   /// may omit documents, reorder them, or point to several anchors in one file.
   static Future<ParsedEpub> parse(Uint8List data) async {
-    return _parseWithArchive(data);
+    return _parseWithArchive(ZipDecoder().decodeBytes(data, verify: false));
+  }
+
+  /// Parse a local EPUB on a worker isolate without buffering the whole ZIP.
+  ///
+  /// Only decoded content crosses back to the caller. The file is closed before
+  /// this future completes, including when package or spine validation fails.
+  /// File paths are supported on native platforms only.
+  static Future<ParsedEpub> parseFile(String path) {
+    return file_parser.parseEpubFile(path, _parseWithArchive);
   }
 
   /// Read only the container and OPF, without requiring readable chapters.
   static Future<EpubBibliographicMetadata> readBibliographicMetadata(
     Uint8List bytes,
   ) async {
-    final package = _readPackage(bytes);
+    final package = _readPackage(
+      ZipDecoder().decodeBytes(bytes, verify: false),
+    );
     return _readMetadata(
       _firstDescendantByLocalName(package.document, 'metadata'),
     );
@@ -110,8 +124,7 @@ class EpubParser {
     String opfPath,
     XmlDocument document,
   })
-  _readPackage(Uint8List data) {
-    final archive = ZipDecoder().decodeBytes(data, verify: false);
+  _readPackage(Archive archive) {
     final fileByPath = <String, ArchiveFile>{};
 
     for (final file in archive.files.where((file) => file.isFile)) {
@@ -146,8 +159,8 @@ class EpubParser {
     return (files: fileByPath, opfPath: opfPath, document: opfDocument);
   }
 
-  static ParsedEpub _parseWithArchive(Uint8List data) {
-    final package = _readPackage(data);
+  static ParsedEpub _parseWithArchive(Archive archive) {
+    final package = _readPackage(archive);
     final fileByPath = package.files;
     final opfPath = package.opfPath;
     final opfDocument = package.document;

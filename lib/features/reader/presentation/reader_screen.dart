@@ -131,14 +131,22 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     BookReaderEngine? engine;
     try {
       if (book.format == 'epub') {
-        engine = EpubBookReaderEngine();
+        final epubEngine = EpubBookReaderEngine(
+          onPositionBeforeProgress: (location) {
+            if (mounted && generation == _loadGeneration) {
+              _recordReadingPosition(location);
+            }
+          },
+        );
+        engine = epubEngine;
+        await epubEngine.loadBookFile(book.fileUrl!);
       } else if (book.format == 'pdf') {
         engine = PdfBookReaderEngine();
+        final bytes = await File(book.fileUrl!).readAsBytes();
+        await engine.loadBook(bytes);
       } else {
         throw UnsupportedError('Format ${book.format} is not supported');
       }
-      final bytes = await File(book.fileUrl!).readAsBytes();
-      await engine.loadBook(bytes);
       if (!mounted || generation != _loadGeneration) {
         engine.dispose();
         return engine;
@@ -766,16 +774,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         highlights: _buildReaderHighlights(highlights),
         onProgressChanged: (location, percentage) {
           if (!mounted || _engine != engine) return;
-          _progressNotifier.value = _progressStateFromPercentage(
-            percentage,
-            location: location,
-          );
-          unawaited(
-            _progressController.saveProgress(
-              location: location.locator,
-              percentage: percentage,
-            ),
-          );
+          _recordReadingPosition(location, percentage: percentage);
         },
         onTextSelected: (text, location) {
           if (!mounted || _engine != engine) return;
@@ -786,6 +785,22 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
             _selectedLocation = hasSelection ? location.locator : null;
           });
         },
+      ),
+    );
+  }
+
+  void _recordReadingPosition(BookLocation location, {double? percentage}) {
+    // An exact EPUB locator is usable before the total text weight is ready.
+    // Keep the last known percentage rather than estimate it from raw XHTML.
+    final value = percentage ?? _progressNotifier.value.fraction * 100;
+    _progressNotifier.value = _progressStateFromPercentage(
+      value,
+      location: location,
+    );
+    unawaited(
+      _progressController.saveProgress(
+        location: location.locator,
+        percentage: value,
       ),
     );
   }
