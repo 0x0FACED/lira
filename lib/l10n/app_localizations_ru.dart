@@ -130,6 +130,14 @@ class AppLocalizationsRu extends AppLocalizations {
   String get bookEditError => 'Не удалось сохранить информацию о книге.';
 
   @override
+  String get bookShareUnavailable => 'Поделиться (пока недоступно)';
+
+  @override
+  String bookDeleteWarning(String title) {
+    return 'Удалить «$title» из библиотеки на этом устройстве? Прогресс чтения, закладки, выделения, жанры и теги книги тоже будут удалены. Исходный файл книги не будет удалён. Это действие нельзя отменить.';
+  }
+
+  @override
   String get openLibraryFind => 'Найти в Open Library';
 
   @override

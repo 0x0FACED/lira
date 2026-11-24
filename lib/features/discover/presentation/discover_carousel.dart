@@ -233,8 +233,13 @@ class _DiscoverCarouselState extends State<DiscoverCarousel> {
                       horizontal: AppLayout.pageGutter(context),
                     ),
                     itemCount: _itemCount,
-                    separatorBuilder: (_, __) =>
-                        const SizedBox(width: AppSpacing.md),
+                    separatorBuilder: (context, _) => VerticalDivider(
+                      width: AppSpacing.md,
+                      thickness: 1,
+                      indent: AppSpacing.compact,
+                      endIndent: AppSpacing.compact,
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
                     itemBuilder: (context, index) {
                       final item = widget.items[index];
                       return Focus(

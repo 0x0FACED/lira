@@ -335,22 +335,6 @@ class AppTheme {
           ),
         ),
       ),
-      navigationRailTheme: NavigationRailThemeData(
-        backgroundColor: canvas,
-        useIndicator: false,
-        indicatorColor: Colors.transparent,
-        selectedIconTheme: IconThemeData(color: colors.primary, size: 22),
-        unselectedIconTheme: IconThemeData(
-          color: colors.onSurfaceVariant,
-          size: 22,
-        ),
-        selectedLabelTextStyle: text.labelLarge?.copyWith(
-          color: colors.primary,
-        ),
-        unselectedLabelTextStyle: text.bodyMedium?.copyWith(
-          color: colors.onSurfaceVariant,
-        ),
-      ),
       listTileTheme: ListTileThemeData(
         mouseCursor: _clickCursor,
         contentPadding: EdgeInsets.zero,

@@ -175,6 +175,32 @@ void main() {
     variant: TargetPlatformVariant.only(TargetPlatform.macOS),
   );
 
+  testWidgets('details share is disabled, named, and explains availability', (
+    tester,
+  ) async {
+    await mount(tester);
+    await tester.tap(find.byType(BookCard));
+    await tester.pumpAndSettle();
+    final context = tester.element(find.byType(BookDetailScreen));
+    final l10n = AppLocalizations.of(context)!;
+    final share = find.byTooltip(l10n.bookShareUnavailable);
+    final semantics = tester.ensureSemantics();
+    expect(
+      tester.getSemantics(share),
+      matchesSemantics(
+        tooltip: l10n.bookShareUnavailable,
+        isButton: true,
+        hasEnabledState: true,
+        isEnabled: false,
+      ),
+    );
+    semantics.dispose();
+    await hover(tester, share);
+    expect(paintedTextContaining(l10n.bookShareUnavailable), findsOneWidget);
+    expect(find.byType(BookDetailScreen), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('discovery save action stays named without a hover popup', (
     tester,
   ) async {

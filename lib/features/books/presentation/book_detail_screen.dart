@@ -141,60 +141,117 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
                       horizontal: gutter,
                       vertical: AppSpacing.sm,
                     ),
-                    child: Row(
-                      children: [
-                        if (draft == null)
-                          MergeSemantics(
-                            child: Semantics(
-                              label: MaterialLocalizations.of(
-                                context,
-                              ).backButtonTooltip,
-                              child: BackButton(onPressed: () => context.pop()),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final title = Text(
+                          draft == null ? l10n.library : l10n.editBook,
+                          style: draft == null
+                              ? theme.textTheme.headlineMedium
+                              : theme.textTheme.titleMedium,
+                          maxLines: draft == null ? null : 1,
+                          overflow: draft == null
+                              ? null
+                              : TextOverflow.ellipsis,
+                        );
+                        const titleGap = SizedBox(width: AppSpacing.compact);
+                        if (draft != null) {
+                          return Row(
+                            children: [
+                              IconButton(
+                                tooltip: l10n.cancel,
+                                onPressed: _saving ? null : _finishEdit,
+                                icon: Icon(
+                                  Icons.close,
+                                  semanticLabel: l10n.cancel,
+                                ),
+                              ),
+                              titleGap,
+                              Expanded(child: title),
+                              FilledButton(
+                                onPressed: _saving ? null : _save,
+                                child: Text(l10n.save),
+                              ),
+                            ],
+                          );
+                        }
+
+                        final heading = Row(
+                          children: [
+                            MergeSemantics(
+                              child: Semantics(
+                                label: MaterialLocalizations.of(
+                                  context,
+                                ).backButtonTooltip,
+                                child: BackButton(
+                                  onPressed: () => context.pop(),
+                                ),
+                              ),
                             ),
-                          )
-                        else
-                          IconButton(
-                            tooltip: l10n.cancel,
-                            onPressed: _saving ? null : _finishEdit,
-                            icon: Icon(Icons.close, semanticLabel: l10n.cancel),
-                          ),
-                        Expanded(
-                          child: Text(
-                            draft == null ? l10n.library : l10n.editBook,
-                            style: theme.textTheme.titleMedium,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (draft != null)
-                          FilledButton(
-                            onPressed: _saving ? null : _save,
-                            child: Text(l10n.save),
-                          )
-                        else ...[
-                          IconButton(
-                            tooltip: l10n.editBook,
-                            onPressed: editBook,
-                            icon: Icon(
-                              Icons.edit_outlined,
-                              semanticLabel: l10n.editBook,
-                            ),
-                          ),
-                          PopupMenuButton<String>(
-                            tooltip: MaterialLocalizations.of(
-                              context,
-                            ).showMenuTooltip,
-                            onSelected: (_) =>
-                                _confirmDelete(context, ref, book),
-                            itemBuilder: (_) => [
-                              PopupMenuItem(
-                                value: 'delete',
-                                child: Text(l10n.deleteBook),
+                            titleGap,
+                            Expanded(child: title),
+                          ],
+                        );
+                        final actions = TooltipVisibility(
+                          visible: true,
+                          child: Wrap(
+                            alignment: WrapAlignment.end,
+                            children: [
+                              IconButton(
+                                tooltip: l10n.openLibraryFind,
+                                onPressed: () => showAppDialog<void>(
+                                  context: context,
+                                  builder: (_) => OpenLibraryDialog(
+                                    book: book,
+                                    organization: organization,
+                                  ),
+                                ),
+                                icon: Icon(
+                                  Icons.manage_search_outlined,
+                                  semanticLabel: l10n.openLibraryFind,
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: l10n.editBook,
+                                onPressed: editBook,
+                                icon: Icon(
+                                  Icons.edit_outlined,
+                                  semanticLabel: l10n.editBook,
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: l10n.bookShareUnavailable,
+                                onPressed: null,
+                                icon: const Icon(Icons.ios_share_outlined),
                               ),
                             ],
                           ),
-                        ],
-                      ],
+                        );
+                        final painter = TextPainter(
+                          text: TextSpan(text: title.data, style: title.style),
+                          textDirection: Directionality.of(context),
+                          textScaler: MediaQuery.textScalerOf(context),
+                          maxLines: 1,
+                        )..layout();
+                        final inlineWidth =
+                            painter.width.ceilToDouble() +
+                            AppSpacing.compact +
+                            AppSpacing.sm +
+                            4 * AppLayout.minTouchTarget;
+                        painter.dispose();
+                        if (constraints.maxWidth < inlineWidth) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [heading, actions],
+                          );
+                        }
+                        return Row(
+                          children: [
+                            Expanded(child: heading),
+                            const SizedBox(width: AppSpacing.sm),
+                            actions,
+                          ],
+                        );
+                      },
                     ),
                   ),
                   Expanded(
@@ -223,21 +280,18 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
                           const SizedBox(height: AppSpacing.lg),
                           _ReadingAction(book: book, enabled: draft == null),
                           const SizedBox(height: AppSpacing.md),
-                          TextButton.icon(
-                            onPressed: draft != null
-                                ? null
-                                : () => showAppDialog<void>(
-                                    context: context,
-                                    builder: (_) => OpenLibraryDialog(
-                                      book: book,
-                                      organization: organization,
-                                    ),
-                                  ),
-                            style: TextButton.styleFrom(
-                              alignment: AlignmentDirectional.centerStart,
+                          Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: TextButton.icon(
+                              onPressed: draft != null
+                                  ? null
+                                  : () => _confirmDelete(context, ref, book),
+                              style: TextButton.styleFrom(
+                                foregroundColor: theme.colorScheme.error,
+                              ),
+                              icon: const Icon(Icons.delete_outline),
+                              label: Text(l10n.deleteBook),
                             ),
-                            icon: const Icon(Icons.manage_search_outlined),
-                            label: Text(l10n.openLibraryFind),
                           ),
                           const SizedBox(height: AppSpacing.md),
                           _FileMetadata(book: book),
@@ -316,7 +370,7 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
       builder: (dialogContext) => AlertDialog(
         scrollable: true,
         title: Text(l10n.deleteBook),
-        content: Text(l10n.deleteBookConfirm(currentBook.title)),
+        content: Text(l10n.bookDeleteWarning(currentBook.title)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),

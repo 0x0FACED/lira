@@ -225,7 +225,7 @@ class DiscoverItemCard extends StatelessWidget {
     required this.onTap,
   });
 
-  static const _inset = AppSpacing.compact;
+  static const _verticalInset = AppSpacing.compact;
 
   static bool _isTextFirst(DiscoverItem item, DiscoverSource source) =>
       source.category == DiscoverCategory.documents || item.imageUrl == null;
@@ -250,10 +250,9 @@ class DiscoverItemCard extends StatelessWidget {
       text.bodyMedium!,
       AppLayout.discoverSummaryLines,
     );
-    final imageHeight =
-        (cardWidth - _inset * 2) / AppLayout.discoverImageAspectRatio;
+    final imageHeight = cardWidth / AppLayout.discoverImageAspectRatio;
     var tallest = 0.0;
-    // The viewport uses the largest caption budget so mixed cards share a
+    // The viewport uses the largest caption budget so mixed items share a
     // baseline for the save button.
     for (final item in items) {
       var height = titleHeight;
@@ -271,7 +270,7 @@ class DiscoverItemCard extends StatelessWidget {
     final footerHeight = smallLine > AppLayout.minTouchTarget
         ? smallLine
         : AppLayout.minTouchTarget;
-    return _inset * 2 + tallest + AppSpacing.xs + footerHeight;
+    return _verticalInset * 2 + tallest + AppSpacing.xs + footerHeight;
   }
 
   final DiscoverItem item;
@@ -292,16 +291,12 @@ class DiscoverItemCard extends StatelessWidget {
             monthOnly: item.documentNumber != null,
           );
     return Material(
-      color: theme.colorScheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        side: BorderSide(color: theme.colorScheme.outlineVariant),
-      ),
-      clipBehavior: Clip.antiAlias,
+      type: MaterialType.transparency,
       child: InkWell(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         child: Padding(
-          padding: const EdgeInsets.all(_inset),
+          padding: const EdgeInsets.symmetric(vertical: _verticalInset),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

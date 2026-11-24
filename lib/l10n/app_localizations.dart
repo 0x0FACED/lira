@@ -314,6 +314,18 @@ abstract class AppLocalizations {
   /// **'Could not save book details.'**
   String get bookEditError;
 
+  /// No description provided for @bookShareUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Share (not available yet)'**
+  String get bookShareUnavailable;
+
+  /// No description provided for @bookDeleteWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete “{title}” from this device’s library? Its reading progress, bookmarks, highlights, genres, and tags will also be deleted. The original book file will not be deleted. This cannot be undone.'**
+  String bookDeleteWarning(String title);
+
   /// No description provided for @openLibraryFind.
   ///
   /// In en, this message translates to:

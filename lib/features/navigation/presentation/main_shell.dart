@@ -66,6 +66,23 @@ class _MainShellState extends State<MainShell>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
+    final destinations = [
+      NavigationDestination(
+        icon: const Icon(Icons.library_books_outlined),
+        selectedIcon: const Icon(Icons.library_books_rounded),
+        label: l10n.library,
+      ),
+      NavigationDestination(
+        icon: const Icon(Icons.explore_outlined),
+        selectedIcon: const Icon(Icons.explore_rounded),
+        label: l10n.discover,
+      ),
+      NavigationDestination(
+        icon: const Icon(Icons.tune_outlined),
+        selectedIcon: const Icon(Icons.tune_rounded),
+        label: l10n.settings,
+      ),
+    ];
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -103,34 +120,26 @@ class _MainShellState extends State<MainShell>
                             ),
                           ),
                           Expanded(
-                            child: NavigationRail(
-                              extended: true,
-                              minExtendedWidth: railWidth,
-                              selectedIndex: _currentIndex,
-                              onDestinationSelected: _selectTab,
-                              destinations: [
-                                NavigationRailDestination(
-                                  icon: const Icon(
-                                    Icons.library_books_outlined,
-                                  ),
-                                  selectedIcon: const Icon(
-                                    Icons.library_books_rounded,
-                                  ),
-                                  label: Text(l10n.library),
-                                ),
-                                NavigationRailDestination(
-                                  icon: const Icon(Icons.explore_outlined),
-                                  selectedIcon: const Icon(
-                                    Icons.explore_rounded,
-                                  ),
-                                  label: Text(l10n.discover),
-                                ),
-                                NavigationRailDestination(
-                                  icon: const Icon(Icons.tune_outlined),
-                                  selectedIcon: const Icon(Icons.tune_rounded),
-                                  label: Text(l10n.settings),
-                                ),
-                              ],
+                            child: SingleChildScrollView(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.compact,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                spacing: AppSpacing.xs,
+                                children: [
+                                  for (
+                                    var index = 0;
+                                    index < destinations.length;
+                                    index++
+                                  )
+                                    _SidebarDestination(
+                                      destination: destinations[index],
+                                      selected: index == _currentIndex,
+                                      onPressed: () => _selectTab(index),
+                                    ),
+                                ],
+                              ),
                             ),
                           ),
                         ],
@@ -170,26 +179,62 @@ class _MainShellState extends State<MainShell>
                   animationDuration: AppMotion.duration(context),
                   selectedIndex: _currentIndex,
                   onDestinationSelected: _selectTab,
-                  destinations: [
-                    NavigationDestination(
-                      icon: const Icon(Icons.library_books_outlined),
-                      selectedIcon: const Icon(Icons.library_books_rounded),
-                      label: l10n.library,
-                    ),
-                    NavigationDestination(
-                      icon: const Icon(Icons.explore_outlined),
-                      selectedIcon: const Icon(Icons.explore_rounded),
-                      label: l10n.discover,
-                    ),
-                    NavigationDestination(
-                      icon: const Icon(Icons.tune_outlined),
-                      selectedIcon: const Icon(Icons.tune_rounded),
-                      label: l10n.settings,
-                    ),
-                  ],
+                  destinations: destinations,
                 ),
         );
       },
+    );
+  }
+}
+
+class _SidebarDestination extends StatelessWidget {
+  const _SidebarDestination({
+    required this.destination,
+    required this.selected,
+    required this.onPressed,
+  });
+
+  final NavigationDestination destination;
+  final bool selected;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final foreground = selected ? colors.primary : colors.onSurfaceVariant;
+    return Semantics(
+      selected: selected,
+      child: TextButton(
+        onPressed: onPressed,
+        style: TextButton.styleFrom(
+          alignment: AlignmentDirectional.centerStart,
+          backgroundColor: selected ? colors.surfaceContainer : null,
+          foregroundColor: foreground,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.compact,
+            vertical: AppSpacing.sm,
+          ),
+        ),
+        child: IconTheme.merge(
+          data: IconThemeData(color: foreground, size: 20),
+          child: Row(
+            spacing: AppSpacing.compact,
+            children: [
+              if (selected && destination.selectedIcon != null)
+                destination.selectedIcon!
+              else
+                destination.icon,
+              Expanded(
+                child: Text(
+                  destination.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

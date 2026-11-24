@@ -4,8 +4,10 @@ import 'dart:ui' as ui;
 import 'package:drift/native.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lira/core/database/app_database.dart';
 import 'package:lira/core/di/injection.dart';
 import 'package:lira/core/theme/app_theme.dart';
@@ -16,6 +18,7 @@ import 'package:lira/features/books/domain/providers/book_organization_provider.
 import 'package:lira/features/books/domain/providers/library_layout_provider.dart';
 import 'package:lira/features/books/presentation/book_detail_screen.dart';
 import 'package:lira/features/books/presentation/library_screen.dart';
+import 'package:lira/features/books/presentation/open_library_dialog.dart';
 import 'package:lira/features/books/presentation/widgets/book_card.dart';
 import 'package:lira/features/progress/data/repositories/reading_progress_local_repository.dart';
 import 'package:lira/features/progress/domain/models/reading_progress_dto.dart';
@@ -240,21 +243,137 @@ void main() {
         find.byWidgetPredicate((widget) => widget is FilledButton),
       );
       final progress = tester.getRect(find.byType(LinearProgressIndicator));
-      final lookup = tester.getRect(
-        find.ancestor(
-          of: find.text(l10n.openLibraryFind),
-          matching: find.byWidgetPredicate((widget) => widget is TextButton),
-        ),
+      final lookup = tester.getRect(find.byTooltip(l10n.openLibraryFind));
+      final edit = tester.getRect(find.byTooltip(l10n.editBook));
+      final share = tester.getRect(find.byTooltip(l10n.bookShareUnavailable));
+      final delete = tester.getRect(
+        find.widgetWithText(TextButton, l10n.deleteBook),
       );
       final pageWidth = size.width.clamp(0.0, AppLayout.contentMaxWidth);
       expect(read.width, pageWidth - 2 * gutter);
       expect(read.center.dx, size.width / 2);
       expect(progress.left, read.left);
       expect(progress.right, read.right);
-      expect(lookup.left, read.left);
-      expect(lookup.right, read.right);
+      expect(lookup.center.dy, edit.center.dy);
+      expect(lookup.right, lessThanOrEqualTo(edit.left));
+      expect(edit.right, lessThanOrEqualTo(share.left));
+      expect(share.right, lessThanOrEqualTo(read.right));
+      expect(delete.left, read.left);
+      expect(delete.width, lessThan(read.width));
+      expect(delete.top, greaterThan(progress.bottom));
     }
   });
+
+  testLibraryWidgets(
+    'details heading stays readable and lookup opens at large text scale',
+    (tester) async {
+      final book = (await getIt<BooksLocalRepository>().getBookById('1'))!;
+      for (final locale in [const Locale('en'), const Locale('ru')]) {
+        await mount(
+          tester,
+          size: const Size(360, 660),
+          textScale: 1.5,
+          locale: locale,
+          home: BookDetailScreen(book: book),
+        );
+        final context = tester.element(find.byType(BookDetailScreen));
+        final l10n = AppLocalizations.of(context)!;
+        final heading = tester.renderObject<RenderParagraph>(
+          find.text(l10n.library),
+        );
+        expect(heading.didExceedMaxLines, isFalse);
+        await tester.tap(find.byTooltip(l10n.openLibraryFind));
+        await tester.pumpAndSettle();
+        expect(find.byType(OpenLibraryDialog), findsOneWidget);
+        expect(find.widgetWithText(TextField, book.title), findsOneWidget);
+        await tester.tap(find.widgetWithText(TextButton, l10n.cancel));
+        await tester.pumpAndSettle();
+        expect(find.byType(OpenLibraryDialog), findsNothing);
+      }
+    },
+  );
+
+  testLibraryWidgets(
+    'details deletion requires confirmation and keeps the source file',
+    (tester) async {
+      final repository = getIt<BooksLocalRepository>();
+      final progressRepository = getIt<ReadingProgressLocalRepository>();
+      final book = (await repository.getBookById(
+        '1',
+      ))!.copyWith(fileUrl: coverPath);
+      await tester.runAsync(() => repository.saveBook(book));
+      await progressRepository.saveProgress(
+        ReadingProgressDto(
+          bookId: book.id,
+          percentage: 25,
+          location: 'saved-location',
+          updatedAt: DateTime(2026),
+        ),
+      );
+      final router = GoRouter(
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (_, _) =>
+                const Scaffold(body: Text('Library after deletion')),
+          ),
+          GoRoute(
+            path: '/book',
+            builder: (_, _) => BookDetailScreen(book: book),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            routerConfig: router,
+            theme: AppTheme.lightTheme,
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      router.push<void>('/book');
+      await tester.pumpAndSettle();
+      final context = tester.element(find.byType(BookDetailScreen));
+      final container = ProviderScope.containerOf(context);
+      final l10n = AppLocalizations.of(context)!;
+      await container
+          .read(bookOrganizationsProvider.notifier)
+          .setLabels(
+            book.id,
+            const BookOrganization(genres: ['Fiction'], tags: ['Favorite']),
+          );
+      await tester.pumpAndSettle();
+      final delete = find.widgetWithText(TextButton, l10n.deleteBook);
+      await tester.ensureVisible(delete);
+      await tester.tap(delete);
+      await tester.pumpAndSettle();
+      expect(find.text(l10n.bookDeleteWarning(book.title)), findsOneWidget);
+      expect(await repository.getBookById(book.id), isNotNull);
+      await tester.tap(find.widgetWithText(TextButton, l10n.cancel));
+      await tester.pumpAndSettle();
+      expect(await repository.getBookById(book.id), isNotNull);
+      expect(await progressRepository.getProgress(book.id), isNotNull);
+      expect(container.read(bookOrganizationProvider(book.id)).tags, [
+        'Favorite',
+      ]);
+      await tester.tap(delete);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, l10n.delete));
+      await tester.pumpAndSettle();
+      expect(find.byType(BookDetailScreen), findsNothing);
+      expect(find.text('Library after deletion'), findsOneWidget);
+      expect(await repository.getBookById(book.id), isNull);
+      expect(await progressRepository.getProgress(book.id), isNull);
+      expect(container.read(bookOrganizationProvider(book.id)).tags, isEmpty);
+      expect(File(coverPath).existsSync(), isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testLibraryWidgets(
     'inline editing saves metadata and an unconfirmed genre, and cancel restores it',
@@ -429,9 +548,9 @@ void main() {
         );
         final l10n = AppLocalizations.of(context)!;
         if (details) {
-          await tester.tap(find.byType(PopupMenuButton<String>));
-          await tester.pumpAndSettle();
-          await tester.tap(find.text(l10n.deleteBook));
+          final delete = find.widgetWithText(TextButton, l10n.deleteBook);
+          await tester.ensureVisible(delete);
+          await tester.tap(delete);
         } else {
           final card = find.byKey(const ValueKey('0'));
           await tester.longPressAt(

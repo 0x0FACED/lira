@@ -129,6 +129,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookEditError => 'Could not save book details.';
 
   @override
+  String get bookShareUnavailable => 'Share (not available yet)';
+
+  @override
+  String bookDeleteWarning(String title) {
+    return 'Delete “$title” from this device’s library? Its reading progress, bookmarks, highlights, genres, and tags will also be deleted. The original book file will not be deleted. This cannot be undone.';
+  }
+
+  @override
   String get openLibraryFind => 'Find in Open Library';
 
   @override
