@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:epub_engine/epub_engine.dart';
@@ -8,14 +9,23 @@ import '../models/book_location.dart';
 import '../models/book_search.dart';
 
 class EpubBookReaderEngine implements BookReaderEngine {
-  EpubBookReaderEngine({this.onPositionBeforeProgress});
+  EpubBookReaderEngine({
+    this.onPositionBeforeProgress,
+    this.paginatedTopPadding,
+  });
 
   final ValueChanged<BookLocation>? onPositionBeforeProgress;
+  final double? paginatedTopPadding;
 
   ParsedEpub? _epub;
   int _loadGeneration = 0;
   final Map<int, _EpubSearchChapter> _searchChapters = {};
   Map<String, List<({String title, String? anchor})>>? _searchToc;
+  final Map<int, Map<String, int>> _chapterAnchorOffsets = {};
+  final Map<int, List<_EpubTocEntry>> _tocByChapter = {};
+  final Map<int, List<_EpubTocSection>> _tocSections = {};
+  final Map<String, int> _chapterIndices = {};
+  final List<int> _tocChapters = [];
   final GlobalKey<EpubNativeViewState> _readerKey =
       GlobalKey<EpubNativeViewState>();
 
@@ -35,8 +45,12 @@ class EpubBookReaderEngine implements BookReaderEngine {
     _epub = null;
     _searchChapters.clear();
     _searchToc = null;
+    _clearTocIndex();
     final epub = await parse();
-    if (generation == _loadGeneration) _epub = epub;
+    if (generation == _loadGeneration) {
+      _epub = epub;
+      _indexToc(epub);
+    }
   }
 
   @override
@@ -48,6 +62,7 @@ class EpubBookReaderEngine implements BookReaderEngine {
     required void Function(BookLocation location, double percentage)
     onProgressChanged,
     required void Function(String text, BookLocation location) onTextSelected,
+    ValueChanged<Rect?>? onSelectionAnchorChanged,
     VoidCallback? onCenterTapped,
     List<Map<String, dynamic>> highlights = const [],
   }) {
@@ -62,6 +77,7 @@ class EpubBookReaderEngine implements BookReaderEngine {
       epub: _epub!,
       initialLocation: parsedLocation,
       settings: settings,
+      paginatedTopPadding: paginatedTopPadding,
       theme: theme,
       highlights: highlights,
       onPositionBeforeProgress: onPositionBeforeProgress == null
@@ -78,6 +94,7 @@ class EpubBookReaderEngine implements BookReaderEngine {
       onTextSelected: (text, locator) {
         onTextSelected(text, BookLocation(locator: locator));
       },
+      onSelectionAnchorChanged: onSelectionAnchorChanged,
       onCenterTapped: onCenterTapped,
     );
   }
@@ -155,6 +172,7 @@ class EpubBookReaderEngine implements BookReaderEngine {
       baseStyle: const TextStyle(fontSize: 16),
     );
     final elements = parser.parse();
+    _chapterAnchorOffsets[index] = parser.anchors;
     final text = StringBuffer();
     final runs = <_EpubSearchRun>[];
     var hasText = false;
@@ -223,12 +241,190 @@ class EpubBookReaderEngine implements BookReaderEngine {
   }
 
   @override
+  TOCItem? tocItemAt(BookLocation location) {
+    final epub = _epub;
+    if (epub == null || _tocChapters.isEmpty) return null;
+    final position = _tocPosition(location.locator);
+    if (position == null) return null;
+    var low = 0;
+    var high = _tocChapters.length;
+    while (low < high) {
+      final middle = (low + high) ~/ 2;
+      if (_tocChapters[middle] <= position.chapter) {
+        low = middle + 1;
+      } else {
+        high = middle;
+      }
+    }
+    for (var index = low - 1; index >= 0; index--) {
+      final chapter = _tocChapters[index];
+      final sections = _sectionsFor(epub, chapter);
+      final limit = chapter == position.chapter ? position.offset : null;
+      for (var section = sections.length - 1; section >= 0; section--) {
+        if (limit == null || sections[section].offset <= limit) {
+          return sections[section].entry.item;
+        }
+      }
+    }
+    return null;
+  }
+
+  void _indexToc(ParsedEpub epub) {
+    for (var index = 0; index < epub.chapters.length; index++) {
+      _chapterIndices[epub.chapters[index].fileName] = index;
+    }
+    var order = 0;
+    void visit(List<TOCItem> items, int depth) {
+      for (final item in items) {
+        final destination = _tocDestination(item.fileName);
+        if (destination != null && item.title.trim().isNotEmpty) {
+          (_tocByChapter[destination.chapter] ??= []).add(
+            _EpubTocEntry(item, destination.anchor, depth, order++),
+          );
+        }
+        visit(item.subItems, depth + 1);
+      }
+    }
+
+    visit(epub.toc, 0);
+    _tocChapters.addAll(_tocByChapter.keys);
+    _tocChapters.sort();
+  }
+
+  ({int chapter, String? anchor})? _tocDestination(String locator) {
+    final uri = Uri.tryParse(locator);
+    if (uri == null || uri.hasScheme || uri.hasAuthority || uri.path.isEmpty) {
+      return null;
+    }
+    try {
+      final chapter =
+          _chapterIndices[uri.normalizePath().pathSegments.join('/')];
+      if (chapter == null) return null;
+      final anchor = uri.hasFragment && uri.fragment.isNotEmpty
+          ? Uri.decodeComponent(uri.fragment)
+          : null;
+      return (chapter: chapter, anchor: anchor);
+    } on FormatException {
+      return null;
+    }
+  }
+
+  ({int chapter, int offset})? _tocPosition(String locator) {
+    final parsed = EpubLocation.fromJson(locator);
+    if (parsed == null) {
+      final destination = _tocDestination(locator);
+      if (destination == null) return null;
+      final offset = destination.anchor == null
+          ? 0
+          : _anchorsFor(_epub!, destination.chapter)[destination.anchor];
+      return offset == null
+          ? null
+          : (chapter: destination.chapter, offset: offset);
+    }
+    // The legacy decoder supplies chapter zero for arbitrary JSON objects.
+    // Those are not known book locations; neither are future wire versions.
+    final data = jsonDecode(locator) as Map<String, dynamic>;
+    if (data['s'] is! int ||
+        (data['v'] != null && data['v'] != 2) ||
+        parsed.chapterIndex < 0 ||
+        parsed.chapterIndex >= _epub!.chapters.length) {
+      return null;
+    }
+    final int? offset;
+    if (parsed.anchor != null) {
+      offset = _anchorsFor(_epub!, parsed.chapterIndex)[parsed.anchor];
+    } else if (parsed.hasExactCharOffset) {
+      offset = parsed.charOffset;
+    } else if (parsed.startOffset != null && parsed.endOffset != null) {
+      offset = parsed.startOffset;
+    } else if (parsed.charOffset == 0 &&
+        parsed.scrollFraction == 0 &&
+        parsed.bookScrollOffset == null &&
+        parsed.bookScrollFraction == null) {
+      offset = 0;
+    } else {
+      // Legacy HTML/pixel/fraction coordinates cannot order exact anchors.
+      // The reader emits a v2 content location after restoring them.
+      return null;
+    }
+    return offset == null || offset < 0
+        ? null
+        : (chapter: parsed.chapterIndex, offset: offset);
+  }
+
+  Map<String, int> _anchorsFor(ParsedEpub epub, int index) {
+    final cached = _chapterAnchorOffsets[index];
+    if (cached != null) return cached;
+    final state = _readerKey.currentState;
+    final native = state != null && identical(state.widget.epub, epub)
+        ? state.parsedChapterAnchors(index)
+        : null;
+    if (native != null) return _chapterAnchorOffsets[index] = native;
+    // Pre-mount lookups or a preceding TOC chapter may not be in the view's
+    // cache. Parse only that requested chapter, never an eager book index.
+    final chapter = epub.chapters[index];
+    final parser = XhtmlParser(
+      html: chapter.htmlContent,
+      images: epub.images,
+      documentPath: chapter.fileName,
+      stylesheets: epub.stylesheets,
+      baseStyle: const TextStyle(fontSize: 16),
+      language: epub.language,
+    );
+    parser.parse();
+    return _chapterAnchorOffsets[index] = parser.anchors;
+  }
+
+  List<_EpubTocSection> _sectionsFor(ParsedEpub epub, int chapter) =>
+      _tocSections.putIfAbsent(chapter, () {
+        final result = <_EpubTocSection>[];
+        for (final entry in _tocByChapter[chapter]!) {
+          final offset = entry.anchor == null
+              ? 0
+              : _anchorsFor(epub, chapter)[entry.anchor];
+          if (offset != null) result.add(_EpubTocSection(entry, offset));
+        }
+        result.sort((a, b) {
+          final offset = a.offset.compareTo(b.offset);
+          if (offset != 0) return offset;
+          final depth = a.entry.depth.compareTo(b.entry.depth);
+          return depth != 0 ? depth : a.entry.order.compareTo(b.entry.order);
+        });
+        return result;
+      });
+
+  void _clearTocIndex() {
+    _chapterAnchorOffsets.clear();
+    _tocByChapter.clear();
+    _tocSections.clear();
+    _chapterIndices.clear();
+    _tocChapters.clear();
+  }
+
+  @override
   void dispose() {
     ++_loadGeneration;
     _epub = null;
     _searchChapters.clear();
     _searchToc = null;
+    _clearTocIndex();
   }
+}
+
+class _EpubTocEntry {
+  const _EpubTocEntry(this.item, this.anchor, this.depth, this.order);
+
+  final TOCItem item;
+  final String? anchor;
+  final int depth;
+  final int order;
+}
+
+class _EpubTocSection {
+  const _EpubTocSection(this.entry, this.offset);
+
+  final _EpubTocEntry entry;
+  final int offset;
 }
 
 class _EpubSearchRun {

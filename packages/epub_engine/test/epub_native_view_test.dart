@@ -271,30 +271,255 @@ Future<Uint8List> _rasterBytes(int width, int height) async {
 Future<void> _selectTextRange(
   WidgetTester tester,
   String startText,
-  String endText,
-) async {
+  String endText, {
+  bool reverse = false,
+}) async {
   final start = _paragraph(tester, startText);
   final end = _paragraph(tester, endText);
-  final first = start.getBoxesForSelection(_sourceSelection(start, 0, 1)).first;
-  final last = end
-      .getBoxesForSelection(
-        _sourceSelection(end, endText.length - 1, endText.length),
-      )
-      .last;
+  Rect glyph(RenderParagraph paragraph, String text, bool last) {
+    final index = last ? text.length - 1 : 0;
+    return paragraph
+        .getBoxesForSelection(_sourceSelection(paragraph, index, index + 1))
+        .first
+        .toRect();
+  }
+  Offset edge(Rect box, bool last) =>
+      Offset(last ? box.right - 1 : box.left + 1, box.center.dy);
+
+  final first = glyph(start, startText, reverse);
+  final last = glyph(end, endText, !reverse);
   final gesture = await tester.startGesture(
-    start.localToGlobal(Offset(first.left + 1, (first.top + first.bottom) / 2)),
+    start.localToGlobal(edge(first, reverse)),
     kind: PointerDeviceKind.mouse,
   );
   await tester.pump();
-  await gesture.moveTo(
-    end.localToGlobal(Offset(last.right - 1, (last.top + last.bottom) / 2)),
-  );
+  await gesture.moveTo(end.localToGlobal(edge(last, !reverse)));
   await tester.pump();
   await gesture.up();
   await tester.pumpAndSettle();
 }
 
 void main() {
+  testWidgets(
+    'selection anchors follow the active edge in both reading modes',
+    (tester) async {
+      for (final mode in ReadingMode.values) {
+        Rect? anchor;
+        final notifications = <String>[];
+        await tester.pumpWidget(
+          _frame(
+            Padding(
+              padding: const EdgeInsets.only(left: 20, top: 16),
+              child: EpubNativeView(
+                key: ValueKey(mode),
+                epub: _htmlBook('<p>FIRST EDGE</p><p>SECOND EDGE</p>'),
+                settings: ReaderSettings(
+                  readingMode: mode,
+                  enableDualPageSpread: false,
+                ),
+                theme: ThemeData.dark(),
+                onTextSelected: (text, _) {
+                  if (text.isNotEmpty) notifications.add('text');
+                },
+                onSelectionAnchorChanged: (value) {
+                  anchor = value;
+                  if (value != null) notifications.add('anchor');
+                },
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await _selectTextRange(tester, 'FIRST EDGE', 'SECOND EDGE');
+        final second = _paragraph(tester, 'SECOND EDGE');
+        final secondBounds = second.localToGlobal(Offset.zero) & second.size;
+        expect(anchor, isNotNull, reason: '$mode');
+        expect(
+          anchor!.center.dy,
+          inInclusiveRange(secondBounds.top, secondBounds.bottom),
+        );
+        expect(anchor!.width, lessThanOrEqualTo(1.01));
+        expect(
+          notifications.indexOf('text'),
+          lessThan(notifications.indexOf('anchor')),
+        );
+
+        await _selectTextRange(
+          tester,
+          'SECOND EDGE',
+          'FIRST EDGE',
+          reverse: true,
+        );
+        final first = _paragraph(tester, 'FIRST EDGE');
+        final firstBounds = first.localToGlobal(Offset.zero) & first.size;
+        expect(anchor, isNotNull, reason: 'Reverse drag in $mode');
+        expect(
+          anchor!.center.dy,
+          inInclusiveRange(firstBounds.top, firstBounds.bottom),
+        );
+
+        final container = tester.widget<SelectionContainer>(
+          find
+              .ancestor(
+                of: find.text('FIRST EDGE'),
+                matching: find.byType(SelectionContainer),
+              )
+              .first,
+        );
+        final delegate = container.delegate!;
+        // The two native handle identities are not sorted by screen position.
+        // Moving the start handle must anchor the start, not the selection box.
+        final start = first
+            .getBoxesForSelection(_sourceSelection(first, 1, 2))
+            .first
+            .toRect();
+        delegate.dispatchSelectionEvent(
+          SelectionEdgeUpdateEvent.forStart(
+            globalPosition: first.localToGlobal(start.center),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(anchor, isNotNull);
+        expect(
+          anchor!.center.dy,
+          inInclusiveRange(firstBounds.top, firstBounds.bottom),
+        );
+        delegate.dispatchSelectionEvent(const ClearSelectionEvent());
+        await tester.pumpAndSettle();
+        expect(anchor, isNull);
+      }
+    },
+  );
+
+  testWidgets(
+    'native touch selection publishes an anchor without a text callback',
+    (tester) async {
+      for (final mode in ReadingMode.values) {
+        Rect? anchor;
+        await tester.pumpWidget(
+          _frame(
+            EpubNativeView(
+              key: ValueKey(mode),
+              epub: _htmlBook('<p>Native touch selection</p>'),
+              settings: ReaderSettings(
+                readingMode: mode,
+                enableDualPageSpread: false,
+              ),
+              theme: ThemeData.dark(),
+              onSelectionAnchorChanged: (value) => anchor = value,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final paragraph = _paragraph(tester, 'Native touch selection');
+        final glyph = paragraph
+            .getBoxesForSelection(_sourceSelection(paragraph, 0, 1))
+            .first
+            .toRect();
+        await tester.longPressAt(paragraph.localToGlobal(glyph.center));
+        await tester.pumpAndSettle();
+        expect(anchor, isNotNull, reason: '$mode');
+        expect(
+          anchor!.center.dy,
+          inInclusiveRange(
+            paragraph.localToGlobal(Offset.zero).dy,
+            paragraph.localToGlobal(Offset(0, paragraph.size.height)).dy,
+          ),
+        );
+      }
+    },
+  );
+
+  testWidgets(
+    'vertical chapter-boundary selections anchor the actual drag direction',
+    (tester) async {
+      Rect? anchor;
+      await tester.pumpWidget(
+        _frame(
+          EpubNativeView(
+            epub: ParsedEpub(
+              title: 'Selection across chapters',
+              author: 'Lira',
+              chapters: [
+                for (final label in ['FIRST EDGE', 'SECOND EDGE'])
+                  EpubChapter(
+                    title: label,
+                    fileName: '$label.xhtml',
+                    htmlContent: '<p>$label</p>',
+                  ),
+              ],
+              toc: const [],
+              images: const {},
+            ),
+            settings: const ReaderSettings(),
+            theme: ThemeData.dark(),
+            // No text callback: geometry is independently observable.
+            onSelectionAnchorChanged: (value) => anchor = value,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      for (final reverse in [false, true]) {
+        await _selectTextRange(
+          tester,
+          reverse ? 'SECOND EDGE' : 'FIRST EDGE',
+          reverse ? 'FIRST EDGE' : 'SECOND EDGE',
+          reverse: reverse,
+        );
+        final target = _paragraph(
+          tester,
+          reverse ? 'FIRST EDGE' : 'SECOND EDGE',
+        );
+        final bounds = target.localToGlobal(Offset.zero) & target.size;
+        expect(anchor, isNotNull);
+        expect(anchor!.center.dy, inInclusiveRange(bounds.top, bounds.bottom));
+      }
+    },
+  );
+
+  testWidgets(
+    'oversized horizontal-page scrolling hides an offscreen active edge',
+    (tester) async {
+      Rect? anchor;
+      var geometryChanges = 0;
+      await tester.pumpWidget(
+        _frame(
+          EpubNativeView(
+            epub: _htmlBook(
+              '<table><tr><td><p>VISIBLE EDGE</p>'
+              '<p>${'Tall content. ' * 300}</p></td></tr></table>',
+            ),
+            settings: const ReaderSettings(
+              readingMode: ReadingMode.horizontal,
+              enableDualPageSpread: false,
+            ),
+            theme: ThemeData.dark(),
+            onSelectionAnchorChanged: (value) {
+              anchor = value;
+              geometryChanges++;
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _selectTextRange(tester, 'VISIBLE EDGE', 'VISIBLE EDGE');
+      expect(anchor, isNotNull);
+      final before = anchor!;
+      final scroll = tester
+          .widget<SingleChildScrollView>(find.byType(SingleChildScrollView))
+          .controller!;
+      final beforeScroll = geometryChanges;
+      scroll.jumpTo(5);
+      await tester.pumpAndSettle();
+      expect(anchor, isNotNull);
+      expect(anchor!.top, closeTo(before.top - 5, 0.01));
+      expect(geometryChanges, greaterThan(beforeScroll));
+      scroll.jumpTo(250);
+      await tester.pumpAndSettle();
+      expect(anchor, isNull);
+    },
+  );
+
   testWidgets(
     'deep resume reports the saved locator before the exact percentage',
     (tester) async {

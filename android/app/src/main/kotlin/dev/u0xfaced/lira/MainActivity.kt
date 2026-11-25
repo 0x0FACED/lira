@@ -72,6 +72,7 @@ class MainActivity : FlutterActivity() {
                             result.success(null)
                         }
                     }
+                    "getReaderBarInsets" -> result.success(readerBarInsets())
                     "restoreSystemBars" -> {
                         restoreSystemBars()
                         result.success(null)
@@ -80,6 +81,27 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun readerBarInsets(): List<Double>? {
+        val insets = window.decorView.rootWindowInsets ?: return null
+        val density = resources.displayMetrics.density
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val bars = insets.getInsetsIgnoringVisibility(
+                WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
+            )
+            return listOf(bars.top.toDouble() / density, bars.bottom.toDouble() / density)
+        }
+        val cutout = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            insets.displayCutout
+        } else {
+            null
+        }
+        return listOf(
+            maxOf(insets.stableInsetTop, cutout?.safeInsetTop ?: 0).toDouble() / density,
+            maxOf(insets.stableInsetBottom, cutout?.safeInsetBottom ?: 0).toDouble() / density,
+        )
     }
 
     @Suppress("DEPRECATION")

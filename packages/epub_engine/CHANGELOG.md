@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Expose `EpubNativeView.onSelectionAnchorChanged` independently of selected text: report the active native selection edge in global logical coordinates after layout, follow either handle and reverse/chapter-boundary drags, update during page scrolling, and clear when clipped or removed.
+- Expose already parsed chapter anchors via `EpubNativeViewState.parsedChapterAnchors` without reparsing content.
 - Open local EPUB archives through a bounded file stream on a worker isolate. Index exact progress in short frame slices without retaining offscreen chapter trees or parsing chapter zero on deep resume.
 - Skip unsupported CSS `@page` rules before parsing inline and local stylesheets, so malformed page rules cannot stall the reader or discard adjacent styles.
 - Replace whole-book synchronous pagination with target-first, frame-budgeted page generation and two-turn lookahead; cancel stale layouts, preserve canonical spread pairing and exact restoration, and resume missing chapter-boundary turns without skipping text. Shape long paragraphs in adaptive page-sized windows; reuse linguistic offsets and lean native hyphen probes instead of allocating full coordinate maps for every trial.

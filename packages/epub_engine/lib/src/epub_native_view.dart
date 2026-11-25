@@ -19,6 +19,7 @@ import 'package:flutter/rendering.dart'
         SelectionEvent,
         SelectionEventType,
         SelectionResult,
+        SelectionStatus,
         ScrollDirection;
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -95,6 +96,14 @@ class _SourceOrderSelectionDelegate extends StaticSelectionContainerDelegate {
   Offset? _endPosition;
   Selectable? _startTarget;
   Selectable? _endTarget;
+  void Function(SelectionEvent event, SelectionResult result)? onSelectionEvent;
+
+  @override
+  SelectionResult dispatchSelectionEvent(SelectionEvent event) {
+    final result = super.dispatchSelectionEvent(event);
+    onSelectionEvent?.call(event, result);
+    return result;
+  }
 
   void addAt(Selectable selectable, int offset) {
     _order[selectable] = (offset, _nextOrder++);
@@ -434,8 +443,16 @@ class EpubNativeView extends StatefulWidget {
   /// Consumers can persist this locator with their last known percentage.
   final ValueChanged<EpubLocation>? onPositionBeforeProgress;
   final void Function(String text, String location)? onTextSelected;
+
+  /// The active selection edge's line-height rect in global logical pixels.
+  /// Reports null when that edge is absent or clipped out of the viewport.
+  /// Geometry updates independently of [onTextSelected], after layout/paint.
+  final ValueChanged<Rect?>? onSelectionAnchorChanged;
   final VoidCallback? onCenterTapped;
   final List<Map<String, dynamic>> highlights;
+
+  /// Optional top page margin in horizontal reading. Vertical flow is unchanged.
+  final double? paginatedTopPadding;
 
   const EpubNativeView({
     super.key,
@@ -446,8 +463,10 @@ class EpubNativeView extends StatefulWidget {
     this.onLocationChanged,
     this.onPositionBeforeProgress,
     this.onTextSelected,
+    this.onSelectionAnchorChanged,
     this.onCenterTapped,
     this.highlights = const [],
+    this.paginatedTopPadding,
   });
 
   @override
@@ -534,6 +553,10 @@ class EpubNativeViewState extends State<EpubNativeView>
 
   int _layoutGeneration = 0;
   bool _hasActiveSelection = false;
+  _SelectionScopeData? _activeSelectionScope;
+  bool _activeSelectionForEnd = true;
+  bool _selectionAnchorScheduled = false;
+  Rect? _lastSelectionAnchor;
 
   @override
   void initState() {
@@ -552,6 +575,11 @@ class EpubNativeViewState extends State<EpubNativeView>
   @override
   void didUpdateWidget(covariant EpubNativeView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.onSelectionAnchorChanged == null &&
+        widget.onSelectionAnchorChanged != null) {
+      _lastSelectionAnchor = null;
+      _scheduleSelectionAnchor();
+    }
     final highlightsChanged = !listEquals(
       oldWidget.highlights,
       widget.highlights,
@@ -572,6 +600,7 @@ class EpubNativeViewState extends State<EpubNativeView>
         oldWidget.settings.textAlign != widget.settings.textAlign ||
         oldWidget.settings.horizontalPadding !=
             widget.settings.horizontalPadding ||
+        oldWidget.paginatedTopPadding != widget.paginatedTopPadding ||
         oldWidget.settings.readingMode != widget.settings.readingMode ||
         oldWidget.settings.enableDualPageSpread !=
             widget.settings.enableDualPageSpread;
@@ -619,6 +648,8 @@ class EpubNativeViewState extends State<EpubNativeView>
     if (needsRepagination) {
       _clearPageTurn();
       _hasActiveSelection = false;
+      _activeSelectionScope = null;
+      _scheduleSelectionAnchor();
       _tableLayouts.clear();
       _invalidatePagination();
       _layoutGeneration++;
@@ -978,6 +1009,7 @@ class EpubNativeViewState extends State<EpubNativeView>
   // ---------------------------------------------------------------------------
 
   bool _onVerticalScrollNotification(ScrollNotification notification) {
+    _scheduleSelectionAnchor();
     if (notification is UserScrollNotification &&
         notification.direction != ScrollDirection.idle) {
       _verticalUserScroll = true;
@@ -1021,6 +1053,7 @@ class EpubNativeViewState extends State<EpubNativeView>
   }
 
   void _onHorizontalPageScroll(_SelectionScopeData scope) {
+    _scheduleSelectionAnchor();
     if (widget.settings.readingMode != ReadingMode.horizontal ||
         _pageTurnImage != null ||
         _pendingRestore != null ||
@@ -1124,6 +1157,7 @@ class EpubNativeViewState extends State<EpubNativeView>
   }
 
   void _handleSelectionChanged(SelectedContent? content) {
+    _scheduleSelectionAnchor();
     final selectedText = content?.plainText.trim() ?? '';
     _hasActiveSelection = selectedText.isNotEmpty;
     if (selectedText.isEmpty) {
@@ -1158,6 +1192,99 @@ class EpubNativeViewState extends State<EpubNativeView>
     );
 
     widget.onTextSelected?.call(selectedText, location.toJson());
+  }
+
+  void _selectionEvent(
+    _SelectionScopeData scope,
+    SelectionEvent event,
+    SelectionResult result,
+  ) {
+    // Other chapters may receive the same routed event while Flutter searches
+    // for its target. Only the chapter/page which owns the edge may anchor it.
+    if (event.type != SelectionEventType.clear &&
+        (result == SelectionResult.end || result == SelectionResult.pending)) {
+      _activeSelectionScope = scope;
+      _activeSelectionForEnd = event.type != SelectionEventType.startEdgeUpdate;
+    }
+    _scheduleSelectionAnchor();
+  }
+
+  void _scheduleSelectionAnchor() {
+    if (!mounted ||
+        widget.onSelectionAnchorChanged == null ||
+        _selectionAnchorScheduled) {
+      return;
+    }
+    _selectionAnchorScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _selectionAnchorScheduled = false;
+      if (!mounted) return;
+      final anchor = _selectionAnchor();
+      if (anchor == _lastSelectionAnchor) return;
+      _lastSelectionAnchor = anchor;
+      widget.onSelectionAnchorChanged?.call(anchor);
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  Rect? _selectionAnchor() {
+    final scope = _activeSelectionScope;
+    if (scope == null ||
+        !_selectionScopes.contains(scope) ||
+        _pageTurnImage != null) {
+      return null;
+    }
+    final content = scope.contentKey.currentContext?.findRenderObject();
+    final viewport = _viewportKey.currentContext?.findRenderObject();
+    if (content is! RenderBox ||
+        !content.attached ||
+        !content.hasSize ||
+        viewport is! RenderBox ||
+        !viewport.attached ||
+        !viewport.hasSize) {
+      return null;
+    }
+    final geometry = scope.selectionDelegate.value;
+    if (!geometry.hasSelection ||
+        (geometry.status == SelectionStatus.collapsed &&
+            !_hasActiveSelection)) {
+      return null;
+    }
+    final point = _activeSelectionForEnd
+        ? geometry.endSelectionPoint
+        : geometry.startSelectionPoint;
+    if (point == null || point.lineHeight <= 0) return null;
+    final anchor = MatrixUtils.transformRect(
+      content.getTransformTo(null),
+      Rect.fromLTWH(
+        point.localPosition.dx,
+        point.localPosition.dy - point.lineHeight,
+        1,
+        point.lineHeight,
+      ),
+    );
+    if (!anchor.isFinite || anchor.isEmpty) return null;
+    var visible = MatrixUtils.transformRect(
+      viewport.getTransformTo(null),
+      Offset.zero & viewport.size,
+    );
+    final screenSize = MediaQuery.maybeOf(context)?.size;
+    if (screenSize != null) {
+      visible = visible.intersect(Offset.zero & screenSize);
+    }
+    final pageViewport = scope.pageScrollKey?.currentContext
+        ?.findRenderObject();
+    if (pageViewport is RenderBox &&
+        pageViewport.attached &&
+        pageViewport.hasSize) {
+      visible = visible.intersect(
+        MatrixUtils.transformRect(
+          pageViewport.getTransformTo(null),
+          Offset.zero & pageViewport.size,
+        ),
+      );
+    }
+    return anchor.overlaps(visible) ? anchor.intersect(visible) : null;
   }
 
   void _reportProgress() {
@@ -1377,6 +1504,11 @@ class EpubNativeViewState extends State<EpubNativeView>
     );
   }
 
+  /// Already parsed content anchors, or null while this chapter is unparsed.
+  /// Reading this immutable map never starts parsing or layout.
+  Map<String, int>? parsedChapterAnchors(int chapterIndex) =>
+      _chapterAnchors[chapterIndex];
+
   void _parseChapter(int index) {
     if (_parsedChapters.containsKey(index)) return;
     if (index < 0 || index >= widget.epub.chapters.length) return;
@@ -1385,7 +1517,7 @@ class EpubNativeViewState extends State<EpubNativeView>
     final elements = parser.parse();
     _parsedChapters[index] = elements;
     _chapterWeights[index] = elements.isEmpty ? 0 : elements.last.charEnd;
-    _chapterAnchors[index] = Map.of(parser.anchors);
+    _chapterAnchors[index] = Map.unmodifiable(parser.anchors);
     _chapterLinks[index] = List.of(parser.links);
   }
 
@@ -2793,6 +2925,7 @@ class EpubNativeViewState extends State<EpubNativeView>
 
   @override
   Widget build(BuildContext context) {
+    _scheduleSelectionAnchor();
     return LayoutBuilder(
       builder: (context, constraints) {
         if (_waitingForRestoreIndex) {
@@ -2806,6 +2939,7 @@ class EpubNativeViewState extends State<EpubNativeView>
           _pendingRestore ??= _captureLocation(widget.settings.readingMode);
           _clearPageTurn();
           _hasActiveSelection = false;
+          _activeSelectionScope = null;
           _layoutGeneration++;
         }
         _lastViewportSize = viewportSize;
@@ -3181,7 +3315,13 @@ class EpubNativeViewState extends State<EpubNativeView>
 
   EdgeInsets _contentInsets() {
     final safeTop = MediaQuery.maybeOf(context)?.padding.top ?? 0;
-    return EdgeInsets.only(top: 24 + math.min(safeTop, 12.0), bottom: 24);
+    final top = widget.settings.readingMode == ReadingMode.horizontal
+        ? widget.paginatedTopPadding
+        : null;
+    return EdgeInsets.only(
+      top: top ?? 24 + math.min(safeTop, 12.0),
+      bottom: 24,
+    );
   }
 
   Widget _buildSelectionArea({
@@ -3227,9 +3367,20 @@ class EpubNativeViewState extends State<EpubNativeView>
       elements: elements,
       onMount: (scope) {
         _selectionScopes.add(scope);
+        scope.selectionDelegate
+          ..onSelectionEvent = ((event, result) =>
+              _selectionEvent(scope, event, result))
+          ..addListener(_scheduleSelectionAnchor);
       },
       onUnmount: (scope) {
+        scope.selectionDelegate
+          ..onSelectionEvent = null
+          ..removeListener(_scheduleSelectionAnchor);
         _selectionScopes.remove(scope);
+        if (identical(_activeSelectionScope, scope)) {
+          _activeSelectionScope = null;
+        }
+        _scheduleSelectionAnchor();
       },
       builder: (scope) {
         final child = builder(scope);
@@ -3563,6 +3714,7 @@ class EpubNativeViewState extends State<EpubNativeView>
     required List<ContentElement> elements,
     required SelectedContent? content,
   }) {
+    _scheduleSelectionAnchor();
     final selectedText = content?.plainText.trim() ?? '';
     _hasActiveSelection = selectedText.isNotEmpty;
 

@@ -276,16 +276,16 @@ void main() {
       'nav.xhtml',
       '<html><body><nav><ol>'
           '<li><a href="chapter.xhtml">Root branch</a><ol>'
-          '<li><a href="chapter.xhtml">Child leaf</a></li>'
-          '<li><a href="chapter.xhtml">Child branch</a><ol>'
-          '<li><a href="chapter.xhtml">Grandchild leaf</a></li>'
+          '<li><a href="chapter.xhtml#paragraph-2">Child leaf</a></li>'
+          '<li><a href="chapter.xhtml#paragraph-4">Child branch</a><ol>'
+          '<li><a href="chapter.xhtml#paragraph-6">Grandchild leaf</a></li>'
           '</ol></li></ol></li>'
-          '<li><a href="chapter.xhtml">Root leaf</a></li>'
+          '<li><a href="chapter.xhtml#paragraph-8">Root leaf</a></li>'
           '</ol></nav></body></html>',
     );
     add(
       'chapter.xhtml',
-      '<html><body>${List.generate(60, (i) => '<p>Paragraph $i. ${'Readable text for position restoration. ' * 8}</p>').join()}</body></html>',
+      '<html><body>${List.generate(60, (i) => '<p id="paragraph-$i">Paragraph $i. ${'Readable text for position restoration. ' * 8}</p>').join()}</body></html>',
     );
     final file = File('${directory.path}/readable.epub')
       ..writeAsBytesSync(ZipEncoder().encode(archive)!);
@@ -759,6 +759,62 @@ void main() {
     expect(tester.getRect(bottom).top, greaterThanOrEqualTo(viewport.bottom));
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  testWidgets(
+    'paginated prose stays between both bars when Android insets appear and hide',
+    (tester) async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('dev.u0xfaced.lira/reader_chrome'),
+            (call) async =>
+                call.method == 'getReaderBarInsets' ? [32.0, 24.0] : null,
+          );
+      await _open(tester, readable);
+      final screen = find.byType(ReaderScreen);
+      final container = ProviderScope.containerOf(tester.element(screen));
+      final settings = container.read(readerSettingsProvider);
+      await container
+          .read(readerSettingsProvider.notifier)
+          .updateSettings(
+            settings.copyWith(readingMode: ReadingMode.horizontal),
+          );
+      await tester.pumpAndSettle();
+      final book = find.byType(EpubNativeView);
+      final before = tester.getRect(book);
+      final lines = _visibleParagraphs(tester);
+      final title = find.byKey(const ValueKey('reader-current-chapter'));
+      final titleBounds = tester.getRect(title);
+      expect(titleBounds.bottom, lessThanOrEqualTo(before.top));
+      expect(lines.first.$2 - titleBounds.bottom, lessThan(AppSpacing.lg));
+      final systemBars = FakeViewPadding(
+        top: 32 * tester.view.devicePixelRatio,
+        bottom: 24 * tester.view.devicePixelRatio,
+      );
+      addTearDown(tester.view.resetPadding);
+      addTearDown(tester.view.resetViewPadding);
+
+      await _showControls(tester);
+      tester.view.padding = systemBars;
+      tester.view.viewPadding = systemBars;
+      await tester.pumpAndSettle();
+      final topBar = find.byKey(const ValueKey('reader-top-bar'));
+      final bottomBar = find.byKey(const ValueKey('reader-bottom-bar'));
+      expect(tester.getRect(book), before);
+      expect(before.top, greaterThanOrEqualTo(tester.getRect(topBar).bottom));
+      expect(before.bottom, lessThanOrEqualTo(tester.getRect(bottomBar).top));
+      expect(tester.getRect(topBar).contains(titleBounds.center), isTrue);
+      expect(_visibleParagraphs(tester), lines);
+
+      await _showControls(tester);
+      tester.view.padding = const FakeViewPadding();
+      tester.view.viewPadding = const FakeViewPadding();
+      await tester.pumpAndSettle();
+      expect(tester.getRect(book), before);
+      expect(_visibleParagraphs(tester), lines);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
 
   testWidgets(
     'bookmarks survive reopening and navigate separately from highlights',

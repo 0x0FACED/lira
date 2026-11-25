@@ -18,6 +18,13 @@ class PdfViewerWidget extends StatefulWidget {
   final void Function(int page, int totalPages)? onPageChanged;
   final void Function(PdfDocument document)? onDocumentLoaded;
   final void Function(String text, String location)? onTextSelected;
+
+  /// The visible active selection edge in global logical coordinates.
+  ///
+  /// Reports a narrow rectangle spanning only the active text line, or null
+  /// when that edge is off-screen or there is no selection. Updates after
+  /// layout/paint, independently of text changes, including scroll and zoom.
+  final ValueChanged<Rect?>? onSelectionAnchorChanged;
   final VoidCallback? onCenterTapped;
   final List<Map<String, dynamic>> highlights;
 
@@ -30,6 +37,7 @@ class PdfViewerWidget extends StatefulWidget {
     this.onPageChanged,
     this.onDocumentLoaded,
     this.onTextSelected,
+    this.onSelectionAnchorChanged,
     this.onCenterTapped,
     this.highlights = const [],
   });
@@ -46,7 +54,14 @@ class _PdfViewerWidgetState extends State<PdfViewerWidget> {
   bool _initialLocationApplied = false;
   String? _lastSelection;
   Map<int, List<_PageHighlight>> _highlightsByPage = const {};
-  final _selectionDelegate = _PdfTextSelectionDelegate();
+  late final _selectionDelegate = _PdfTextSelectionDelegate(
+    onSelectionEvent: _onSelectionGeometryChanged,
+  );
+  PdfViewerController? _observedController;
+  bool _anchorScheduled = false;
+  bool _anchorReported = false;
+  Rect? _lastAnchor;
+  bool _selectionGeometryDirty = true;
   final _pressedPointers = <int>{};
   PointerDownEvent? _tapStart;
   Duration? _previousTapUpTime;
@@ -60,6 +75,7 @@ class _PdfViewerWidgetState extends State<PdfViewerWidget> {
   @override
   void initState() {
     super.initState();
+    _selectionDelegate.addListener(_onSelectionGeometryChanged);
     _resetViewer();
     _readHighlights();
   }
@@ -72,6 +88,10 @@ class _PdfViewerWidgetState extends State<PdfViewerWidget> {
       _resetViewer();
     }
     if (!identical(oldWidget.highlights, widget.highlights)) _readHighlights();
+    if (oldWidget.onSelectionAnchorChanged != widget.onSelectionAnchorChanged) {
+      _anchorReported = false;
+      _scheduleSelectionAnchor();
+    }
   }
 
   void _resetViewer() {
@@ -79,7 +99,11 @@ class _PdfViewerWidgetState extends State<PdfViewerWidget> {
     _selectionDelegate.resetEdges();
     _pressedPointers.clear();
     _trackpadDocumentFocalPoint = null;
+    _observedController?.removeListener(_scheduleSelectionAnchor);
     _controller = widget.controller ?? PdfViewerController();
+    _observedController = _controller;
+    _controller.addListener(_scheduleSelectionAnchor);
+    _scheduleSelectionAnchor();
     _viewerIdentity = Object();
     _totalPages = 0;
     _initialLocationApplied = false;
@@ -117,6 +141,36 @@ class _PdfViewerWidgetState extends State<PdfViewerWidget> {
       }
     }
     _highlightsByPage = byPage;
+  }
+
+  void _onSelectionGeometryChanged() {
+    _selectionGeometryDirty = true;
+    _scheduleSelectionAnchor();
+  }
+
+  void _scheduleSelectionAnchor() {
+    if (!mounted || _anchorScheduled) return;
+    _anchorScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _anchorScheduled = false;
+      if (!mounted) return;
+      // pdfrx delays text notifications by 300 ms. Publish the current native
+      // ranges before their anchor so a newly created selection is usable now.
+      if (_selectionGeometryDirty && _controller.isReady) {
+        _selectionGeometryDirty = false;
+        _onTextSelectionChanged(_selectionDelegate.selectedRanges);
+      }
+      final anchor = _controller.isReady
+          ? _selectionDelegate.visibleActiveEdge(
+              Offset.zero & MediaQuery.sizeOf(context),
+            )
+          : null;
+      if (_anchorReported && anchor == _lastAnchor) return;
+      _anchorReported = true;
+      _lastAnchor = anchor;
+      widget.onSelectionAnchorChanged?.call(anchor);
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   void _onTextSelectionChanged(List<PdfTextRanges> selections) {
@@ -323,6 +377,8 @@ class _PdfViewerWidgetState extends State<PdfViewerWidget> {
   @override
   void dispose() {
     _cancelObservedTap();
+    _observedController?.removeListener(_scheduleSelectionAnchor);
+    _selectionDelegate.removeListener(_onSelectionGeometryChanged);
     _selectionDelegate.dispose();
     super.dispose();
   }
@@ -345,6 +401,7 @@ class _PdfViewerWidgetState extends State<PdfViewerWidget> {
 
   @override
   Widget build(BuildContext context) {
+    _scheduleSelectionAnchor();
     // Selectable PDF text can hit-test above pdfrx's own scale recognizer.
     // A trackpad-only recognizer covers that path without competing with
     // mouse/touch text selection. Native pdfrx wins where it is hit directly.
@@ -387,10 +444,16 @@ class _PdfViewerWidgetState extends State<PdfViewerWidget> {
         enableTextSelection: true,
         // Lira owns the selection action bar; retain native selection handles,
         // but do not put Flutter's Copy toolbar on top of the application UI.
-        selectableRegionInjector: (context, child) => SelectionArea(
-          contextMenuBuilder: (context, state) => const SizedBox.shrink(),
-          child: SelectionContainer(delegate: _selectionDelegate, child: child),
-        ),
+        selectableRegionInjector: (context, child) {
+          _scheduleSelectionAnchor();
+          return SelectionArea(
+            contextMenuBuilder: (context, state) => const SizedBox.shrink(),
+            child: SelectionContainer(
+              delegate: _selectionDelegate,
+              child: child,
+            ),
+          );
+        },
         onTextSelectionChange: _onTextSelectionChanged,
         pagePaintCallbacks: [_paintHighlights],
         viewerOverlayBuilder: (context, size, handleLinkTap) => [
@@ -407,6 +470,7 @@ class _PdfViewerWidgetState extends State<PdfViewerWidget> {
         ],
         onViewerReady: (document, controller) {
           _totalPages = document.pages.length;
+          _scheduleSelectionAnchor();
           final location = widget.initialLocation;
           if (!_initialLocationApplied &&
               location != null &&
@@ -449,6 +513,12 @@ class _PdfViewerWidgetState extends State<PdfViewerWidget> {
 /// Keep native gestures, text ranges, fragment rectangles and callbacks intact;
 /// only adapt the degenerate edge geometry sent to the native selectable.
 class _PdfTextSelectionDelegate extends StaticSelectionContainerDelegate {
+  _PdfTextSelectionDelegate({required this.onSelectionEvent});
+
+  final VoidCallback onSelectionEvent;
+  final _geometrySizes =
+      <Selectable, ({SelectionGeometry geometry, Size size})>{};
+  bool _activeStart = false;
   Offset? _start;
   Offset? _end;
 
@@ -457,13 +527,86 @@ class _PdfTextSelectionDelegate extends StaticSelectionContainerDelegate {
     _end = null;
   }
 
+  List<PdfTextRanges> get selectedRanges => [
+    for (final selectable in selectables)
+      if (selectable is PdfPageTextSelectable &&
+          selectable.selectedRanges.isNotEmpty)
+        selectable.selectedRanges,
+  ];
+
+  Rect? visibleActiveEdge(Rect screen) {
+    if (value.status != SelectionStatus.uncollapsed) return null;
+    final index = _activeStart
+        ? currentSelectionStartIndex
+        : currentSelectionEndIndex;
+    if (index < 0 || index >= selectables.length) return null;
+    final selectable = selectables[index];
+    final geometry = selectable.value;
+    if (geometry.status != SelectionStatus.uncollapsed) return null;
+    final point = _activeStart
+        ? geometry.startSelectionPoint
+        : geometry.endSelectionPoint;
+    final captured = _geometrySizes[selectable];
+    if (point == null || captured == null || captured.size.width <= 0) {
+      return null;
+    }
+    // pdfrx paints retained selection geometry at the ratio between the page's
+    // current width and its width at selection time (including native handles).
+    final scale = selectable.size.width / captured.size.width;
+    final position = point.localPosition * scale;
+    final height = point.lineHeight * scale;
+    if (!position.isFinite || !height.isFinite || height <= 0) return null;
+    final edge = MatrixUtils.transformRect(
+      selectable.getTransformTo(null),
+      Rect.fromLTWH(position.dx - 0.5, position.dy - height, 1, height),
+    );
+    final viewport = MatrixUtils.transformRect(
+      getTransformTo(null),
+      Offset.zero & containerSize,
+    ).intersect(screen);
+    final visible = edge.intersect(viewport);
+    return visible.isFinite && !visible.isEmpty ? visible : null;
+  }
+
+  @override
+  SelectionResult dispatchSelectionEventToChild(
+    Selectable selectable,
+    SelectionEvent event,
+  ) {
+    final result = super.dispatchSelectionEventToChild(selectable, event);
+    final geometry = selectable.value;
+    if (!identical(_geometrySizes[selectable]?.geometry, geometry)) {
+      _geometrySizes[selectable] = (geometry: geometry, size: selectable.size);
+    }
+    return result;
+  }
+
+  @override
+  void remove(Selectable selectable) {
+    _geometrySizes.remove(selectable);
+    super.remove(selectable);
+    onSelectionEvent();
+  }
+
   @override
   SelectionResult dispatchSelectionEvent(SelectionEvent event) {
     if (event is! SelectionEdgeUpdateEvent) {
       resetEdges();
-      return super.dispatchSelectionEvent(event);
+      if (event is GranularlyExtendSelectionEvent) {
+        _activeStart = !event.isEnd;
+      } else if (event is DirectionallyExtendSelectionEvent) {
+        _activeStart = !event.isEnd;
+      } else {
+        // A long press selects a native fragment first; subsequent movement
+        // extends its end edge, including reverse drags.
+        _activeStart = false;
+      }
+      final result = super.dispatchSelectionEvent(event);
+      onSelectionEvent();
+      return result;
     }
     final isStart = event.type == SelectionEventType.startEdgeUpdate;
+    _activeStart = isStart;
     final position = event.globalPosition;
     if (isStart) {
       _start = position;
@@ -489,7 +632,9 @@ class _PdfTextSelectionDelegate extends StaticSelectionContainerDelegate {
               );
       }
     }
-    return super.dispatchSelectionEvent(event);
+    final result = super.dispatchSelectionEvent(event);
+    onSelectionEvent();
+    return result;
   }
 }
 

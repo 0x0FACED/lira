@@ -14,6 +14,7 @@ class PdfBookReaderEngine implements BookReaderEngine {
   Uint8List? _bookData;
   PdfViewerController? _controller;
   List<TOCItem> _toc = [];
+  final List<_PdfTocSection> _tocSections = [];
   int _pageCount = 0;
   PdfReaderLocation? _pendingLocation;
   bool _viewerReady = false;
@@ -37,6 +38,7 @@ class PdfBookReaderEngine implements BookReaderEngine {
     _bookData = null;
     _controller = null;
     _toc = [];
+    _tocSections.clear();
     _pageCount = 0;
     _pendingLocation = null;
     _viewerReady = false;
@@ -54,6 +56,12 @@ class PdfBookReaderEngine implements BookReaderEngine {
       if (generation != _documentGeneration) return;
       _pageCount = document.pages.length;
       _toc = _convertOutline(outline);
+      _tocSections.sort((a, b) {
+        final page = a.page.compareTo(b.page);
+        if (page != 0) return page;
+        final depth = a.depth.compareTo(b.depth);
+        return depth != 0 ? depth : a.order.compareTo(b.order);
+      });
       // Reuse the validated document for searches before the viewer mounts.
       // The mounted viewer owns a separate document and replaces this one.
       _searchDocument = _PdfSearchDocument(document);
@@ -66,20 +74,23 @@ class PdfBookReaderEngine implements BookReaderEngine {
   }
 
   /// Recursively converts pdfrx PdfOutlineNode tree to TOCItem tree.
-  List<TOCItem> _convertOutline(List<PdfOutlineNode> nodes) {
+  List<TOCItem> _convertOutline(List<PdfOutlineNode> nodes, [int depth = 0]) {
     return nodes.map((node) {
-      // Use the destination page number as the fileName locator
-      final pageNumber = (node.dest?.pageNumber ?? 1).clamp(
-        1,
-        _pageCount > 0 ? _pageCount : 1,
-      );
-      return TOCItem(
+      final page = node.dest?.pageNumber;
+      final validPage = page != null && page >= 1 && page <= _pageCount;
+      final order = _tocSections.length;
+      final item = TOCItem(
         title: node.title,
-        fileName: pageNumber.toString(),
+        // A grouping node or an invalid destination is not a page-one anchor.
+        fileName: validPage ? page.toString() : '',
         subItems: node.children.isNotEmpty
-            ? _convertOutline(node.children)
+            ? _convertOutline(node.children, depth + 1)
             : [],
       );
+      if (validPage && item.title.trim().isNotEmpty) {
+        _tocSections.add(_PdfTocSection(item, page, depth, order));
+      }
+      return item;
     }).toList();
   }
 
@@ -92,6 +103,7 @@ class PdfBookReaderEngine implements BookReaderEngine {
     required void Function(BookLocation location, double percentage)
     onProgressChanged,
     required void Function(String text, BookLocation location) onTextSelected,
+    ValueChanged<Rect?>? onSelectionAnchorChanged,
     VoidCallback? onCenterTapped,
     List<Map<String, dynamic>> highlights = const [],
   }) {
@@ -119,6 +131,7 @@ class PdfBookReaderEngine implements BookReaderEngine {
       onTextSelected: (text, location) {
         onTextSelected(text, BookLocation(locator: location));
       },
+      onSelectionAnchorChanged: onSelectionAnchorChanged,
       onDocumentLoaded: (_) {
         if (generation != _documentGeneration) return;
         _retireSearchDocument();
@@ -304,6 +317,27 @@ class PdfBookReaderEngine implements BookReaderEngine {
   }
 
   @override
+  TOCItem? tocItemAt(BookLocation location) {
+    final parsed = PdfReaderLocation.tryParse(location.locator);
+    if (parsed == null ||
+        parsed.pageNumber < 1 ||
+        parsed.pageNumber > _pageCount) {
+      return null;
+    }
+    var low = 0;
+    var high = _tocSections.length;
+    while (low < high) {
+      final middle = (low + high) ~/ 2;
+      if (_tocSections[middle].page <= parsed.pageNumber) {
+        low = middle + 1;
+      } else {
+        high = middle;
+      }
+    }
+    return low == 0 ? null : _tocSections[low - 1].item;
+  }
+
+  @override
   void dispose() {
     _documentGeneration++;
     _retireSearchDocument();
@@ -311,10 +345,20 @@ class PdfBookReaderEngine implements BookReaderEngine {
     _controller = null;
     _bookData = null;
     _toc = [];
+    _tocSections.clear();
     _pageCount = 0;
     _pendingLocation = null;
     _viewerReady = false;
   }
+}
+
+class _PdfTocSection {
+  const _PdfTocSection(this.item, this.page, this.depth, this.order);
+
+  final TOCItem item;
+  final int page;
+  final int depth;
+  final int order;
 }
 
 /// Owns only a pre-mount/fallback document, never the viewer's document.

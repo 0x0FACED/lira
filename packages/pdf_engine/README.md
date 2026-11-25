@@ -13,6 +13,7 @@ A trackpad-only scale recognizer handles pan/pinch when selectable text intercep
 ## Selection and navigation
 
 - Native text selection emits the selected text and an encoded `PdfReaderLocation`.
+- `onSelectionAnchorChanged` reports the visible active edge in global logical coordinates, independent of the selected text. It follows drags and viewer transforms, and reports `null` when the edge is offscreen or selection clears.
 - Empty selection clears the application-owned action bar.
 - Reader taps are observed without competing with native selection gestures; single taps wait for the double-click window.
 - Internal PDF annotations navigate to destinations; external HTTP(S) links use `url_launcher`.

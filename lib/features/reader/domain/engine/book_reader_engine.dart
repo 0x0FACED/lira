@@ -23,6 +23,7 @@ abstract class BookReaderEngine {
     required void Function(BookLocation location, double percentage)
     onProgressChanged,
     required void Function(String text, BookLocation location) onTextSelected,
+    ValueChanged<Rect?>? onSelectionAnchorChanged,
     VoidCallback? onCenterTapped,
     List<Map<String, dynamic>> highlights = const [],
   });
@@ -36,6 +37,9 @@ abstract class BookReaderEngine {
 
   /// Returns the hierarchical Table of Contents
   List<TOCItem> getToc();
+
+  /// The last reached outline entry, as an item from [getToc].
+  TOCItem? tocItemAt(BookLocation location);
 
   /// Cleans up resources
   void dispose();
