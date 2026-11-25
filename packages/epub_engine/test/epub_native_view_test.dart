@@ -283,6 +283,7 @@ Future<void> _selectTextRange(
         .first
         .toRect();
   }
+
   Offset edge(Rect box, bool last) =>
       Offset(last ? box.right - 1 : box.left + 1, box.center.dy);
 
@@ -300,6 +301,186 @@ Future<void> _selectTextRange(
 }
 
 void main() {
+  testWidgets(
+    'deep vertical restore builds only nearby paragraph ranges and stays put',
+    (tester) async {
+      final paragraphs = [
+        for (var i = 0; i < 817; i++)
+          '😀 á [P${i.toString().padLeft(4, '0')}] '
+              '${'Readable content. ' * 10}',
+      ];
+      final html = paragraphs.map((text) => '<p>$text</p>').join();
+      final blocks = XhtmlParser(
+        html: html,
+        images: const {},
+        baseStyle: const TextStyle(fontSize: 18),
+      ).parse();
+      final target = EpubLocation.fromPosition(
+        chapterIndex: 1,
+        charOffset: blocks[650].charStart + paragraphs[650].indexOf('[P0650]'),
+        hasExactCharOffset: true,
+      );
+      final book = ParsedEpub(
+        title: 'Long opening chapter',
+        author: 'Lira',
+        chapters: [
+          EpubChapter(
+            title: 'Other chapter',
+            fileName: 'other.xhtml',
+            htmlContent: '<p>WRONG OPENING CHAPTER</p>',
+          ),
+          EpubChapter(
+            title: 'Long chapter',
+            fileName: 'long.xhtml',
+            htmlContent: html,
+          ),
+        ],
+        toc: const [],
+        images: const {},
+      );
+      final key = GlobalKey<EpubNativeViewState>();
+      var settings = const ReaderSettings();
+      EpubLocation? latest;
+      late StateSetter rebuild;
+      await tester.pumpWidget(
+        StatefulBuilder(
+          builder: (context, setState) {
+            rebuild = setState;
+            return _frame(
+              EpubNativeView(
+                key: key,
+                epub: book,
+                initialLocation: target,
+                settings: settings,
+                theme: ThemeData.dark(),
+                onPositionBeforeProgress: (location) => latest = location,
+              ),
+            );
+          },
+        ),
+      );
+      // Check the first content frame, not merely the eventual scroll target.
+      expect(_topVisibleText(tester), contains('[P0650]'));
+      expect(latest!.chapterIndex, target.chapterIndex);
+      expect(latest!.charOffset, target.charOffset);
+      expect(_renderedText(tester), isNot(contains('[P0000]')));
+      expect(_renderedText(tester), isNot(contains('[P0816]')));
+      expect(find.byType(SelectionArea), findsOneWidget);
+      await tester.pumpAndSettle();
+      final opening = _topVisibleText(tester);
+      rebuild(() {});
+      await tester.pumpAndSettle();
+      expect(_topVisibleText(tester), opening);
+
+      await tester.drag(find.byType(EpubNativeView), const Offset(0, -420));
+      await tester.pumpAndSettle();
+      final scrolled = _topVisibleText(tester);
+      final saved = latest!;
+      expect(scrolled, isNot(opening));
+      expect(saved.charOffset, greaterThan(target.charOffset));
+      rebuild(() {});
+      await tester.pumpAndSettle();
+      expect(_topVisibleText(tester), scrolled);
+
+      rebuild(() => settings = settings.copyWith(fontSize: 22));
+      await tester.pump();
+      expect(_renderedText(tester), isNot(contains('WRONG OPENING CHAPTER')));
+      expect(latest!.chapterIndex, saved.chapterIndex);
+      expect(latest!.charOffset, saved.charOffset);
+      await tester.pumpAndSettle();
+
+      key.currentState!.goToLocation(target);
+      await tester.pump();
+      expect(_topVisibleText(tester), contains('[P0650]'));
+      expect(latest!.charOffset, target.charOffset);
+    },
+  );
+
+  testWidgets('selection spans vertical parts in the same chapter', (
+    tester,
+  ) async {
+    final paragraphs = [for (var i = 0; i < 10; i++) 'PART $i selectable'];
+    final book = _htmlBook(paragraphs.map((text) => '<p>$text</p>').join());
+    final elements = XhtmlParser(
+      html: book.chapters.single.htmlContent,
+      images: const {},
+      baseStyle: const TextStyle(fontSize: 18),
+    ).parse();
+    String? selected;
+    EpubLocation? selection;
+    await tester.pumpWidget(
+      _frame(
+        EpubNativeView(
+          epub: book,
+          settings: const ReaderSettings(
+            fontSize: 14,
+            lineHeight: 1,
+            paragraphSpacing: 0,
+          ),
+          theme: ThemeData.dark(),
+          onTextSelected: (text, location) {
+            if (text.isNotEmpty) {
+              selected = text;
+              selection = EpubLocation.fromJson(location);
+            }
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    for (final reverse in [false, true]) {
+      await _selectTextRange(
+        tester,
+        reverse ? paragraphs[9] : paragraphs[6],
+        reverse ? paragraphs[6] : paragraphs[9],
+        reverse: reverse,
+      );
+      expect(selected, contains(paragraphs[6]));
+      expect(selected, contains(paragraphs[9]));
+      expect(selection!.chapterIndex, 0);
+      expect(selection!.startOffset, elements[6].charStart);
+      expect(selection!.endOffset, elements[9].charEnd);
+    }
+  });
+
+  testWidgets('horizontal opening paints before parsing its first demand', (
+    tester,
+  ) async {
+    var reads = 0;
+    final book = ParsedEpub(
+      title: 'Deferred first pagination',
+      author: 'Lira',
+      chapters: [
+        _ObservedChapter(
+          title: 'Chapter',
+          fileName: 'chapter.xhtml',
+          htmlContent: '<p>FIRST CONTENT ${'Readable content. ' * 100}</p>',
+          onRead: () => reads++,
+        ),
+      ],
+      toc: const [],
+      images: const {},
+    );
+    await tester.pumpWidget(
+      _frame(
+        EpubNativeView(
+          epub: book,
+          settings: const ReaderSettings(
+            readingMode: ReadingMode.horizontal,
+            enableDualPageSpread: false,
+          ),
+          theme: ThemeData.dark(),
+        ),
+      ),
+    );
+    expect(reads, 0);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(_renderedText(tester), isNot(contains('FIRST CONTENT')));
+    await tester.pumpAndSettle();
+    expect(reads, greaterThan(0));
+    expect(_renderedText(tester), contains('FIRST CONTENT'));
+  });
+
   testWidgets(
     'selection anchors follow the active edge in both reading modes',
     (tester) async {
@@ -2940,7 +3121,14 @@ void main() {
         initial = EpubLocation.fromJson(saved.toJson());
         readerId++;
       });
-      await _pumpEveryFrame(tester, checkSavedFrame);
+      await _pumpEveryFrame(tester, () {
+        if (find.byType(CircularProgressIndicator).evaluate().isEmpty) {
+          checkSavedFrame();
+        } else {
+          expect(latest!.charOffset, saved.charOffset);
+        }
+      });
+      checkSavedFrame();
       rebuild(
         () => settings = settings.copyWith(fontSize: 23, lineHeight: 1.8),
       );
@@ -3129,6 +3317,13 @@ void main() {
             size: size,
           ),
         );
+        await _pumpEveryFrame(tester, () {
+          if (find.byType(CircularProgressIndicator).evaluate().isEmpty) {
+            checkFrame();
+          } else {
+            expect(reports, isEmpty);
+          }
+        });
         checkFrame();
         await tester.runAsync(
           () => precacheImage(

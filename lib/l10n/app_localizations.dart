@@ -932,12 +932,6 @@ abstract class AppLocalizations {
   /// **'Port'**
   String get proxyPort;
 
-  /// No description provided for @proxyDisabled.
-  ///
-  /// In en, this message translates to:
-  /// **'Disabled'**
-  String get proxyDisabled;
-
   /// No description provided for @searchBothSources.
   ///
   /// In en, this message translates to:
@@ -2862,6 +2856,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter a port from 1 to 65535'**
   String get proxyPortInvalid;
+
+  /// No description provided for @proxyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'SOCKS5 proxy'**
+  String get proxyTitle;
+
+  /// No description provided for @proxySavedEndpoint.
+  ///
+  /// In en, this message translates to:
+  /// **'Off · Saved: {host}:{port}'**
+  String proxySavedEndpoint(String host, int port);
+
+  /// No description provided for @proxyHostInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a host name or IP address, not a URL'**
+  String get proxyHostInvalid;
+
+  /// No description provided for @proxyDraftHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The check only contacts Open Library. Saving does not turn the proxy on.'**
+  String get proxyDraftHint;
+
+  /// No description provided for @proxyCheckAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Check connection'**
+  String get proxyCheckAction;
+
+  /// No description provided for @proxyCheckInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking Open Library through this proxy…'**
+  String get proxyCheckInProgress;
+
+  /// No description provided for @proxyCheckConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Library is reachable through this proxy'**
+  String get proxyCheckConnected;
+
+  /// No description provided for @proxyCheckTimedOut.
+  ///
+  /// In en, this message translates to:
+  /// **'The connection check timed out'**
+  String get proxyCheckTimedOut;
+
+  /// No description provided for @proxyCheckProxyUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open a connection through the SOCKS5 proxy'**
+  String get proxyCheckProxyUnavailable;
+
+  /// No description provided for @proxyCheckServiceUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Proxy reached, but Open Library is unavailable'**
+  String get proxyCheckServiceUnavailable;
+
+  /// No description provided for @proxySaving.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving endpoint…'**
+  String get proxySaving;
+
+  /// No description provided for @proxySaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Endpoint saved'**
+  String get proxySaved;
+
+  /// No description provided for @proxySaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the endpoint'**
+  String get proxySaveFailed;
 
   /// No description provided for @zLibraryLoginError.
   ///

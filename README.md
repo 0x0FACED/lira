@@ -117,6 +117,8 @@ Browser clearance can be bound to the domain, exit IP and User-Agent. Use the sa
 
 SOCKS5 settings in Lira are the explicit application-level routing policy; inherited `HTTP_PROXY`/`HTTPS_PROXY` variables are not layered inside that connection. Normal TLS certificate verification remains enabled.
 
+In **Settings → Network**, enter the SOCKS5 host (DNS name, IPv4 or IPv6) and port. **Check connection** tests those fields with a short HTTPS request to Open Library, even while the proxy is off. It does not save or enable the proxy, and success does not guarantee access to other sources. **Save** applies the address; the switch controls whether Lira uses it. Proxies that require authentication are not supported.
+
 ### Export quotes and notes
 
 In the reader's annotations panel, use **Highlights** to search quote text and notes. Color and **With note** filters intersect; whitespace-only notes do not count as notes. Check individual quotes or **Select visible**, then **Export**. Choose all saved, current visible results or selected visible results, and Markdown or plain text. Book title, author, format and dates are included; EPUB reading-order chapters and PDF pages are added when the saved position is recognized. Unknown legacy locators are omitted, not displayed as invented chapters.

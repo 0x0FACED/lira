@@ -454,9 +454,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get proxyPort => 'Port';
 
   @override
-  String get proxyDisabled => 'Disabled';
-
-  @override
   String get searchBothSources => 'Both sources';
 
   @override
@@ -1591,6 +1588,52 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get proxyPortInvalid => 'Enter a port from 1 to 65535';
+
+  @override
+  String get proxyTitle => 'SOCKS5 proxy';
+
+  @override
+  String proxySavedEndpoint(String host, int port) {
+    return 'Off · Saved: $host:$port';
+  }
+
+  @override
+  String get proxyHostInvalid => 'Enter a host name or IP address, not a URL';
+
+  @override
+  String get proxyDraftHint =>
+      'The check only contacts Open Library. Saving does not turn the proxy on.';
+
+  @override
+  String get proxyCheckAction => 'Check connection';
+
+  @override
+  String get proxyCheckInProgress =>
+      'Checking Open Library through this proxy…';
+
+  @override
+  String get proxyCheckConnected =>
+      'Open Library is reachable through this proxy';
+
+  @override
+  String get proxyCheckTimedOut => 'The connection check timed out';
+
+  @override
+  String get proxyCheckProxyUnavailable =>
+      'Could not open a connection through the SOCKS5 proxy';
+
+  @override
+  String get proxyCheckServiceUnavailable =>
+      'Proxy reached, but Open Library is unavailable';
+
+  @override
+  String get proxySaving => 'Saving endpoint…';
+
+  @override
+  String get proxySaved => 'Endpoint saved';
+
+  @override
+  String get proxySaveFailed => 'Could not save the endpoint';
 
   @override
   String get zLibraryLoginError =>

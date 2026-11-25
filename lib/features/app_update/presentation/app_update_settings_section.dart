@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../settings/presentation/settings_controls.dart';
 import '../domain/app_update.dart';
 import 'app_update_controller.dart';
 
@@ -83,12 +84,11 @@ class _AppUpdateSettingsSectionState
     return AppSection(
       title: l10n.updateSection,
       children: [
-        ListTile(
+        SettingsActionRow(
           leading: const Icon(Icons.system_update_outlined),
           title: Text(l10n.updateCheckAction),
           subtitle: AppMetadata(label: l10n.updateSource),
           trailing: const Icon(Icons.refresh),
-          enabled: !controller.busy,
           onTap: controller.busy ? null : controller.check,
         ),
         Padding(

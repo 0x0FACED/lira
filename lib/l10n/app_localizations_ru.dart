@@ -456,9 +456,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get proxyPort => 'Порт';
 
   @override
-  String get proxyDisabled => 'Выключен';
-
-  @override
   String get searchBothSources => 'Оба источника';
 
   @override
@@ -1600,6 +1597,51 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get proxyPortInvalid => 'Укажите порт от 1 до 65535';
+
+  @override
+  String get proxyTitle => 'Прокси SOCKS5';
+
+  @override
+  String proxySavedEndpoint(String host, int port) {
+    return 'Выключен · Сохранён: $host:$port';
+  }
+
+  @override
+  String get proxyHostInvalid => 'Укажите имя хоста или IP-адрес без URL';
+
+  @override
+  String get proxyDraftHint =>
+      'Проверка обращается только к Open Library. Сохранение не включает прокси.';
+
+  @override
+  String get proxyCheckAction => 'Проверить подключение';
+
+  @override
+  String get proxyCheckInProgress =>
+      'Проверяем Open Library через этот прокси…';
+
+  @override
+  String get proxyCheckConnected => 'Open Library доступна через этот прокси';
+
+  @override
+  String get proxyCheckTimedOut => 'Время проверки соединения истекло';
+
+  @override
+  String get proxyCheckProxyUnavailable =>
+      'Не удалось открыть соединение через прокси SOCKS5';
+
+  @override
+  String get proxyCheckServiceUnavailable =>
+      'Прокси доступен, но Open Library недоступна';
+
+  @override
+  String get proxySaving => 'Сохраняем адрес…';
+
+  @override
+  String get proxySaved => 'Адрес прокси сохранён';
+
+  @override
+  String get proxySaveFailed => 'Не удалось сохранить адрес прокси';
 
   @override
   String get zLibraryLoginError =>

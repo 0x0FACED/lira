@@ -172,15 +172,10 @@ class Socks5ConfigNotifier extends Notifier<Socks5Config> {
     await prefs.setBool(_keyProxyEnabled, enabled);
   }
 
-  Future<void> setHost(String host) async {
-    state = state.copyWith(host: host);
+  Future<void> setEndpoint(String host, int port) async {
+    state = state.copyWith(host: host, port: port);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyProxyHost, host);
-  }
-
-  Future<void> setPort(int port) async {
-    state = state.copyWith(port: port);
-    final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_keyProxyPort, port);
   }
 }

@@ -18,7 +18,9 @@ import '../../search/presentation/anna_access_screen.dart';
 import '../../search/presentation/zlibrary_mirrors_screen.dart';
 
 import '../data/interface_font_scale_provider.dart';
+import 'proxy_settings_card.dart';
 import 'reader_settings_workspace.dart';
+import 'settings_controls.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -28,19 +30,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  final _proxyFormKey = GlobalKey<FormState>();
-  final _proxyHostController = TextEditingController();
-  final _proxyPortController = TextEditingController();
   late final _packageInfo = PackageInfo.fromPlatform();
-  bool _proxyDraftInitialized = false;
-  bool _proxyDraftEdited = false;
-
-  @override
-  void dispose() {
-    _proxyHostController.dispose();
-    _proxyPortController.dispose();
-    super.dispose();
-  }
 
   @override
   void didChangeDependencies() {
@@ -84,7 +74,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       _SettingsGroup(
                         title: l10n.settingsAccountsSync,
                         cards: [
-                          _SettingsCard(
+                          SettingsCard(
                             children: [
                               ListTile(
                                 leading: const Icon(Icons.devices_outlined),
@@ -94,7 +84,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   style: hintStyle,
                                 ),
                               ),
-                              ListTile(
+                              SettingsActionRow(
                                 leading: const Icon(Icons.qr_code_rounded),
                                 title: Text(l10n.localSyncSettingsAction),
                                 subtitle: Text(
@@ -110,9 +100,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                             ],
                           ),
-                          _SettingsCard(
+                          SettingsCard(
                             children: [
-                              ListTile(
+                              SettingsActionRow(
                                 leading: const Icon(Icons.person_outline),
                                 title: Text(l10n.serverAccountInfoTitle),
                                 subtitle: Text(
@@ -129,10 +119,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       _SettingsGroup(
                         title: l10n.openLibrarySettingsGroup,
                         cards: [
-                          _SettingsCard(
+                          SettingsCard(
                             children: [
-                              SwitchListTile(
-                                secondary: const Icon(
+                              SettingsSwitchRow(
+                                leading: const Icon(
                                   Icons.auto_stories_outlined,
                                 ),
                                 title: Text(l10n.openLibraryAutoTitle),
@@ -152,13 +142,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       _buildSources(context, l10n),
                       _SettingsGroup(
                         title: l10n.settingsNetwork,
-                        cards: [_buildProxyCard(context, ref)],
+                        cards: const [ProxySettingsCard()],
                       ),
                       const AppUpdateSettingsSection(),
                       _SettingsGroup(
                         title: l10n.about,
                         cards: [
-                          _SettingsCard(
+                          SettingsCard(
                             children: [
                               FutureBuilder<PackageInfo>(
                                 future: _packageInfo,
@@ -200,9 +190,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           builder: (context, constraints) {
             // Leave enough room for the row title when text is enlarged.
             final inline = constraints.maxWidth >= 340 * textScale;
-            return _SettingsCard(
+            return SettingsCard(
               children: [
-                ListTile(
+                SettingsActionRow(
                   leading: const Icon(Icons.menu_book_outlined),
                   title: Text(l10n.readerCustomize),
                   trailing: const Icon(Icons.chevron_right),
@@ -212,8 +202,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   ),
                 ),
-                SwitchListTile(
-                  secondary: Icon(
+                SettingsSwitchRow(
+                  leading: Icon(
                     isDark
                         ? Icons.dark_mode_outlined
                         : Icons.light_mode_outlined,
@@ -231,7 +221,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   onChanged: (_) =>
                       ref.read(themeModeProvider.notifier).toggle(),
                 ),
-                ListTile(
+                SettingsActionRow(
                   leading: const Icon(Icons.language),
                   title: _SettingValue(
                     label: l10n.language,
@@ -258,7 +248,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ('en', 'English'),
                           ('ru', 'Русский'),
                         ])
-                          ListTile(
+                          SettingsActionRow(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.md,
                             ),
@@ -353,9 +343,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return _SettingsGroup(
       title: l10n.discoverSources,
       cards: [
-        _SettingsCard(
+        SettingsCard(
           children: [
-            ListTile(
+            SettingsActionRow(
               leading: const Icon(Icons.key_outlined),
               title: Text(l10n.annaSessionTitle),
               trailing: const Icon(Icons.chevron_right),
@@ -363,7 +353,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 MaterialPageRoute(builder: (_) => const AnnaAccessScreen()),
               ),
             ),
-            ListTile(
+            SettingsActionRow(
               leading: const Icon(Icons.dns_outlined),
               title: Text(l10n.zLibraryMirrors),
               subtitle: Text(
@@ -416,108 +406,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ],
     );
   }
-
-  Widget _buildProxyCard(BuildContext context, WidgetRef ref) {
-    final proxyConfig = ref.watch(socks5ConfigProvider);
-    final l10n = AppLocalizations.of(context)!;
-    if (!_proxyDraftInitialized) {
-      _proxyHostController.text = proxyConfig.host;
-      _proxyPortController.text = '${proxyConfig.port}';
-      _proxyDraftInitialized = true;
-    }
-    ref.listen(socks5ConfigProvider, (_, next) {
-      if (_proxyDraftEdited) return;
-      _proxyHostController.text = next.host;
-      _proxyPortController.text = '${next.port}';
-    });
-
-    Future<void> applyProxy() async {
-      if (!_proxyFormKey.currentState!.validate()) return;
-      final host = _proxyHostController.text.trim();
-      final port = int.parse(_proxyPortController.text.trim());
-      final notifier = ref.read(socks5ConfigProvider.notifier);
-      await notifier.setHost(host);
-      await notifier.setPort(port);
-    }
-
-    return _SettingsCard(
-      children: [
-        SwitchListTile(
-          secondary: const Icon(Icons.vpn_lock_outlined),
-          title: const Text('SOCKS5 Proxy'),
-          subtitle: Text(
-            proxyConfig.enabled
-                ? l10n.proxyAppliedEndpoint(proxyConfig.host, proxyConfig.port)
-                : l10n.proxyDisabled,
-          ),
-          value: proxyConfig.enabled,
-          onChanged: (value) {
-            ref.read(socks5ConfigProvider.notifier).setEnabled(value);
-          },
-        ),
-        if (proxyConfig.enabled)
-          Padding(
-            key: const ValueKey('proxy-fields'),
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.sm,
-              AppSpacing.md,
-              AppSpacing.compact,
-            ),
-            child: Form(
-              key: _proxyFormKey,
-              autovalidateMode: AutovalidateMode.onUserInteraction,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextFormField(
-                    controller: _proxyHostController,
-                    autocorrect: false,
-                    enableSuggestions: false,
-                    textInputAction: TextInputAction.next,
-                    decoration: InputDecoration(
-                      labelText: l10n.proxyHost,
-                      errorMaxLines: 3,
-                    ),
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? l10n.proxyHostRequired
-                        : null,
-                    onChanged: (_) => _proxyDraftEdited = true,
-                  ),
-                  const SizedBox(height: AppSpacing.compact),
-                  TextFormField(
-                    controller: _proxyPortController,
-                    keyboardType: TextInputType.number,
-                    textInputAction: TextInputAction.done,
-                    decoration: InputDecoration(
-                      labelText: l10n.proxyPort,
-                      errorMaxLines: 3,
-                    ),
-                    validator: (value) {
-                      final port = int.tryParse(value?.trim() ?? '');
-                      return port == null || port < 1 || port > 65535
-                          ? l10n.proxyPortInvalid
-                          : null;
-                    },
-                    onChanged: (_) => _proxyDraftEdited = true,
-                    onFieldSubmitted: (_) => applyProxy(),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Align(
-                    alignment: AlignmentDirectional.centerEnd,
-                    child: FilledButton(
-                      onPressed: applyProxy,
-                      child: Text(l10n.save),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-      ],
-    );
-  }
 }
 
 class _SettingsGroup extends StatelessWidget {
@@ -540,40 +428,6 @@ class _SettingsGroup extends StatelessWidget {
           ),
           ...cards,
         ],
-      ),
-    );
-  }
-}
-
-class _SettingsCard extends StatelessWidget {
-  const _SettingsCard({required this.children});
-
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return AppSurface(
-      color: colors.surfaceContainerLow,
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-      radius: AppRadius.md,
-      child: ListTileTheme.merge(
-        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (var index = 0; index < children.length; index++) ...[
-              if (index > 0)
-                Divider(
-                  height: 1,
-                  indent: AppSpacing.md,
-                  endIndent: AppSpacing.md,
-                  color: colors.outlineVariant,
-                ),
-              children[index],
-            ],
-          ],
-        ),
       ),
     );
   }

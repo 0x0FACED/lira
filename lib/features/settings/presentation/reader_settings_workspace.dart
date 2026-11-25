@@ -38,6 +38,7 @@ class ReaderSettingsWorkspace extends StatefulWidget {
 class _ReaderSettingsWorkspaceState extends State<ReaderSettingsWorkspace> {
   bool _sampleSelected = false;
   bool _sampleOpened = false;
+  bool _panelMounted = false;
   bool _panelVisible = false;
   final _bookStorage = PageStorageBucket();
   final _sampleStorage = PageStorageBucket();
@@ -45,19 +46,29 @@ class _ReaderSettingsWorkspaceState extends State<ReaderSettingsWorkspace> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && widget.isOpen) {
-        setState(() => _panelVisible = true);
-      }
-    });
+    if (widget.isOpen) _mountPanel();
   }
 
   @override
   void didUpdateWidget(covariant ReaderSettingsWorkspace oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.isOpen != widget.isOpen) {
+    if (oldWidget.isOpen == widget.isOpen) return;
+    if (widget.isOpen && !_panelMounted) {
+      _mountPanel();
+    } else {
       _panelVisible = widget.isOpen;
     }
+  }
+
+  void _mountPanel() {
+    _panelMounted = true;
+    // The first frame puts the new panel offscreen; the next slides it in.
+    // While reading before first use, there is no settings subtree to lay out.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && widget.isOpen && !_panelVisible) {
+        setState(() => _panelVisible = true);
+      }
+    });
   }
 
   void _backToBook() {
@@ -183,121 +194,123 @@ class _ReaderSettingsWorkspaceState extends State<ReaderSettingsWorkspace> {
                       ),
                     ),
                   ),
-                Positioned(
-                  key: const ValueKey('reader-settings-position'),
-                  top: sideBySide ? 0 : null,
-                  bottom: keyboardInset,
-                  left: 0,
-                  right: sideBySide ? null : 0,
-                  width: sideBySide ? panelWidth : null,
-                  height: sideBySide ? null : panelHeight,
-                  child: IgnorePointer(
-                    ignoring: !widget.isOpen,
-                    child: ExcludeFocus(
-                      excluding: !widget.isOpen,
-                      child: ExcludeSemantics(
+                if (_panelMounted)
+                  Positioned(
+                    key: const ValueKey('reader-settings-position'),
+                    top: sideBySide ? 0 : null,
+                    bottom: keyboardInset,
+                    left: 0,
+                    right: sideBySide ? null : 0,
+                    width: sideBySide ? panelWidth : null,
+                    height: sideBySide ? null : panelHeight,
+                    child: IgnorePointer(
+                      ignoring: !widget.isOpen,
+                      child: ExcludeFocus(
                         excluding: !widget.isOpen,
-                        child: AnimatedSlide(
-                          duration: AppMotion.duration(
-                            context,
-                            widget.isOpen ? AppMotion.slow : AppMotion.normal,
-                          ),
-                          curve: widget.isOpen
-                              ? AppMotion.curve
-                              : Curves.easeInCubic,
-                          offset: _panelVisible
-                              ? Offset.zero
-                              : sideBySide
-                              ? const Offset(-1, 0)
-                              : const Offset(0, 1),
-                          child: Material(
-                            key: const ValueKey('reader-settings-surface'),
-                            color: colors.surface,
-                            surfaceTintColor: Colors.transparent,
-                            elevation: 0,
-                            clipBehavior: Clip.antiAlias,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: sideBySide
-                                  ? BorderRadius.zero
-                                  : const BorderRadius.vertical(
-                                      top: Radius.circular(AppRadius.sm),
-                                    ),
+                        child: ExcludeSemantics(
+                          excluding: !widget.isOpen,
+                          child: AnimatedSlide(
+                            duration: AppMotion.duration(
+                              context,
+                              widget.isOpen ? AppMotion.slow : AppMotion.normal,
                             ),
-                            child: SafeArea(
-                              right: !sideBySide,
-                              top: sideBySide,
-                              child: SingleChildScrollView(
-                                key: const PageStorageKey(
-                                  'reader-settings-scroll',
-                                ),
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    Padding(
-                                      padding:
-                                          const EdgeInsetsDirectional.fromSTEB(
-                                            AppSpacing.md,
-                                            AppSpacing.xs,
-                                            AppSpacing.xs,
-                                            0,
-                                          ),
-                                      child: Row(
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              widget.previewOnly
-                                                  ? l10n.readerPreviewTitle
-                                                  : l10n.readerSettings,
-                                              style: Theme.of(
-                                                context,
-                                              ).textTheme.titleLarge,
-                                            ),
-                                          ),
-                                          IconButton(
-                                            icon: Semantics(
-                                              label: l10n.readerCloseSettings,
-                                              child: const Icon(Icons.close),
-                                            ),
-                                            onPressed: widget.onClose,
-                                          ),
-                                        ],
+                            curve: widget.isOpen
+                                ? AppMotion.curve
+                                : Curves.easeInCubic,
+                            offset: _panelVisible
+                                ? Offset.zero
+                                : sideBySide
+                                ? const Offset(-1, 0)
+                                : const Offset(0, 1),
+                            child: Material(
+                              key: const ValueKey('reader-settings-surface'),
+                              color: colors.surface,
+                              surfaceTintColor: Colors.transparent,
+                              elevation: 0,
+                              clipBehavior: Clip.antiAlias,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: sideBySide
+                                    ? BorderRadius.zero
+                                    : const BorderRadius.vertical(
+                                        top: Radius.circular(AppRadius.sm),
                                       ),
-                                    ),
-                                    if (!widget.previewOnly)
+                              ),
+                              child: SafeArea(
+                                right: !sideBySide,
+                                top: sideBySide,
+                                child: SingleChildScrollView(
+                                  key: const PageStorageKey(
+                                    'reader-settings-scroll',
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
                                       Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: AppSpacing.md,
-                                        ),
-                                        child: SingleChildScrollView(
-                                          scrollDirection: Axis.horizontal,
-                                          child: SegmentedButton<bool>(
-                                            showSelectedIcon: false,
-                                            segments: [
-                                              ButtonSegment(
-                                                value: false,
-                                                label: Text(
-                                                  l10n.readerCurrentBook,
-                                                ),
+                                        padding:
+                                            const EdgeInsetsDirectional.fromSTEB(
+                                              AppSpacing.md,
+                                              AppSpacing.xs,
+                                              AppSpacing.xs,
+                                              0,
+                                            ),
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                widget.previewOnly
+                                                    ? l10n.readerPreviewTitle
+                                                    : l10n.readerSettings,
+                                                style: Theme.of(
+                                                  context,
+                                                ).textTheme.titleLarge,
                                               ),
-                                              ButtonSegment(
-                                                value: true,
-                                                label: Text(
-                                                  l10n.readerPreviewBook,
-                                                ),
+                                            ),
+                                            IconButton(
+                                              icon: Semantics(
+                                                label: l10n.readerCloseSettings,
+                                                child: const Icon(Icons.close),
                                               ),
-                                            ],
-                                            selected: {_sampleSelected},
-                                            onSelectionChanged: (value) =>
-                                                setState(
-                                                  () => _sampleSelected =
-                                                      value.single,
-                                                ),
-                                          ),
+                                              onPressed: widget.onClose,
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                    const SettingsPanel(),
-                                  ],
+                                      if (!widget.previewOnly)
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: AppSpacing.md,
+                                          ),
+                                          child: SingleChildScrollView(
+                                            scrollDirection: Axis.horizontal,
+                                            child: SegmentedButton<bool>(
+                                              showSelectedIcon: false,
+                                              segments: [
+                                                ButtonSegment(
+                                                  value: false,
+                                                  label: Text(
+                                                    l10n.readerCurrentBook,
+                                                  ),
+                                                ),
+                                                ButtonSegment(
+                                                  value: true,
+                                                  label: Text(
+                                                    l10n.readerPreviewBook,
+                                                  ),
+                                                ),
+                                              ],
+                                              selected: {_sampleSelected},
+                                              onSelectionChanged: (value) =>
+                                                  setState(
+                                                    () => _sampleSelected =
+                                                        value.single,
+                                                  ),
+                                            ),
+                                          ),
+                                        ),
+                                      const SettingsPanel(),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
@@ -306,7 +319,6 @@ class _ReaderSettingsWorkspaceState extends State<ReaderSettingsWorkspace> {
                       ),
                     ),
                   ),
-                ),
               ],
             );
           },
