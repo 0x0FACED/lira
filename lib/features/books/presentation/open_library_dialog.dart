@@ -31,6 +31,17 @@ class OpenLibraryDialog extends ConsumerStatefulWidget {
 }
 
 class _OpenLibraryDialogState extends ConsumerState<OpenLibraryDialog> {
+  static final _subtitleSeparator = RegExp(
+    r':(?=\s)|\s[-–—]\s|\p{L}{3,}\.(?=\s)',
+    unicode: true,
+  );
+  static final _authorListSeparator = RegExp(
+    r'[,;/&]|\s(?:and|и)\s',
+    caseSensitive: false,
+  );
+  static final _nameWhitespace = RegExp(r'\s+');
+  static final _surname = RegExp(r"^\p{L}[\p{L}\p{M}’'\-]+$", unicode: true);
+
   late final _title = TextEditingController(text: widget.book.title);
   late final _author = TextEditingController(
     text: widget.book.author.trim() == 'Unknown Author'
@@ -49,6 +60,7 @@ class _OpenLibraryDialogState extends ConsumerState<OpenLibraryDialog> {
   bool _searchFailed = false;
   bool _invalidSearch = false;
   List<OpenLibraryCandidate> _results = const [];
+  ({String title, String author})? _shortQuery;
   OpenLibraryCandidate? _candidate;
   List<String> _candidateGenres = const [];
   OpenLibraryCover? _cover;
@@ -109,38 +121,73 @@ class _OpenLibraryDialogState extends ConsumerState<OpenLibraryDialog> {
       _searched = false;
       _searchFailed = false;
       _results = const [];
+      _shortQuery = null;
     });
   }
 
-  Future<void> _search() async {
-    final isbn = normalizeIsbn(_isbn.text);
-    if ((_byIsbn && isbn == null) ||
-        (!_byIsbn &&
-            _title.text.trim().isEmpty &&
-            _author.text.trim().isEmpty)) {
+  static ({String title, String author})? _shorten(
+    String title,
+    String author,
+  ) {
+    final separator = _subtitleSeparator.firstMatch(title);
+    final cutoff = separator == null
+        ? 0
+        : title[separator.end - 1] == '.'
+        ? separator.end - 1
+        : separator.start;
+    final shortTitle = cutoff == 0
+        ? title
+        : title.substring(0, cutoff).trimRight();
+    // Don't discard co-authors or guess the order of comma-separated names.
+    final lastName = author.split(_nameWhitespace).last;
+    final shortAuthor =
+        !_authorListSeparator.hasMatch(author) && _surname.hasMatch(lastName)
+        ? lastName
+        : author;
+    if (shortTitle == title && shortAuthor == author) return null;
+    return (title: shortTitle, author: shortAuthor);
+  }
+
+  void _searchShorter(({String title, String author}) query) {
+    _title.text = query.title;
+    _author.text = query.author;
+    _search(allowShortQuery: false);
+  }
+
+  Future<void> _search({bool allowShortQuery = true}) async {
+    final isbn = _byIsbn ? normalizeIsbn(_isbn.text) : null;
+    final title = _title.text.trim();
+    final author = _author.text.trim();
+    if (_byIsbn ? isbn == null : title.isEmpty && author.isEmpty) {
       setState(() => _invalidSearch = true);
       return;
     }
     FocusScope.of(context).unfocus();
     setState(() {
+      _draftEdited = true;
       _searching = true;
+      _searched = false;
       _invalidSearch = false;
       _searchFailed = false;
       _results = const [];
+      _shortQuery = null;
     });
     try {
       final results = await ref
           .read(openLibraryClientProvider)
           .search(
-            isbn: _byIsbn ? isbn : null,
-            title: _byIsbn ? null : _title.text.trim(),
-            author: _byIsbn ? null : _author.text.trim(),
+            isbn: isbn,
+            title: _byIsbn ? null : title,
+            author: _byIsbn ? null : author,
             language:
                 _bookLanguage ?? Localizations.localeOf(context).languageCode,
           );
       if (!mounted) return;
       setState(() {
         _results = results.take(8).toList();
+        if (results.isEmpty && !_byIsbn && allowShortQuery) {
+          _shortQuery = _shorten(title, author);
+        }
         _searched = true;
         _searching = false;
       });
@@ -326,6 +373,7 @@ class _OpenLibraryDialogState extends ConsumerState<OpenLibraryDialog> {
   }
 
   Widget _buildSearch(AppLocalizations l10n) {
+    final shortQuery = _shortQuery;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -415,8 +463,29 @@ class _OpenLibraryDialogState extends ConsumerState<OpenLibraryDialog> {
           _message(l10n.openLibrarySearching),
         ],
         if (_searchFailed) _message(l10n.openLibraryNetworkError, error: true),
-        if (_searched && _results.isEmpty && !_searching)
-          _message(l10n.openLibraryNoResults),
+        if (_searched && _results.isEmpty)
+          _message(
+            _byIsbn ? l10n.openLibraryNoResults : l10n.openLibraryTextNoResults,
+          ),
+        if (shortQuery != null) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            [
+              if (shortQuery.title.isNotEmpty) shortQuery.title,
+              if (shortQuery.author.isNotEmpty) shortQuery.author,
+            ].join(' · '),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton(
+              onPressed: () => _searchShorter(shortQuery),
+              child: Text(l10n.openLibrarySearchShorter),
+            ),
+          ),
+        ],
         if (_results.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.lg),
           for (final candidate in _results)

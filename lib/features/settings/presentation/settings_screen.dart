@@ -2,15 +2,18 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/providers/preferences_provider.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../app_update/data/github_update_client.dart';
 import '../../app_update/presentation/app_update_controller.dart';
-import '../../app_update/presentation/app_update_settings_section.dart';
+import '../../app_update/presentation/app_update_settings_card.dart';
 import '../../books/domain/providers/open_library_preferences.dart';
 import '../../local_sync/presentation/local_sync_screen.dart';
 import '../../search/domain/providers/book_source_clients.dart';
@@ -48,10 +51,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  Future<void> _openSourceCode() async {
+    try {
+      if (await launchUrl(
+        GitHubUpdateClient.repositoryUri,
+        mode: LaunchMode.externalApplication,
+      )) {
+        return;
+      }
+    } catch (_) {
+      // Platform launch failures share the same user-facing recovery.
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppLocalizations.of(context)!.sourceCodeError)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final hintStyle = Theme.of(context).textTheme.bodySmall;
+    final theme = Theme.of(context);
+    final hintStyle = theme.textTheme.bodySmall;
 
     return Scaffold(
       body: SafeArea(
@@ -144,7 +165,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         title: l10n.settingsNetwork,
                         cards: const [ProxySettingsCard()],
                       ),
-                      const AppUpdateSettingsSection(),
                       _SettingsGroup(
                         title: l10n.about,
                         cards: [
@@ -157,6 +177,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   title: Text(l10n.version),
                                   subtitle: Text(snapshot.data?.version ?? '—'),
                                 ),
+                              ),
+                            ],
+                          ),
+                          const AppUpdateSettingsCard(),
+                          SettingsCard(
+                            children: [
+                              SettingsActionRow(
+                                leading: SvgPicture.asset(
+                                  'assets/icon/github-mark.svg',
+                                  width: 24,
+                                  height: 24,
+                                  colorFilter: ColorFilter.mode(
+                                    theme.brightness == Brightness.dark
+                                        ? Colors.white
+                                        : Colors.black,
+                                    BlendMode.srcIn,
+                                  ),
+                                  excludeFromSemantics: true,
+                                ),
+                                title: Text(l10n.sourceCode),
+                                trailing: const Icon(Icons.open_in_new),
+                                onTap: _openSourceCode,
                               ),
                             ],
                           ),

@@ -582,7 +582,18 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     bool listView,
   ) {
     final controller = ref.read(booksControllerProvider.notifier);
-    final indices = {for (var i = 0; i < books.length; i++) books[i].id: i};
+    final indices = <String, int>{};
+    final maxPageCounts = listView ? null : <String, int>{};
+    for (var i = 0; i < books.length; i++) {
+      final book = books[i];
+      indices[book.id] = i;
+      if (maxPageCounts != null) {
+        final previous = maxPageCounts[book.format];
+        if (previous == null || book.pageCount > previous) {
+          maxPageCounts[book.format] = book.pageCount;
+        }
+      }
+    }
     final delegate = SliverChildBuilderDelegate(
       (context, index) {
         final book = books[index];
@@ -603,9 +614,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     if (listView) {
       sliver = SliverList(delegate: delegate);
     } else {
-      final captionExtent = BookCard.metadataExtent(
-        MediaQuery.textScalerOf(context),
-      );
+      // getLayout also runs while scrolling; only measure after width changes.
+      var measuredWidth = -1.0;
+      var measuredExtent = 0.0;
       sliver = SliverGrid(
         gridDelegate: ResponsiveGridDelegate(
           crossAxisCount: columns,
@@ -618,8 +629,20 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           crossAxisSpacing: (wide ? AppSpacing.lg : AppSpacing.md) - extraHit,
           mainAxisSpacing: (wide ? AppSpacing.xl : AppSpacing.lg) - extraHit,
           childAspectRatio: BookCard.coverAspectRatio,
-          mainAxisExtraExtentForWidth: (_) =>
-              captionExtent + extraHit - extraHit / BookCard.coverAspectRatio,
+          mainAxisExtraExtentForWidth: (width) {
+            if (width != measuredWidth) {
+              measuredExtent =
+                  BookCard.metadataExtent(
+                    context,
+                    maxPageCounts!,
+                    width - extraHit,
+                  ) +
+                  extraHit -
+                  extraHit / BookCard.coverAspectRatio;
+              measuredWidth = width;
+            }
+            return measuredExtent;
+          },
         ),
         delegate: delegate,
       );

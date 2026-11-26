@@ -8,6 +8,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:lira/core/database/app_database.dart';
 import 'package:lira/core/di/injection.dart';
 import 'package:lira/core/theme/app_theme.dart';
@@ -611,6 +612,16 @@ void main() {
               LibraryColumnsNotifier.storageKey,
               columns,
             );
+            for (final id in ['0', '1']) {
+              await getIt<ReadingProgressLocalRepository>().saveProgress(
+                ReadingProgressDto(
+                  bookId: id,
+                  percentage: 42.79,
+                  location: 'saved-$id',
+                  updatedAt: DateTime(2026),
+                ),
+              );
+            }
             await mount(
               tester,
               size: Size(width, 844),
@@ -620,12 +631,55 @@ void main() {
             expectColumns(tester, columns);
             expect(tester.takeException(), isNull);
 
+            final l10n = AppLocalizations.of(
+              tester.element(find.byType(LibraryScreen)),
+            )!;
+            final countFormat = NumberFormat.decimalPattern(l10n.localeName);
             final cards = find.byType(BookCard).evaluate().take(3).toList();
             final coverSizes = <Size>[];
             final titleOffsets = <double>[];
+            final metadataOffsets = <double>[];
+            final progressOffsets = <double>[];
             for (final element in cards) {
               final card = find.byWidget(element.widget);
               final book = (element.widget as BookCard).book;
+              final format = book.format.toUpperCase();
+              final count = countFormat.format(book.pageCount);
+              final pages = l10n.bookPageCountCompact(
+                book.format == 'epub' ? '≈$count' : count,
+              );
+              final metadata = find.descendant(
+                of: card,
+                matching: find.text(
+                  book.pageCount > 0 ? '$format · $pages' : format,
+                ),
+              );
+              expect(metadata, findsOneWidget);
+              final metadataRect = tester.getRect(metadata);
+              final cardRect = tester.getRect(card);
+              expect(metadataRect.left, greaterThanOrEqualTo(cardRect.left));
+              expect(metadataRect.right, lessThanOrEqualTo(cardRect.right));
+              expect(metadataRect.bottom, lessThanOrEqualTo(cardRect.bottom));
+              expect(
+                tester
+                    .renderObject<RenderParagraph>(metadata)
+                    .didExceedMaxLines,
+                isFalse,
+              );
+              metadataOffsets.add(metadataRect.top - cardRect.top);
+              final progress = find.descendant(
+                of: card,
+                matching: find.byType(LinearProgressIndicator),
+              );
+              if (book.id == '0' || book.id == '1') {
+                expect(progress, findsOneWidget);
+                final progressRect = tester.getRect(progress);
+                expect(metadataRect.bottom, lessThan(progressRect.top));
+                expect(progressRect.bottom, lessThanOrEqualTo(cardRect.bottom));
+                progressOffsets.add(progressRect.bottom - cardRect.bottom);
+              } else {
+                expect(progress, findsNothing);
+              }
               final cover = find.descendant(
                 of: card,
                 matching: find.byWidgetPredicate(
@@ -644,6 +698,12 @@ void main() {
             expect(coverSizes, everyElement(coverSizes.first));
             for (final offset in titleOffsets) {
               expect(offset, closeTo(titleOffsets.first, 0.01));
+            }
+            for (final offset in metadataOffsets) {
+              expect(offset, closeTo(metadataOffsets.first, 0.01));
+            }
+            for (final offset in progressOffsets) {
+              expect(offset, closeTo(progressOffsets.first, 0.01));
             }
           },
         );

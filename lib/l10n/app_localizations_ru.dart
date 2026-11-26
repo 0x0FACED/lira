@@ -174,6 +174,12 @@ class AppLocalizationsRu extends AppLocalizations {
       'Совпадений нет. Попробуйте поиск по названию и автору или другой ISBN.';
 
   @override
+  String get openLibraryTextNoResults => 'Совпадений нет';
+
+  @override
+  String get openLibrarySearchShorter => 'Искать по короткому запросу';
+
+  @override
   String get openLibraryNetworkError =>
       'Не удалось связаться с Open Library. Проверьте соединение и повторите поиск.';
 
@@ -331,6 +337,13 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get version => 'Версия';
+
+  @override
+  String get sourceCode => 'Исходный код на GitHub';
+
+  @override
+  String get sourceCodeError =>
+      'Не удалось открыть исходный код на GitHub в браузере.';
 
   @override
   String get editBook => 'Редактировать';
@@ -734,9 +747,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String bookDownloaded(String title) {
     return '«$title» добавлена в библиотеку';
   }
-
-  @override
-  String get updateSection => 'Обновление приложения';
 
   @override
   String get updateSource => 'Официальные релизы на GitHub';

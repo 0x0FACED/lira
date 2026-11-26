@@ -173,6 +173,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'No matches. Try title and author, or another ISBN.';
 
   @override
+  String get openLibraryTextNoResults => 'No matches';
+
+  @override
+  String get openLibrarySearchShorter => 'Search with a shorter query';
+
+  @override
   String get openLibraryNetworkError =>
       'Could not reach Open Library. Check your connection and try again.';
 
@@ -330,6 +336,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get version => 'Version';
+
+  @override
+  String get sourceCode => 'Source code on GitHub';
+
+  @override
+  String get sourceCodeError =>
+      'Could not open the source code on GitHub in your browser.';
 
   @override
   String get editBook => 'Edit Book';
@@ -730,9 +743,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String bookDownloaded(String title) {
     return '“$title” added to your library';
   }
-
-  @override
-  String get updateSection => 'App updates';
 
   @override
   String get updateSource => 'Official releases on GitHub';

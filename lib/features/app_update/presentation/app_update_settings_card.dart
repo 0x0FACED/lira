@@ -10,16 +10,15 @@ import '../../settings/presentation/settings_controls.dart';
 import '../domain/app_update.dart';
 import 'app_update_controller.dart';
 
-class AppUpdateSettingsSection extends ConsumerStatefulWidget {
-  const AppUpdateSettingsSection({super.key});
+class AppUpdateSettingsCard extends ConsumerStatefulWidget {
+  const AppUpdateSettingsCard({super.key});
 
   @override
-  ConsumerState<AppUpdateSettingsSection> createState() =>
-      _AppUpdateSettingsSectionState();
+  ConsumerState<AppUpdateSettingsCard> createState() =>
+      _AppUpdateSettingsCardState();
 }
 
-class _AppUpdateSettingsSectionState
-    extends ConsumerState<AppUpdateSettingsSection> {
+class _AppUpdateSettingsCardState extends ConsumerState<AppUpdateSettingsCard> {
   Future<void> _openRelease(Uri url) async {
     try {
       if (await launchUrl(url, mode: LaunchMode.externalApplication)) return;
@@ -81,8 +80,7 @@ class _AppUpdateSettingsSectionState
             null => null,
           };
 
-    return AppSection(
-      title: l10n.updateSection,
+    return SettingsCard(
       children: [
         SettingsActionRow(
           leading: const Icon(Icons.system_update_outlined),
@@ -92,7 +90,10 @@ class _AppUpdateSettingsSectionState
           onTap: controller.busy ? null : controller.check,
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.compact),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.compact,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

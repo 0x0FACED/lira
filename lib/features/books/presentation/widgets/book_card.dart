@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../core/formatters.dart';
 import '../../../../core/theme/app_tokens.dart';
@@ -29,22 +30,81 @@ class BookCard extends StatelessWidget {
   static const _titleSize = 14.0;
   static const _authorSize = 12.0;
   static const _progressSize = 11.0;
+  static const _metadataSize = 11.0;
   static const _progressBarHeight = 2.0;
   static const _lineHeight = 1.3;
 
-  /// Reserve the same caption height for every book in the grid.
-  static double metadataExtent(TextScaler textScaler) =>
-      AppSpacing.compact +
-      _textLineExtent(textScaler, _titleSize) * 2 +
-      AppSpacing.xs +
-      _textLineExtent(textScaler, _authorSize) +
-      AppSpacing.sm +
-      _textLineExtent(textScaler, _progressSize) +
-      AppSpacing.sm +
-      _progressBarHeight;
+  /// Reserve the same caption height, including wrapped metadata, for the grid.
+  /// Only the largest count per format needs measuring; digits share a width.
+  /// [width] excludes the card's hit inset.
+  static double metadataExtent(
+    BuildContext context,
+    Map<String, int> maxPageCounts,
+    double width,
+  ) {
+    final textScaler = MediaQuery.textScalerOf(context);
+    final l10n = AppLocalizations.of(context)!;
+    final countFormat = NumberFormat.decimalPattern(l10n.localeName);
+    final painter = TextPainter(
+      textDirection: Directionality.of(context),
+      textScaler: textScaler,
+      locale: Localizations.localeOf(context),
+    );
+    final style = _fileMetadataStyle(Theme.of(context));
+    var fileMetadataExtent = _textLineExtent(textScaler, _metadataSize);
+    try {
+      for (final entry in maxPageCounts.entries) {
+        painter.text = TextSpan(
+          text: _fileMetadataLabel(entry.key, entry.value, l10n, countFormat),
+          style: style,
+        );
+        painter.layout(maxWidth: width);
+        if (painter.height > fileMetadataExtent) {
+          fileMetadataExtent = painter.height.ceilToDouble();
+        }
+      }
+    } finally {
+      painter.dispose();
+    }
+    return AppSpacing.compact +
+        _textLineExtent(textScaler, _titleSize) * 2 +
+        AppSpacing.xs +
+        _textLineExtent(textScaler, _authorSize) +
+        AppSpacing.xs +
+        fileMetadataExtent +
+        AppSpacing.sm +
+        _textLineExtent(textScaler, _progressSize) +
+        AppSpacing.sm +
+        _progressBarHeight;
+  }
 
   static double _textLineExtent(TextScaler scaler, double size) =>
       (scaler.scale(size) * _lineHeight).ceilToDouble();
+
+  static TextStyle? _fileMetadataStyle(ThemeData theme) =>
+      theme.textTheme.labelSmall?.copyWith(
+        fontSize: _metadataSize,
+        fontWeight: FontWeight.w400,
+        height: _lineHeight,
+        letterSpacing: 0,
+        fontFeatures: const [FontFeature.tabularFigures()],
+        color: theme.colorScheme.onSurfaceVariant,
+      );
+
+  static String _fileMetadataLabel(
+    String fileFormat,
+    int pageCount,
+    AppLocalizations l10n,
+    NumberFormat countFormat,
+  ) {
+    final format = fileFormat.toUpperCase();
+    if (pageCount <= 0) return format;
+    final count = countFormat.format(pageCount);
+    final pages = l10n.bookPageCountCompact(
+      format == 'EPUB' ? '≈$count' : count,
+    );
+    return '$format · $pages';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -92,6 +152,16 @@ class BookCard extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            _fileMetadataLabel(
+              book.format,
+              book.pageCount,
+              l10n,
+              NumberFormat.decimalPattern(l10n.localeName),
+            ),
+            style: _fileMetadataStyle(theme),
           ),
           const SizedBox(height: AppSpacing.sm),
           Expanded(child: _buildFooter(context)),

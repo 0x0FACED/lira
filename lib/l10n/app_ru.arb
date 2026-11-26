@@ -70,6 +70,8 @@
   "profile": "Профиль",
   "about": "О приложении",
   "version": "Версия",
+  "sourceCode": "Исходный код на GitHub",
+  "sourceCodeError": "Не удалось открыть исходный код на GitHub в браузере.",
   "editBook": "Редактировать",
   "@editBook": {
     "description": "Edit book action"
@@ -263,7 +265,6 @@
       "title": {"type": "String"}
     }
   },
-  "updateSection": "Обновление приложения",
   "updateSource": "Официальные релизы на GitHub",
   "updateCheckAction": "Проверить обновления",
   "updateCheckHint": "Проверьте, доступна ли новая версия Lira.",
@@ -579,6 +580,8 @@
   "openLibrarySearchRequired": "Введите название или автора",
   "openLibrarySearching": "Поиск в Open Library…",
   "openLibraryNoResults": "Совпадений нет. Попробуйте поиск по названию и автору или другой ISBN.",
+  "openLibraryTextNoResults": "Совпадений нет",
+  "openLibrarySearchShorter": "Искать по короткому запросу",
   "openLibraryNetworkError": "Не удалось связаться с Open Library. Проверьте соединение и повторите поиск.",
   "openLibraryHintsError": "Не удалось прочитать ISBN книги. Можно искать по названию и автору.",
   "openLibraryWork": "Произведение",

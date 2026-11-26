@@ -8,6 +8,8 @@
 2. **Add a book.** Import an EPUB or PDF, or open **Discover** to search for a title through a supported source.
 3. **Settle in.** Open the book, adjust your EPUB reading settings, and start reading. Your place is saved as you go.
 
+In the library's two- and three-column grids, cards show the file format and page count when available. EPUB page counts are estimates and are marked with **≈**.
+
 You can also open **Settings → Customize reader** to try the controls on the bundled Russian/English EPUB without importing a book.
 
 ## Customize EPUB reading
@@ -23,6 +25,8 @@ Open its details and select the pencil. Edit the title and author in place. Use 
 ## Fill in book details with Open Library
 
 Open a saved book's details and choose **Find in Open Library**. Search by ISBN for a specific edition, or edit the title and author to look for candidates. Select a result to compare it with the local entry, then choose which fields and cover to apply. Lira adds recognized genres without replacing your genres or tags. The saved cover is available offline.
+
+If a title and author search finds nothing, Lira can suggest a shorter query by dropping the subtitle and using the author's surname. **Search with a shorter query** sends it only when you choose to retry.
 
 **Settings → Library metadata → Fill missing details from Open Library** is off by default. When enabled, Lira looks up new EPUB imports and downloads only if the file contains one valid ISBN and the catalog confirms one edition. The lookup runs after the book is saved. It fills missing details without replacing titles from the file or overwriting local edits. It only replaces a usable embedded cover automatically if the same edition has a substantially larger image and the original was small.
 
@@ -88,7 +92,7 @@ Each protocol message is limited to 16 MiB of serialized metadata (at most 100,0
 
 ## Updating Lira
 
-Open **Settings → App updates** to check the latest stable GitHub release. Lira checks when you first open Settings; **Check for updates** checks again.
+Open **Settings → About** to see the installed version and check the latest stable GitHub release. Lira checks when you first open Settings; **Check for updates** checks again. **Source code on GitHub** opens the project repository in your browser.
 
 - **Android:** download the APK in the app, then tap **Install update**. The download continues when you switch tabs. Lira verifies its size and SHA-256, and checks the APK's package, version, and signing key before opening Android's installer. If Android requests permission to install unknown apps, allow it for Lira and tap **Install update** again. Updating keeps your library and settings; an APK signed with a different key cannot update your installation.
 - **iOS, macOS, Windows, Linux:** **Open release on GitHub** opens the release page in your browser. Follow the [installation instructions for your platform](../README.md#get-lira).

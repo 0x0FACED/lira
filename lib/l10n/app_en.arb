@@ -52,6 +52,8 @@
   "openLibrarySearchRequired": "Enter a title or author",
   "openLibrarySearching": "Searching Open Library…",
   "openLibraryNoResults": "No matches. Try title and author, or another ISBN.",
+  "openLibraryTextNoResults": "No matches",
+  "openLibrarySearchShorter": "Search with a shorter query",
   "openLibraryNetworkError": "Could not reach Open Library. Check your connection and try again.",
   "openLibraryHintsError": "Could not read the book’s ISBN. You can still search by title and author.",
   "openLibraryWork": "Work",
@@ -109,6 +111,8 @@
   "languageComingSoon": "Language selector coming soon",
   "about": "About",
   "version": "Version",
+  "sourceCode": "Source code on GitHub",
+  "sourceCodeError": "Could not open the source code on GitHub in your browser.",
   "editBook": "Edit Book",
   "@editBook": {
     "description": "Edit book action"
@@ -295,7 +299,6 @@
       "title": {"type": "String"}
     }
   },
-  "updateSection": "App updates",
   "updateSource": "Official releases on GitHub",
   "updateCheckAction": "Check for updates",
   "updateCheckHint": "Check whether a newer version of Lira is available.",

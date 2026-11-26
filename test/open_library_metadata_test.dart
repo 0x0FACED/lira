@@ -37,6 +37,30 @@ class _PreviewCatalog extends OpenLibraryClient {
   ];
 }
 
+class _ShortQueryCatalog extends OpenLibraryClient {
+  _ShortQueryCatalog()
+    : super(client: MockClient((_) => throw StateError('Unexpected request')));
+
+  @override
+  Future<List<OpenLibraryCandidate>> search({
+    String? isbn,
+    String? title,
+    String? author,
+    String? language,
+  }) async => switch ((title, author)) {
+    ('Неизвестная книга', _) => throw http.ClientException('Unavailable'),
+    ('Дюна', 'Герберт') => [
+      OpenLibraryCandidate(
+        workKey: '/works/OL1W',
+        title: 'Дюна',
+        authors: ['Фрэнк Герберт'],
+        subjects: [],
+      ),
+    ],
+    _ => [],
+  };
+}
+
 void main() {
   test(
     'an ISBN shared by two editions cannot look like a unique match',
@@ -147,6 +171,82 @@ void main() {
       expect(merged, ['To reread', 'Sci-fi', 'Биография']);
     },
   );
+
+  testWidgets('an empty text search offers an explicit shorter query', (
+    tester,
+  ) async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    getIt.registerSingleton(BooksLocalRepository(db));
+    addTearDown(() async {
+      await getIt.reset();
+      await db.close();
+    });
+    final client = _ShortQueryCatalog();
+    addTearDown(client.close);
+    final book = BookDto(
+      id: 'short-query',
+      title: 'Дюна. Легендарный роман',
+      author: 'Фрэнк Герберт',
+      format: 'epub',
+      createdAt: DateTime.utc(2026),
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [openLibraryClientProvider.overrideWithValue(client)],
+        child: MaterialApp(
+          locale: const Locale('ru'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: OpenLibraryDialog(
+              book: book,
+              organization: const BookOrganization(),
+            ),
+          ),
+        ),
+      ),
+    );
+    try {
+      await tester.pumpAndSettle();
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(OpenLibraryDialog)),
+      )!;
+      final search = find.widgetWithText(FilledButton, l10n.search);
+      final shorter = find.widgetWithText(
+        TextButton,
+        l10n.openLibrarySearchShorter,
+      );
+      final title = find.widgetWithText(TextField, l10n.editBookTitle);
+      final result = find.widgetWithText(ListTile, 'Дюна');
+      Future<void> submit() async {
+        await tester.tap(search);
+        await tester.pumpAndSettle();
+      }
+
+      await submit();
+      expect(find.text('Дюна · Герберт'), findsOneWidget);
+      expect(result, findsNothing);
+
+      await tester.enterText(title, 'Неизвестная книга');
+      await tester.pumpAndSettle();
+      expect(shorter, findsNothing);
+      await submit();
+      expect(find.text(l10n.openLibraryNetworkError), findsOneWidget);
+      expect(shorter, findsNothing);
+
+      await tester.enterText(title, 'Дюна: Легендарный роман');
+      await tester.pumpAndSettle();
+      await submit();
+      await tester.ensureVisible(shorter);
+      await tester.tap(shorter);
+      await tester.pumpAndSettle();
+      expect(result, findsOneWidget);
+      expect(shorter, findsNothing);
+    } finally {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    }
+  });
 
   testWidgets(
     'preview fits a narrow window without artwork and applies only selected fields',

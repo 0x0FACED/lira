@@ -28,6 +28,7 @@ class GitHubUpdateClient {
   }
 
   static const _repository = ['0x0FACED', 'lira'];
+  static final repositoryUri = Uri.https('github.com', _repository.join('/'));
   static String _apkName(String tag) => 'lira-$tag-android.apk';
   static const _connectionTimeout = Duration(seconds: 15);
   static const _readTimeout = Duration(seconds: 30);

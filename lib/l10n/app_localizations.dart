@@ -392,6 +392,18 @@ abstract class AppLocalizations {
   /// **'No matches. Try title and author, or another ISBN.'**
   String get openLibraryNoResults;
 
+  /// No description provided for @openLibraryTextNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No matches'**
+  String get openLibraryTextNoResults;
+
+  /// No description provided for @openLibrarySearchShorter.
+  ///
+  /// In en, this message translates to:
+  /// **'Search with a shorter query'**
+  String get openLibrarySearchShorter;
+
   /// No description provided for @openLibraryNetworkError.
   ///
   /// In en, this message translates to:
@@ -691,6 +703,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Version'**
   String get version;
+
+  /// No description provided for @sourceCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Source code on GitHub'**
+  String get sourceCode;
+
+  /// No description provided for @sourceCodeError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the source code on GitHub in your browser.'**
+  String get sourceCodeError;
 
   /// Edit book action
   ///
@@ -1417,12 +1441,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'“{title}” added to your library'**
   String bookDownloaded(String title);
-
-  /// No description provided for @updateSection.
-  ///
-  /// In en, this message translates to:
-  /// **'App updates'**
-  String get updateSection;
 
   /// No description provided for @updateSource.
   ///
