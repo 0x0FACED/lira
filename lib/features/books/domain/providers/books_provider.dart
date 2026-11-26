@@ -27,6 +27,7 @@ import '../../data/repositories/books_local_repository.dart';
 import '../../../search/domain/providers/download_provider.dart';
 import '../open_library_genres.dart';
 import 'book_organization_provider.dart';
+import 'favorite_books_provider.dart';
 import 'open_library_preferences.dart';
 import 'open_library_provider.dart';
 
@@ -677,6 +678,7 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
   Future<void> removeBook(String id) async {
     final organizations = ref.read(bookOrganizationsProvider.notifier);
     final manualReadStatus = ref.read(manuallyReadBookIdsProvider.notifier);
+    final favorites = ref.read(favoriteBookIdsProvider.notifier);
     final book = await _repository.getBookById(id);
     await _repository.deleteBook(id);
     state = const AsyncValue.loading();
@@ -684,6 +686,7 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
     await organizations.removeLabels(id);
     await deleteOpenLibraryCover(id, book?.coverUrl);
     await manualReadStatus.setRead(id, false);
+    await favorites.setFavorite(id, false);
   }
 
   Future<String?> _downloadCoverToPath(

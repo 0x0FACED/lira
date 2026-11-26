@@ -55,6 +55,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get libraryClearLabelFilter => 'Clear label filter';
 
   @override
+  String get libraryFormat => 'Format';
+
+  @override
+  String get libraryClearFormatFilter => 'Clear format filter';
+
+  @override
   String get librarySortAdded => 'Date added';
 
   @override
@@ -71,6 +77,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get libraryAllBooks => 'All books';
+
+  @override
+  String get libraryFavorites => 'Favorites';
+
+  @override
+  String get libraryNoFavorites => 'No favorite books yet';
 
   @override
   String get libraryUnread => 'Not started';
@@ -118,7 +130,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String bookPageCountCompact(String count) {
-    return '$count pp.';
+    return '$count p.';
   }
 
   @override
@@ -178,6 +190,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bookReadMarkError => 'Could not update the book’s read mark.';
+
+  @override
+  String get bookAddFavorite => 'Add to favorites';
+
+  @override
+  String get bookRemoveFavorite => 'Remove from favorites';
+
+  @override
+  String get bookFavoriteStatus => 'Favorite';
+
+  @override
+  String get bookFavoriteError => 'Could not update favorites.';
 
   @override
   String get bookDeleteError => 'Could not remove the book from the library.';

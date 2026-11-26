@@ -236,8 +236,8 @@ class _DiscoverCarouselState extends State<DiscoverCarousel> {
                     separatorBuilder: (context, _) => VerticalDivider(
                       width: AppSpacing.md,
                       thickness: 1,
-                      indent: AppSpacing.compact,
-                      endIndent: AppSpacing.compact,
+                      indent: DiscoverItemCard.hitInset,
+                      endIndent: DiscoverItemCard.hitInset,
                       color: Theme.of(context).colorScheme.outlineVariant,
                     ),
                     itemBuilder: (context, index) {
@@ -262,7 +262,7 @@ class _DiscoverCarouselState extends State<DiscoverCarousel> {
                           foregroundDecoration: _cardFocusNodes[index].hasFocus
                               ? BoxDecoration(
                                   borderRadius: BorderRadius.circular(
-                                    AppRadius.md,
+                                    AppRadius.sm,
                                   ),
                                   border: Border.all(
                                     color: Theme.of(

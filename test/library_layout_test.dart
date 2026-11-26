@@ -16,6 +16,8 @@ import 'package:lira/core/theme/app_tokens.dart';
 import 'package:lira/features/books/data/repositories/books_local_repository.dart';
 import 'package:lira/features/books/domain/models/book_dto.dart';
 import 'package:lira/features/books/domain/providers/book_organization_provider.dart';
+import 'package:lira/features/books/domain/providers/books_provider.dart';
+import 'package:lira/features/books/domain/providers/favorite_books_provider.dart';
 import 'package:lira/features/books/domain/providers/library_layout_provider.dart';
 import 'package:lira/features/books/presentation/book_detail_screen.dart';
 import 'package:lira/features/books/presentation/book_export.dart';
@@ -244,7 +246,9 @@ void main() {
       final read = tester.getRect(
         find.byWidgetPredicate((widget) => widget is FilledButton),
       );
+      final favorite = tester.getRect(find.byTooltip(l10n.bookAddFavorite));
       final progress = tester.getRect(find.byType(LinearProgressIndicator));
+      final back = tester.getRect(find.byType(BackButton));
       final lookup = tester.getRect(find.byTooltip(l10n.openLibraryFind));
       final edit = tester.getRect(find.byTooltip(l10n.editBook));
       final share = tester.getRect(
@@ -254,26 +258,27 @@ void main() {
               : bookExportActionLabel(context),
         ),
       );
-      final delete = tester.getRect(
-        find.widgetWithText(TextButton, l10n.deleteBook),
-      );
+      final delete = tester.getRect(find.byTooltip(l10n.deleteBook));
       final pageWidth = size.width.clamp(0.0, AppLayout.contentMaxWidth);
-      expect(read.width, pageWidth - 2 * gutter);
-      expect(read.center.dx, size.width / 2);
-      expect(progress.left, read.left);
-      expect(progress.right, read.right);
+      expect(read.left, progress.left);
+      expect(favorite.right, progress.right);
+      expect(favorite.center.dy, read.center.dy);
+      expect(favorite.left - read.right, AppSpacing.sm);
+      expect(favorite.right - read.left, pageWidth - 2 * gutter);
+      expect(progress.width, pageWidth - 2 * gutter);
+      expect(progress.center.dx, size.width / 2);
+      expect(lookup.center.dy, back.center.dy);
       expect(lookup.center.dy, edit.center.dy);
+      expect(delete.center.dy, back.center.dy);
       expect(lookup.right, lessThanOrEqualTo(edit.left));
       expect(edit.right, lessThanOrEqualTo(share.left));
-      expect(share.right, lessThanOrEqualTo(read.right));
-      expect(delete.left, read.left);
-      expect(delete.width, lessThan(read.width));
-      expect(delete.top, greaterThan(progress.bottom));
+      expect(share.right, lessThanOrEqualTo(delete.left));
+      expect(delete.right, lessThanOrEqualTo(progress.right));
     }
   });
 
   testLibraryWidgets(
-    'details heading stays readable and lookup opens at large text scale',
+    'details top actions stay inline without Library title and lookup opens at large text scale',
     (tester) async {
       final book = (await getIt<BooksLocalRepository>().getBookById('1'))!;
       for (final locale in [const Locale('en'), const Locale('ru')]) {
@@ -286,14 +291,20 @@ void main() {
         );
         final context = tester.element(find.byType(BookDetailScreen));
         final l10n = AppLocalizations.of(context)!;
-        final heading = tester.renderObject<RenderParagraph>(
-          find.text(l10n.library),
+        expect(find.text(l10n.library), findsNothing);
+        final backRect = tester.getRect(find.byType(BackButton));
+        final lookupRect = tester.getRect(find.byTooltip(l10n.openLibraryFind));
+        final readRect = tester.getRect(
+          find.byWidgetPredicate((widget) => widget is FilledButton),
         );
-        expect(heading.didExceedMaxLines, isFalse);
+        final favRect = tester.getRect(find.byTooltip(l10n.bookAddFavorite));
+        expect(lookupRect.center.dy, backRect.center.dy);
+        expect(favRect.center.dy, readRect.center.dy);
+        expect(favRect.left - readRect.right, AppSpacing.sm);
         await tester.tap(find.byTooltip(l10n.openLibraryFind));
         await tester.pumpAndSettle();
         expect(find.byType(OpenLibraryDialog), findsOneWidget);
-        expect(find.widgetWithText(TextField, book.title), findsOneWidget);
+        expect(find.widgetWithText(TextButton, l10n.cancel), findsOneWidget);
         await tester.tap(find.widgetWithText(TextButton, l10n.cancel));
         await tester.pumpAndSettle();
         expect(find.byType(OpenLibraryDialog), findsNothing);
@@ -356,7 +367,7 @@ void main() {
             const BookOrganization(genres: ['Fiction'], tags: ['Favorite']),
           );
       await tester.pumpAndSettle();
-      final delete = find.widgetWithText(TextButton, l10n.deleteBook);
+      final delete = find.byTooltip(l10n.deleteBook);
       await tester.ensureVisible(delete);
       await tester.tap(delete);
       await tester.pumpAndSettle();
@@ -367,7 +378,7 @@ void main() {
       expect(await repository.getBookById(book.id), isNotNull);
       expect(await progressRepository.getProgress(book.id), isNotNull);
       expect(container.read(bookOrganizationProvider(book.id)).tags, [
-        'Favorite',
+        '#Favorite',
       ]);
       await tester.tap(delete);
       await tester.pumpAndSettle();
@@ -471,7 +482,7 @@ void main() {
       expect((saved.title, saved.author), ('Новое название', 'Новый автор'));
       final organization = container.read(bookOrganizationProvider(book.id));
       expect(organization.genres, ['Проза', draftGenre]);
-      expect(organization.tags, ['Избранное']);
+      expect(organization.tags, ['#Избранное']);
       expect(find.byType(TextField), findsNothing);
 
       await tapVisible(find.byTooltip(l10n.editBook));
@@ -556,7 +567,7 @@ void main() {
         );
         final l10n = AppLocalizations.of(context)!;
         if (details) {
-          final delete = find.widgetWithText(TextButton, l10n.deleteBook);
+          final delete = find.byTooltip(l10n.deleteBook);
           await tester.ensureVisible(delete);
           await tester.tap(delete);
         } else {
@@ -873,7 +884,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testLibraryWidgets('a manual mark changes shelves without moving the book', (
+  testLibraryWidgets('marking read sets progress to 100% and unmarking resets to 0%', (
     tester,
   ) async {
     await getIt<ReadingProgressLocalRepository>().saveProgress(
@@ -908,13 +919,21 @@ void main() {
     await showShelf(l10n.libraryFinished);
     expect(card, findsOneWidget);
     expect(
-      find.descendant(of: card, matching: find.textContaining('25,0%')),
+      find.descendant(of: card, matching: find.textContaining('100,0%')),
       findsOneWidget,
+    );
+    expect(
+      find.descendant(of: card, matching: find.byIcon(Icons.check)),
+      findsNothing,
     );
     await chooseMark(l10n.bookUnmarkRead);
     expect(card, findsNothing);
-    await showShelf(l10n.libraryInProgress);
+    await showShelf(l10n.libraryUnread);
     expect(card, findsOneWidget);
+    expect(
+      find.descendant(of: card, matching: find.textContaining('0,0%')),
+      findsOneWidget,
+    );
   });
 
   testLibraryWidgets(
@@ -984,7 +1003,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip(l10n.librarySortAndFilters));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(ChoiceChip, 'К обсуждению'));
+    await tester.tap(find.widgetWithText(ChoiceChip, '#К обсуждению'));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('0')), findsOneWidget);
     expect(find.byKey(const ValueKey('1')), findsOneWidget);
@@ -1054,5 +1073,321 @@ void main() {
       expect(tester.takeException(), isNull);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
+  testLibraryWidgets(
+    'genres and tags stay visible when empty, add immediately without edit mode, normalize tags, and use compact theme spacing',
+    (tester) async {
+      final book = (await getIt<BooksLocalRepository>().getBookById('1'))!;
+      await mount(
+        tester,
+        size: const Size(420, 900),
+        home: BookDetailScreen(book: book),
+      );
+      final context = tester.element(find.byType(BookDetailScreen));
+      final l10n = AppLocalizations.of(context)!;
+      final container = ProviderScope.containerOf(context);
+      Finder control(String group, String key) => find.descendant(
+        of: find.byKey(ValueKey(group)),
+        matching: find.byKey(ValueKey(key)),
+      );
+
+      // Both empty sections and their + buttons are immediately visible.
+      expect(find.text(l10n.bookGenres), findsOneWidget);
+      expect(find.text(l10n.bookTags), findsOneWidget);
+      expect(control('book-genres', 'inline-label-add'), findsOneWidget);
+      expect(control('book-tags', 'inline-label-add'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, l10n.save), findsNothing);
+
+      // Compact theme spacing between labels and file metadata separated by dividers.
+      final genresSection = find.byKey(const ValueKey('book-genres'));
+      final tagsSection = find.byKey(const ValueKey('book-tags'));
+      final dividers = find.byType(Divider);
+      expect(dividers, findsNWidgets(2));
+      expect(
+        tester.getTopLeft(tagsSection).dy -
+            tester.getBottomLeft(genresSection).dy,
+        AppSpacing.compact,
+      );
+      final firstDivider = dividers.at(0);
+      final secondDivider = dividers.at(1);
+      expect(
+        tester.getTopLeft(genresSection).dy -
+            tester.getBottomLeft(firstDivider).dy,
+        AppSpacing.md,
+      );
+      expect(
+        tester.getTopLeft(secondDivider).dy -
+            tester.getBottomLeft(tagsSection).dy,
+        AppSpacing.md,
+      );
+
+      // Add a genre directly via + and confirm without entering edit mode.
+      await tester.ensureVisible(control('book-genres', 'inline-label-add'));
+      await tester.tap(control('book-genres', 'inline-label-add'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        control('book-genres', 'inline-label-editor'),
+        'Фантастика',
+      );
+      await tester.tap(control('book-genres', 'inline-label-confirm'));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(FilledButton, l10n.save), findsNothing);
+      expect(container.read(bookOrganizationProvider(book.id)).genres, [
+        'Фантастика',
+      ]);
+
+      // Verify compact spacing between section header and chips.
+      final genresHeaderBottom = tester
+          .getBottomLeft(control('book-genres', 'inline-label-add'))
+          .dy;
+      final firstChipTop = tester
+          .getTopLeft(control('book-genres', 'inline-label-0'))
+          .dy;
+      expect(firstChipTop - genresHeaderBottom, AppSpacing.xs);
+
+      // Add a tag with multiple leading hashes -> normalized to single '#'.
+      await tester.ensureVisible(control('book-tags', 'inline-label-add'));
+      await tester.tap(control('book-tags', 'inline-label-add'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        control('book-tags', 'inline-label-editor'),
+        '###  Прочесть позже',
+      );
+      await tester.tap(control('book-tags', 'inline-label-confirm'));
+      await tester.pumpAndSettle();
+      expect(container.read(bookOrganizationProvider(book.id)).tags, [
+        '#Прочесть позже',
+      ]);
+      expect(find.text('#Прочесть позже'), findsOneWidget);
+
+      // Add a tag without '#' -> gets '#' prefix on save.
+      await tester.tap(control('book-tags', 'inline-label-add'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        control('book-tags', 'inline-label-editor'),
+        'классика',
+      );
+      await tester.tap(control('book-tags', 'inline-label-confirm'));
+      await tester.pumpAndSettle();
+      expect(container.read(bookOrganizationProvider(book.id)).tags, [
+        '#Прочесть позже',
+        '#классика',
+      ]);
+      expect(find.text('#классика'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testLibraryWidgets('format filter filters books and resets cleanly', (
+    tester,
+  ) async {
+    await mount(tester);
+    final l10n = AppLocalizations.of(
+      tester.element(find.byType(LibraryScreen)),
+    )!;
+    // Open sort and filters sheet and pick PDF.
+    await tester.tap(find.byTooltip(l10n.librarySortAndFilters));
+    await tester.pumpAndSettle();
+    expect(find.text(l10n.libraryFormat), findsOneWidget);
+    await tester.tap(find.widgetWithText(ChoiceChip, 'PDF'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('0')), findsNothing); // epub
+    expect(find.byKey(const ValueKey('1')), findsOneWidget); // pdf
+    expect(find.byKey(const ValueKey('2')), findsNothing); // epub
+    expect(find.byKey(const ValueKey('3')), findsOneWidget); // pdf
+    expect(find.widgetWithText(InputChip, 'PDF'), findsOneWidget);
+
+    // Clear the format filter chip.
+    await tester.tap(find.byTooltip(l10n.libraryClearFormatFilter));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('1')), findsOneWidget);
+  });
+
+  testLibraryWidgets(
+    'favorites can be toggled from library and details, viewed on Favorites shelf, and cleared on deletion',
+    (tester) async {
+      await mount(tester);
+      final context = tester.element(find.byType(LibraryScreen));
+      final l10n = AppLocalizations.of(context)!;
+      final container = ProviderScope.containerOf(context);
+      final card0 = find.byKey(const ValueKey('0'));
+      final favoritesShelf = find.widgetWithText(
+        ChoiceChip,
+        l10n.libraryFavorites,
+      );
+
+      // Empty favorites shelf first.
+      await tester.ensureVisible(favoritesShelf);
+      await tester.tap(favoritesShelf);
+      await tester.pumpAndSettle();
+      expect(find.text(l10n.libraryNoFavorites), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(TextButton, l10n.libraryAllBooks));
+      await tester.pumpAndSettle();
+
+      // Add book '0' to favorites via long-press menu.
+      await tester.longPress(card0);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ListTile, l10n.bookAddFavorite));
+      await tester.pumpAndSettle();
+      expect(container.read(isBookFavoriteProvider('0')), isTrue);
+      expect(
+        find.descendant(
+          of: card0,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Icon &&
+                widget.icon == Icons.favorite &&
+                widget.semanticLabel == l10n.bookFavoriteStatus,
+          ),
+        ),
+        findsOneWidget,
+      );
+
+      // View Favorites shelf.
+      await tester.ensureVisible(favoritesShelf);
+      await tester.tap(favoritesShelf);
+      await tester.pumpAndSettle();
+      expect(card0, findsOneWidget);
+      expect(find.byKey(const ValueKey('1')), findsNothing);
+
+      // Remove from favorites via long-press menu.
+      await tester.longPress(card0);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ListTile, l10n.bookRemoveFavorite));
+      await tester.pumpAndSettle();
+      expect(container.read(isBookFavoriteProvider('0')), isFalse);
+      expect(find.text(l10n.libraryNoFavorites), findsOneWidget);
+
+      // Toggle favorite from BookDetailScreen and verify cleanup on removal.
+      final book1 = (await getIt<BooksLocalRepository>().getBookById('1'))!;
+      await mount(tester, home: BookDetailScreen(book: book1));
+      final detailL10n = AppLocalizations.of(
+        tester.element(find.byType(BookDetailScreen)),
+      )!;
+      final detailContainer = ProviderScope.containerOf(
+        tester.element(find.byType(BookDetailScreen)),
+      );
+      await tester.tap(find.byTooltip(detailL10n.bookAddFavorite));
+      await tester.pumpAndSettle();
+      expect(detailContainer.read(isBookFavoriteProvider('1')), isTrue);
+      expect(
+        find.byTooltip(detailL10n.bookRemoveFavorite),
+        findsOneWidget,
+      );
+      await detailContainer.read(booksControllerProvider.notifier).removeBook('1');
+      await tester.pumpAndSettle();
+      expect(detailContainer.read(isBookFavoriteProvider('1')), isFalse);
+    },
+  );
+
+  testLibraryWidgets(
+    'details read button sets 100% progress and allows unmarking a finished book',
+    (tester) async {
+      final book = (await getIt<BooksLocalRepository>().getBookById('2'))!;
+      await getIt<ReadingProgressLocalRepository>().saveProgress(
+        ReadingProgressDto(
+          bookId: book.id,
+          location: 'end',
+          percentage: 100,
+          updatedAt: DateTime(2026),
+        ),
+      );
+      await mount(tester, home: BookDetailScreen(book: book));
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(BookDetailScreen)),
+      )!;
+      final unmark = find.widgetWithText(TextButton, l10n.bookUnmarkRead);
+      expect(unmark, findsOneWidget);
+      await tester.tap(unmark);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('0,0%'), findsOneWidget);
+      final mark = find.widgetWithText(TextButton, l10n.bookMarkRead);
+      expect(mark, findsOneWidget);
+      await tester.tap(mark);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('100,0%'), findsOneWidget);
+      expect(
+        find.widgetWithText(TextButton, l10n.bookUnmarkRead),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testLibraryWidgets(
+    'details show page progress alongside percentage and align mark-read button flush left',
+    (tester) async {
+      final progressRepository = getIt<ReadingProgressLocalRepository>();
+      // Book '1' is PDF with 1234 pages; book '0' is EPUB with 1234 pages.
+      final pdfBook = (await getIt<BooksLocalRepository>().getBookById('1'))!;
+      final epubBook = (await getIt<BooksLocalRepository>().getBookById('0'))!;
+      await progressRepository.saveProgress(
+        ReadingProgressDto(
+          bookId: pdfBook.id,
+          location: '37',
+          percentage: 15.0,
+          updatedAt: DateTime(2026),
+        ),
+      );
+      await progressRepository.saveProgress(
+        ReadingProgressDto(
+          bookId: epubBook.id,
+          location: 'epubcfi(/6/2)',
+          percentage: 42.79,
+          updatedAt: DateTime(2026),
+        ),
+      );
+
+      await mount(tester, home: BookDetailScreen(book: pdfBook));
+      var l10n = AppLocalizations.of(
+        tester.element(find.byType(BookDetailScreen)),
+      )!;
+      final counts = NumberFormat.decimalPattern(l10n.localeName);
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(const ValueKey('book-detail-progress-label')),
+            )
+            .data,
+        '${l10n.bookPageCountCompact('37/${counts.format(1234)}')} · 15,0%',
+      );
+      final progressRect = tester.getRect(find.byType(LinearProgressIndicator));
+      final markButtonRect = tester.getRect(
+        find.widgetWithText(TextButton, l10n.bookMarkRead),
+      );
+      expect(markButtonRect.left, progressRect.left);
+
+      await mount(tester, home: BookDetailScreen(book: epubBook));
+      l10n = AppLocalizations.of(
+        tester.element(find.byType(BookDetailScreen)),
+      )!;
+      final currentEpub = (42.79 * 1234 / 100).ceil();
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(const ValueKey('book-detail-progress-label')),
+            )
+            .data,
+        '${l10n.bookPageCountCompact('≈${counts.format(currentEpub)}/${counts.format(1234)}')} · 42,7%',
+      );
+
+      // Unread EPUB shows total pages without fabricating a current page.
+      final unreadEpub = (await getIt<BooksLocalRepository>().getBookById('4'))!;
+      await mount(tester, home: BookDetailScreen(book: unreadEpub));
+      l10n = AppLocalizations.of(
+        tester.element(find.byType(BookDetailScreen)),
+      )!;
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(const ValueKey('book-detail-progress-label')),
+            )
+            .data,
+        '${l10n.bookPageCountCompact('≈${counts.format(1234)}')} · 0,0%',
+      );
+    },
   );
 }

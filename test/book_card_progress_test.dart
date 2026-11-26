@@ -114,7 +114,6 @@ void main() {
                                 book: value,
                                 compact: compact,
                                 readingPercentage: 42.79,
-                                isRead: true,
                                 onTap: () {},
                                 onLongPress: (_) {},
                               ),
@@ -150,7 +149,7 @@ void main() {
                     .didExceedMaxLines,
                 isFalse,
               );
-              expect(find.byIcon(Icons.check), findsOneWidget);
+              expect(find.byIcon(Icons.check), findsNothing);
               final progress = tester.widget<LinearProgressIndicator>(
                 find.byType(LinearProgressIndicator),
               );
@@ -201,7 +200,6 @@ void main() {
                     book: book(total: 300),
                     compact: true,
                     readingPercentage: 15,
-                    isRead: true,
                     onTap: () {},
                     onLongPress: (_) {},
                   ),
@@ -250,7 +248,6 @@ void main() {
             child: BookCard(
               book: book(total: 200),
               compact: true,
-              isRead: true,
               onTap: () {},
               onLongPress: (_) {},
             ),
@@ -262,6 +259,6 @@ void main() {
     final l10n = AppLocalizations.of(context)!;
     expect(find.text(l10n.bookPageCountCompact('≈200')), findsOneWidget);
     expect(find.byType(LinearProgressIndicator), findsNothing);
-    expect(find.byIcon(Icons.check), findsOneWidget);
+    expect(find.byIcon(Icons.check), findsNothing);
   });
 }

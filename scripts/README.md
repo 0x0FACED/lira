@@ -111,6 +111,6 @@ Legacy-скрипт с устаревшим набором целей, вклю�
 
 ## Границы CI
 
-После CI собираются Android, iOS, Windows, Linux и macOS. APK и AAB используют отдельные runners, чтобы не накапливать промежуточные файлы обеих сборок на одном диске; для Android debug запускается только APK. Artifacts: `android-apk`, `android-aab` (только release), `ios-ipa`, `linux-zip`, `windows-zip`, `macos-dmg`. Manual-запуск не создаёт GitHub Release. На push нового tag `v*` один publish job автоматически публикует релиз, не черновик, только после успеха всех пяти платформ.
+После CI собираются Android, iOS, Windows, Linux и macOS. В GitHub Actions Android собирается только как универсальный APK; `build_android.sh` по-прежнему позволяет собрать AAB локально. Artifacts: `android-apk`, `ios-ipa`, `linux-zip`, `windows-zip`, `macos-dmg`. Manual-запуск не создаёт GitHub Release. На push нового tag `v*` один publish job автоматически публикует релиз после успеха всех пяти платформ.
 
 iOS artifact — `lira-ios-unsigned.ipa` с device build в `Payload/Runner.app`, без Apple-секретов в CI. Для установки нужна последующая подпись, например через AltStore/Sideloadly; напрямую установить неподписанный IPA нельзя. Публикация в сторах не настроена. macOS DMG собирается без Developer ID и notarization; ограничения Gatekeeper этим pipeline не устраняются.

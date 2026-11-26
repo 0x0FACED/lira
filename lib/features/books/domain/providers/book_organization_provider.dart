@@ -30,14 +30,30 @@ final bookOrganizationProvider = Provider.family<BookOrganization, String>(
 );
 
 final _labelWhitespace = RegExp(r'\s+');
+final _leadingHashes = RegExp(r'^#+');
 
 /// Retains the first spelling of each nonempty label in display order.
-List<String> normalizeBookLabels(Iterable<Object?> labels) {
+List<String> normalizeBookLabels(Iterable<Object?> labels) =>
+    _normalizeLabels(labels, tagPrefix: false);
+
+/// Normalizes tags so every nonempty tag starts with a single `#`.
+List<String> normalizeBookTags(Iterable<Object?> labels) =>
+    _normalizeLabels(labels, tagPrefix: true);
+
+List<String> _normalizeLabels(
+  Iterable<Object?> labels, {
+  required bool tagPrefix,
+}) {
   final seen = <String>{};
   final normalized = <String>[];
   for (final label in labels) {
     if (label is! String) continue;
-    final display = label.trim().replaceAll(_labelWhitespace, ' ');
+    var display = label.trim().replaceAll(_labelWhitespace, ' ');
+    if (tagPrefix) {
+      display = display.replaceFirst(_leadingHashes, '').trimLeft();
+      if (display.isEmpty) continue;
+      display = '#$display';
+    }
     if (display.isNotEmpty && seen.add(display.toLowerCase())) {
       normalized.add(display);
     }
@@ -59,7 +75,7 @@ class BookOrganizationsNotifier
     Iterable<Object?> tags,
   ) {
     final normalizedGenres = normalizeBookLabels(genres);
-    final normalizedTags = normalizeBookLabels(tags);
+    final normalizedTags = normalizeBookTags(tags);
     if (normalizedGenres.isEmpty && normalizedTags.isEmpty) {
       return _emptyOrganization;
     }

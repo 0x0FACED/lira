@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -6,7 +7,7 @@ import '../../../../l10n/app_localizations.dart';
 import '../../domain/providers/book_organization_provider.dart'
     show normalizeBookLabels;
 
-/// Edits a mount-time snapshot and publishes drafts without persisting them.
+/// Displays and adds labels inline, either as live drafts or immediate commits.
 class InlineBookLabels extends StatefulWidget {
   const InlineBookLabels({
     super.key,
@@ -14,14 +15,20 @@ class InlineBookLabels extends StatefulWidget {
     required this.addLabelTooltip,
     required this.initialLabels,
     required this.enabled,
-    required this.onChanged,
+    this.readOnlyChips = false,
+    this.normalizeLabels = normalizeBookLabels,
+    this.onChanged,
+    this.onCommit,
   });
 
   final String title;
   final String addLabelTooltip;
   final List<String> initialLabels;
   final bool enabled;
-  final ValueChanged<List<String>> onChanged;
+  final bool readOnlyChips;
+  final List<String> Function(Iterable<Object?>) normalizeLabels;
+  final ValueChanged<List<String>>? onChanged;
+  final ValueChanged<List<String>>? onCommit;
 
   @override
   State<InlineBookLabels> createState() => _InlineBookLabelsState();
@@ -38,7 +45,26 @@ class _InlineBookLabelsState extends State<InlineBookLabels> {
   @override
   void initState() {
     super.initState();
-    _labels = normalizeBookLabels(widget.initialLabels).toList();
+    _labels = widget.normalizeLabels(widget.initialLabels).toList();
+  }
+
+  @override
+  void didUpdateWidget(covariant InlineBookLabels oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final normalized = widget.normalizeLabels(widget.initialLabels);
+    if (oldWidget.readOnlyChips != widget.readOnlyChips) {
+      _editing = false;
+      _editingIndex = null;
+      _labels
+        ..clear()
+        ..addAll(normalized);
+      return;
+    }
+    if (!_editing && !listEquals(_labels, normalized)) {
+      _labels
+        ..clear()
+        ..addAll(normalized);
+    }
   }
 
   @override
@@ -49,24 +75,27 @@ class _InlineBookLabelsState extends State<InlineBookLabels> {
     super.dispose();
   }
 
-  void _publish() {
+  List<String> _draftLabels() {
     final value = _controller.text;
-    widget.onChanged(
-      normalizeBookLabels([
-        for (var index = 0; index < _labels.length; index++)
-          if (_editing && index == _editingIndex && value.trim().isNotEmpty)
-            value
-          else
-            _labels[index],
-        if (_editing && _editingIndex == null) value,
-      ]),
-    );
+    return widget.normalizeLabels([
+      for (var index = 0; index < _labels.length; index++)
+        if (_editing && index == _editingIndex && value.trim().isNotEmpty)
+          value
+        else
+          _labels[index],
+      if (_editing && _editingIndex == null) value,
+    ]);
+  }
+
+  void _publish() {
+    widget.onChanged?.call(_draftLabels());
   }
 
   void _startEditing([int? index]) {
     if (!widget.enabled) return;
+    if (index != null && widget.readOnlyChips) return;
     final label = index == null ? null : _labels[index];
-    _finishEditing();
+    _finishEditing(commit: false);
     // Committing the previous draft may have merged a duplicate chip.
     final nextIndex = label == null
         ? null
@@ -87,9 +116,10 @@ class _InlineBookLabelsState extends State<InlineBookLabels> {
     });
   }
 
-  void _finishEditing() {
+  void _finishEditing({bool commit = true}) {
     if (!_editing) return;
     final value = _controller.text;
+    late final List<String> updated;
     setState(() {
       final index = _editingIndex;
       if (value.trim().isNotEmpty) {
@@ -100,15 +130,18 @@ class _InlineBookLabelsState extends State<InlineBookLabels> {
         }
       }
       // An empty existing draft is cancelled, not an implicit deletion.
-      final normalized = normalizeBookLabels(_labels);
+      updated = widget.normalizeLabels(_labels);
       _labels
         ..clear()
-        ..addAll(normalized);
+        ..addAll(updated);
       _editing = false;
       _editingIndex = null;
     });
     _focusNode.unfocus();
     _publish();
+    if (commit) {
+      widget.onCommit?.call(updated);
+    }
   }
 
   void _cancelEditing() {
@@ -147,20 +180,24 @@ class _InlineBookLabelsState extends State<InlineBookLabels> {
               key: const ValueKey('inline-label-add'),
               tooltip: widget.addLabelTooltip,
               onPressed: widget.enabled ? _startEditing : null,
+              padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+              style: IconButton.styleFrom(
+                minimumSize: const Size(32, 32),
+                padding: EdgeInsets.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
               icon: Icon(
                 Icons.add,
-                size: 20,
+                size: 18,
                 semanticLabel: widget.addLabelTooltip,
               ),
-              constraints: const BoxConstraints(
-                minWidth: AppLayout.minTouchTarget,
-                minHeight: AppLayout.minTouchTarget,
-              ),
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
             ),
           ],
         ),
         if (_labels.isNotEmpty || _editing) ...[
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.xs),
           LayoutBuilder(
             builder: (context, constraints) => Wrap(
               spacing: AppSpacing.sm,
@@ -186,6 +223,7 @@ class _InlineBookLabelsState extends State<InlineBookLabels> {
     final theme = Theme.of(context);
     final radius = BorderRadius.circular(AppRadius.sm);
     final label = _labels[index];
+    final editable = widget.enabled && !widget.readOnlyChips;
     final removeLabel =
         '${MaterialLocalizations.of(context).deleteButtonTooltip}: $label';
     return ConstrainedBox(
@@ -200,17 +238,17 @@ class _InlineBookLabelsState extends State<InlineBookLabels> {
           children: [
             Flexible(
               child: InkWell(
-                onTap: widget.enabled ? () => _startEditing(index) : null,
+                onTap: editable ? () => _startEditing(index) : null,
                 borderRadius: radius,
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
-                    minWidth: widget.enabled ? AppLayout.minTouchTarget : 0,
-                    minHeight: widget.enabled ? AppLayout.minTouchTarget : 0,
+                    minWidth: editable ? AppLayout.minTouchTarget : 0,
+                    minHeight: editable ? AppLayout.minTouchTarget : 0,
                   ),
                   child: Padding(
                     padding: EdgeInsets.symmetric(
                       horizontal: AppSpacing.sm,
-                      vertical: widget.enabled ? AppSpacing.sm : AppSpacing.xs,
+                      vertical: editable ? AppSpacing.sm : AppSpacing.xs,
                     ),
                     child: Align(
                       widthFactor: 1,
@@ -222,7 +260,7 @@ class _InlineBookLabelsState extends State<InlineBookLabels> {
                 ),
               ),
             ),
-            if (widget.enabled)
+            if (editable)
               IconButton(
                 key: ValueKey('inline-label-remove-$index'),
                 tooltip: removeLabel,

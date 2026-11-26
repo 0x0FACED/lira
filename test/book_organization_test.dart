@@ -22,7 +22,14 @@ void main() {
         '',
         ' Фэнтези ',
       ];
-      final tags = [' Read\t soon ', 'read soon', '  Любимое ', 'любимое'];
+      final tags = [
+        ' Read\t soon ',
+        '#read soon',
+        '###Любимое ',
+        'любимое',
+        '#   ',
+        '###',
+      ];
 
       await notifier.setLabels(
         'book/one:эпос',
@@ -33,7 +40,7 @@ void main() {
 
       final labels = container.read(bookOrganizationProvider('book/one:эпос'));
       expect(labels.genres, ['Science fiction', 'Фэнтези']);
-      expect(labels.tags, ['Read soon', 'Любимое']);
+      expect(labels.tags, ['#Read soon', '#Любимое']);
       expect(() => labels.genres.add('Other'), throwsUnsupportedError);
       expect(() => labels.tags.clear(), throwsUnsupportedError);
       expect(() => notifier.state.clear(), throwsUnsupportedError);
@@ -72,11 +79,11 @@ void main() {
       addTearDown(reopened.dispose);
       expect(reopened.state.keys, ['second']);
       expect(reopened.state['second']!.genres, ['Fantasy']);
-      expect(reopened.state['second']!.tags, ['New']);
+      expect(reopened.state['second']!.tags, ['#New']);
 
       await reopened.setLabels(
         'second',
-        const BookOrganization(genres: ['   '], tags: ['\n']),
+        const BookOrganization(genres: ['   '], tags: ['\n', '##  ']),
       );
       await prefs.reload();
       expect(reopened.state, isEmpty);
@@ -115,7 +122,7 @@ void main() {
       expect(notifier.state.keys, ['partly-valid', 'valid']);
       expect(notifier.state['partly-valid']!.genres, ['Fantasy']);
       expect(notifier.state['partly-valid']!.tags, isEmpty);
-      expect(notifier.state['valid']!.tags, ['Research', 'Primary source']);
+      expect(notifier.state['valid']!.tags, ['#Research', '#Primary source']);
     },
   );
 
@@ -132,7 +139,7 @@ void main() {
       await prefs.reload();
       final reopened = BookOrganizationsNotifier(prefs);
       addTearDown(reopened.dispose);
-      expect(reopened.state['book']!.tags, ['Saved']);
+      expect(reopened.state['book']!.tags, ['#Saved']);
     }
   });
 }

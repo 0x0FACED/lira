@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:epub_engine/epub_engine.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
@@ -431,6 +433,93 @@ void main() {
         expect(_readerGlyph(tester).height, greaterThan(originalGlyph.height));
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
+
+  for (final locale in [const Locale('en'), const Locale('ru')]) {
+    testWidgets(
+      'appearance and Z-Library rows stay inline at 140% on phone widths in $locale',
+      (tester) async {
+        await tester.runAsync(() async {
+          final font = File('assets/fonts/Inter-Variable.ttf');
+          if (await font.exists()) {
+            final bytes = await font.readAsBytes();
+            final loader = FontLoader('Inter')
+              ..addFont(Future.value(ByteData.sublistView(bytes)));
+            await loader.load();
+          }
+        });
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(390, 844);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPhysicalSize);
+        await sharedPrefs.setInt(InterfaceFontScaleNotifier.storageKey, 140);
+        await tester.pumpWidget(
+          ProviderScope(
+            child: MaterialApp(
+              theme: AppTheme.darkTheme,
+              locale: locale,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              builder: (context, child) => AppTextScaling(child: child!),
+              home: const TickerMode(enabled: false, child: SettingsScreen()),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final context = tester.element(find.byType(SettingsScreen));
+        final container = ProviderScope.containerOf(context);
+        await container
+            .read(localeProvider.notifier)
+            .setLocale(locale.languageCode);
+        await tester.pumpAndSettle();
+        final l10n = AppLocalizations.of(
+          tester.element(find.byType(SettingsScreen)),
+        )!;
+        final expectedTheme =
+            container.read(themeModeProvider) == ThemeMode.dark
+            ? l10n.themeDark
+            : l10n.themeLight;
+
+        // Theme row: label and value share the same row.
+        final themeLabel = tester.getRect(find.text(l10n.theme));
+        final themeValue = tester.getRect(find.text(expectedTheme));
+        expect(themeLabel.right, lessThan(themeValue.left));
+        expect(themeValue.center.dy, closeTo(themeLabel.center.dy, 4));
+
+        // Language row: label and value share the same row.
+        final langLabel = tester.getRect(find.text(l10n.language));
+        final langValue = tester.getRect(
+          find.text(locale.languageCode == 'ru' ? 'Русский' : 'English'),
+        );
+        expect(langLabel.right, lessThan(langValue.left));
+        expect(langValue.center.dy, closeTo(langLabel.center.dy, 4));
+
+        // Interface font size row: label and dropdown value share the row.
+        final fontTitle = find.text(l10n.interfaceFontSize);
+        await tester.ensureVisible(fontTitle);
+        await tester.pumpAndSettle();
+        final fontLabel = tester.getRect(fontTitle);
+        final fontValue = tester.getRect(
+          find.descendant(
+            of: find.byType(DropdownButton<int>),
+            matching: find.text('140%'),
+          ),
+        );
+        expect(fontLabel.right, lessThan(fontValue.left));
+
+        // Z-Library row: title and Sign In button stay inline.
+        final zLibTitle = find.text(l10n.zLibrary);
+        await tester.ensureVisible(zLibTitle);
+        await tester.pumpAndSettle();
+        final zLibRect = tester.getRect(zLibTitle);
+        final signInRect = tester.getRect(
+          find.widgetWithText(FilledButton, l10n.signIn),
+        );
+        expect(zLibRect.right, lessThan(signInRect.left));
+        expect(signInRect.top, lessThan(zLibRect.bottom + 24));
+        expect(tester.takeException(), isNull);
       },
     );
   }

@@ -9,6 +9,7 @@ import 'package:lira/features/books/data/repositories/books_local_repository.dar
 import 'package:lira/features/books/domain/models/book_dto.dart';
 import 'package:lira/features/books/domain/providers/book_organization_provider.dart';
 import 'package:lira/features/books/domain/providers/books_provider.dart';
+import 'package:lira/features/books/domain/providers/favorite_books_provider.dart';
 import 'package:lira/features/progress/data/repositories/reading_progress_local_repository.dart';
 import 'package:lira/features/progress/domain/models/reading_progress_dto.dart';
 import 'package:lira/features/progress/domain/providers/manual_read_status_provider.dart';
@@ -20,6 +21,7 @@ void main() {
     final prefs = await SharedPreferences.getInstance();
     final marks = ManualReadStatusNotifier(prefs);
     final organizations = BookOrganizationsNotifier(prefs);
+    final favorites = FavoriteBooksNotifier(prefs);
     final database = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(database.close);
     final books = BooksLocalRepository(database);
@@ -29,6 +31,7 @@ void main() {
       overrides: [
         manuallyReadBookIdsProvider.overrideWith((ref) => marks),
         bookOrganizationsProvider.overrideWith((ref) => organizations),
+        favoriteBookIdsProvider.overrideWith((ref) => favorites),
       ],
     );
     addTearDown(container.dispose);

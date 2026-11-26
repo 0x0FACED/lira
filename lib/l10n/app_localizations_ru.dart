@@ -54,6 +54,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get libraryClearLabelFilter => 'Сбросить фильтр по метке';
 
   @override
+  String get libraryFormat => 'Формат';
+
+  @override
+  String get libraryClearFormatFilter => 'Сбросить фильтр по формату';
+
+  @override
   String get librarySortAdded => 'Дата добавления';
 
   @override
@@ -70,6 +76,12 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get libraryAllBooks => 'Все книги';
+
+  @override
+  String get libraryFavorites => 'Избранное';
+
+  @override
+  String get libraryNoFavorites => 'В избранном пока нет книг';
 
   @override
   String get libraryUnread => 'Не начаты';
@@ -119,7 +131,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String bookPageCountCompact(String count) {
-    return '$count стр.';
+    return '$count с.';
   }
 
   @override
@@ -179,6 +191,18 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get bookReadMarkError => 'Не удалось изменить отметку о прочтении.';
+
+  @override
+  String get bookAddFavorite => 'Добавить в избранное';
+
+  @override
+  String get bookRemoveFavorite => 'Удалить из избранного';
+
+  @override
+  String get bookFavoriteStatus => 'В избранном';
+
+  @override
+  String get bookFavoriteError => 'Не удалось обновить избранное.';
 
   @override
   String get bookDeleteError => 'Не удалось удалить книгу из библиотеки.';

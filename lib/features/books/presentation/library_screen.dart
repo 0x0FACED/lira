@@ -7,11 +7,11 @@ import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../progress/domain/models/reading_progress_dto.dart';
-import '../../progress/domain/providers/manual_read_status_provider.dart';
 import '../../progress/domain/providers/reading_progress_provider.dart';
 import '../domain/models/book_dto.dart';
 import '../domain/providers/book_organization_provider.dart';
 import '../domain/providers/books_provider.dart';
+import '../domain/providers/favorite_books_provider.dart';
 import '../domain/providers/library_layout_provider.dart';
 import 'book_actions.dart';
 import 'book_export.dart';
@@ -25,9 +25,15 @@ class LibraryScreen extends ConsumerStatefulWidget {
   ConsumerState<LibraryScreen> createState() => _LibraryScreenState();
 }
 
-enum _Shelf { all, reading, unread, finished }
+enum _Shelf { all, favorites, reading, unread, finished }
 
-enum _BookAction { exportFile, copyFile, toggleReadMark, delete }
+enum _BookAction {
+  exportFile,
+  copyFile,
+  toggleFavorite,
+  toggleReadMark,
+  delete,
+}
 
 typedef _Label = ({bool genre, String key});
 
@@ -35,6 +41,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   final _searchController = TextEditingController();
   String _query = '';
   _Shelf _shelf = _Shelf.all;
+  String? _format;
   _Label? _label;
 
   @override
@@ -49,7 +56,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final colors = Theme.of(context).colorScheme;
     final books = ref.watch(booksControllerProvider);
     final progress = ref.watch(libraryReadingProgressProvider);
-    final manuallyRead = ref.watch(manuallyReadBookIdsProvider);
+    final favorites = ref.watch(favoriteBookIdsProvider);
     final organizations = ref.watch(bookOrganizationsProvider);
     final sort = ref.watch(librarySortProvider);
     final listView = ref.watch(libraryListViewProvider);
@@ -78,7 +85,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 SliverToBoxAdapter(
                   child: AppPageHeader(
                     title: l10n.library,
-                    keepActionsInline: media.textScaler.scale(28) <= 40,
+                    keepActionsInline: media.textScaler.scale(28) <= 45,
                     actions: [
                       _layoutAction(l10n, isPhone, columns, listView),
                       IconButton.filled(
@@ -100,7 +107,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     items,
                     organizations,
                     progress,
-                    manuallyRead,
+                    favorites,
                     sort,
                     gutter: gutter,
                     wide: wide,
@@ -207,7 +214,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     List<BookDto> books,
     Map<String, BookOrganization> organizations,
     AsyncValue<Map<String, ReadingProgressDto>> progress,
-    Set<String> manuallyRead,
+    Set<String> favorites,
     LibrarySort sort, {
     required double gutter,
     required bool wide,
@@ -226,6 +233,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         ),
       ];
     }
+    final formats = <String>{
+      for (final book in books)
+        if (book.format.trim().isNotEmpty) book.format.trim().toLowerCase(),
+    }.toList()..sort();
+    final activeFormat = formats.contains(_format) ? _format : null;
     final labels = <_Label, String>{};
     for (final book in books) {
       final organization = organizations[book.id];
@@ -246,7 +258,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final activeLabel = labels.containsKey(_label) ? _label : null;
     final savedProgress = progress.valueOrNull;
     final needsProgress =
-        _shelf != _Shelf.all ||
+        (_shelf != _Shelf.all && _shelf != _Shelf.favorites) ||
         sort == LibrarySort.recent ||
         sort == LibrarySort.progress;
     final List<BookDto>? visible = needsProgress && savedProgress == null
@@ -255,10 +267,16 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             books,
             organizations,
             savedProgress ?? const {},
-            manuallyRead,
+            favorites,
+            activeFormat,
             activeLabel,
             sort,
           );
+    final emptyFavorites =
+        _shelf == _Shelf.favorites &&
+        _query.isEmpty &&
+        activeFormat == null &&
+        activeLabel == null;
 
     return [
       _controls(
@@ -267,6 +285,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         sort,
         gutter: gutter,
         wide: wide,
+        formats: formats,
+        activeFormat: activeFormat,
         labels: labels,
         activeLabel: activeLabel,
         bookCount: visible?.length,
@@ -286,14 +306,22 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               AppEmptyState(
-                icon: Icons.search_off_rounded,
+                icon: emptyFavorites
+                    ? Icons.favorite_border
+                    : Icons.search_off_rounded,
                 title: _query.isNotEmpty
                     ? l10n.searchNoResults
+                    : emptyFavorites
+                    ? l10n.libraryNoFavorites
                     : l10n.libraryNoMatchingBooks,
               ),
               TextButton(
                 onPressed: _clearFilters,
-                child: Text(l10n.libraryClearFilters),
+                child: Text(
+                  emptyFavorites
+                      ? l10n.libraryAllBooks
+                      : l10n.libraryClearFilters,
+                ),
               ),
             ],
           ),
@@ -303,7 +331,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           context,
           visible,
           savedProgress ?? const {},
-          manuallyRead,
+          favorites,
           gutter,
           wide,
           columns,
@@ -318,12 +346,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     LibrarySort sort, {
     required double gutter,
     required bool wide,
+    List<String> formats = const [],
+    String? activeFormat,
     Map<_Label, String> labels = const {},
     _Label? activeLabel,
     int? bookCount,
   }) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    final hasFilter = activeFormat != null || activeLabel != null;
     final search = Row(
       spacing: AppSpacing.sm,
       children: [
@@ -336,8 +367,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         ),
         IconButton(
           tooltip: l10n.librarySortAndFilters,
-          onPressed: () => _showSortAndFilters(context, l10n, sort, labels),
-          icon: const Icon(Icons.filter_alt_outlined),
+          onPressed: () =>
+              _showSortAndFilters(context, l10n, sort, formats, labels),
+          icon: Icon(
+            Icons.filter_alt_outlined,
+            color: hasFilter ? colors.primary : null,
+          ),
         ),
       ],
     );
@@ -351,29 +386,38 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           onSelected: (_) => setState(() => _shelf = shelf),
         ),
     ];
-    final labelChip = activeLabel == null
-        ? null
-        : InputChip(
-            avatar: Icon(
-              activeLabel.genre ? Icons.bookmark_border : Icons.label_outline,
-              size: 16,
-            ),
-            backgroundColor: colors.secondaryContainer,
-            deleteButtonTooltipMessage: l10n.libraryClearLabelFilter,
-            label: Text(
-              labels[activeLabel]!,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            onDeleted: () => setState(() => _label = null),
-          );
+    final filterChips = [
+      if (activeFormat != null)
+        InputChip(
+          avatar: const Icon(Icons.description_outlined, size: 16),
+          backgroundColor: colors.secondaryContainer,
+          deleteButtonTooltipMessage: l10n.libraryClearFormatFilter,
+          label: Text(activeFormat.toUpperCase()),
+          onDeleted: () => setState(() => _format = null),
+        ),
+      if (activeLabel != null)
+        InputChip(
+          avatar: Icon(
+            activeLabel.genre ? Icons.bookmark_border : Icons.label_outline,
+            size: 16,
+          ),
+          backgroundColor: colors.secondaryContainer,
+          deleteButtonTooltipMessage: l10n.libraryClearLabelFilter,
+          label: Text(
+            labels[activeLabel]!,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          onDeleted: () => setState(() => _label = null),
+        ),
+    ];
     final Widget content;
     if (wide) {
       final shelves = Wrap(
         spacing: AppSpacing.xs,
         runSpacing: AppSpacing.xs,
         crossAxisAlignment: WrapCrossAlignment.center,
-        children: [...shelfOptions, ?labelChip],
+        children: [...shelfOptions, ...filterChips],
       );
       content = AppSurface(
         color: colors.surface,
@@ -416,7 +460,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             scrollDirection: Axis.horizontal,
             child: Row(spacing: AppSpacing.xs, children: shelfOptions),
           ),
-          ?labelChip,
+          if (filterChips.isNotEmpty)
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              children: filterChips,
+            ),
         ],
       );
     }
@@ -432,6 +481,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     BuildContext context,
     AppLocalizations l10n,
     LibrarySort sort,
+    List<String> formats,
     Map<_Label, String> labels,
   ) {
     final ordered = labels.entries.toList()
@@ -479,6 +529,28 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                       ),
                   ],
                 ),
+                if (formats.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Text(l10n.libraryFormat, style: text.titleMedium),
+                  const SizedBox(height: AppSpacing.xs),
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.xs,
+                    children: [
+                      for (final format in formats)
+                        ChoiceChip(
+                          label: Text(format.toUpperCase()),
+                          selected: format == _format,
+                          onSelected: (selected) {
+                            setState(() {
+                              _format = selected ? format : null;
+                            });
+                            Navigator.pop(sheet);
+                          },
+                        ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.md),
                 if (ordered.isEmpty) ...[
                   Text(l10n.libraryLabels, style: text.titleMedium),
@@ -526,8 +598,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final progress = ref
         .read(libraryReadingProgressProvider)
         .valueOrNull?[book.id];
-    final marked = ref.read(isBookManuallyReadProvider(book.id));
-    final markLabel = marked ? l10n.bookUnmarkRead : l10n.bookMarkRead;
+    final isRead = (progress?.percentage ?? 0) >= 100;
+    final isFavorite = ref.read(isBookFavoriteProvider(book.id));
+    final markLabel = isRead ? l10n.bookUnmarkRead : l10n.bookMarkRead;
+    final favoriteLabel = isFavorite
+        ? l10n.bookRemoveFavorite
+        : l10n.bookAddFavorite;
     final anchor = cardContext.findRenderObject();
     final origin = anchor is RenderBox && anchor.hasSize
         ? anchor.localToGlobal(Offset.zero) & anchor.size
@@ -566,14 +642,20 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   title: Text(l10n.bookCopyFile),
                   onTap: () => Navigator.pop(sheet, _BookAction.copyFile),
                 ),
-              if (marked || (progress?.percentage ?? 0) < 100)
-                ListTile(
-                  leading: Icon(
-                    marked ? Icons.remove_done : Icons.check_circle_outline,
-                  ),
-                  title: Text(markLabel),
-                  onTap: () => Navigator.pop(sheet, _BookAction.toggleReadMark),
+              ListTile(
+                leading: Icon(
+                  isFavorite ? Icons.favorite : Icons.favorite_border,
                 ),
+                title: Text(favoriteLabel),
+                onTap: () => Navigator.pop(sheet, _BookAction.toggleFavorite),
+              ),
+              ListTile(
+                leading: Icon(
+                  isRead ? Icons.remove_done : Icons.check_circle_outline,
+                ),
+                title: Text(markLabel),
+                onTap: () => Navigator.pop(sheet, _BookAction.toggleReadMark),
+              ),
               ListTile(
                 leading: const Icon(Icons.delete_outline),
                 title: Text(l10n.deleteBook),
@@ -592,8 +674,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         await exportBook(context, book, shareOrigin: origin);
       case _BookAction.copyFile:
         await copyBookToClipboard(context, book);
+      case _BookAction.toggleFavorite:
+        await setBookFavorite(context, ref, book.id, !isFavorite);
       case _BookAction.toggleReadMark:
-        await setBookReadMark(context, ref, book.id, !marked);
+        await setBookReadMark(context, ref, book, !isRead);
       case _BookAction.delete:
         if (!await confirmBookDeletion(context, book) || !mounted) return;
         try {
@@ -613,21 +697,26 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     List<BookDto> books,
     Map<String, BookOrganization> organizations,
     Map<String, ReadingProgressDto> progress,
-    Set<String> manuallyRead,
+    Set<String> favorites,
+    String? format,
     _Label? label,
     LibrarySort sort,
   ) {
     final visible = <BookDto>[];
     for (final book in books) {
       final percentage = progress[book.id]?.percentage ?? 0;
-      final isRead = percentage >= 100 || manuallyRead.contains(book.id);
+      final isRead = percentage >= 100;
       if (!switch (_shelf) {
         _Shelf.all => true,
+        _Shelf.favorites => favorites.contains(book.id),
         _Shelf.reading => !isRead && percentage > 0,
         _Shelf.unread => !isRead && percentage <= 0,
         _Shelf.finished => isRead,
       })
         continue;
+      if (format != null && book.format.trim().toLowerCase() != format) {
+        continue;
+      }
       final organization = organizations[book.id];
       if (label != null && !_hasLabel(organization, label)) continue;
       if (_query.isNotEmpty &&
@@ -676,7 +765,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     BuildContext context,
     List<BookDto> books,
     Map<String, ReadingProgressDto> progress,
-    Set<String> manuallyRead,
+    Set<String> favorites,
     double gutter,
     bool wide,
     int? columns,
@@ -695,8 +784,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           compact: listView,
           readingPercentage: saved?.percentage,
           readingLocation: saved?.location,
-          isRead:
-              (saved?.percentage ?? 0) >= 100 || manuallyRead.contains(book.id),
+          isFavorite: favorites.contains(book.id),
           onTap: () => context.push('/book-detail', extra: book),
           onLongPress: (cardContext) => _showBookActions(cardContext, book),
         );
@@ -753,6 +841,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     setState(() {
       _query = '';
       _shelf = _Shelf.all;
+      _format = null;
       _label = null;
     });
   }
@@ -790,6 +879,7 @@ int _nameOrder(String a, String b) => a.isEmpty
 
 String _shelfTitle(_Shelf shelf, AppLocalizations l10n) => switch (shelf) {
   _Shelf.all => l10n.libraryAllBooks,
+  _Shelf.favorites => l10n.libraryFavorites,
   _Shelf.reading => l10n.libraryInProgress,
   _Shelf.unread => l10n.libraryUnread,
   _Shelf.finished => l10n.libraryFinished,

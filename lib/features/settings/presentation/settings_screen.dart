@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -223,135 +224,131 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final valueStyle = theme.textTheme.labelLarge?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
     );
-    final textScale = MediaQuery.textScalerOf(context).scale(16) / 16;
+    final languageLabel = locale.languageCode == 'ru' ? 'Русский' : 'English';
+    final themeLabel = isDark ? l10n.themeDark : l10n.themeLight;
 
     return _SettingsGroup(
       title: l10n.settingsReadingAppearance,
       cards: [
-        LayoutBuilder(
-          builder: (context, constraints) {
-            // Leave enough room for the row title when text is enlarged.
-            final inline = constraints.maxWidth >= 340 * textScale;
-            return SettingsCard(
-              children: [
-                SettingsActionRow(
-                  leading: const Icon(Icons.menu_book_outlined),
-                  title: Text(l10n.readerCustomize),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.of(context).push<void>(
-                    MaterialPageRoute(
-                      builder: (_) => const ReaderCustomizationScreen(),
-                    ),
-                  ),
+        SettingsCard(
+          children: [
+            SettingsActionRow(
+              leading: const Icon(Icons.menu_book_outlined),
+              title: Text(l10n.readerCustomize),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => const ReaderCustomizationScreen(),
                 ),
-                SettingsSwitchRow(
-                  leading: Icon(
-                    isDark
-                        ? Icons.dark_mode_outlined
-                        : Icons.light_mode_outlined,
-                  ),
-                  title: _SettingValue(
-                    label: l10n.theme,
-                    inline: inline,
-                    value: Text(
-                      isDark ? l10n.themeDark : l10n.themeLight,
-                      style: valueStyle,
-                      textAlign: TextAlign.end,
-                    ),
-                  ),
-                  value: isDark,
-                  onChanged: (_) =>
-                      ref.read(themeModeProvider.notifier).toggle(),
+              ),
+            ),
+            SettingsSwitchRow(
+              leading: Icon(
+                isDark ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+              ),
+              title: _SettingValue(
+                label: l10n.theme,
+                valueText: themeLabel,
+                valueStyle: valueStyle,
+                value: Text(
+                  themeLabel,
+                  style: valueStyle,
+                  textAlign: TextAlign.end,
                 ),
-                SettingsActionRow(
-                  leading: const Icon(Icons.language),
-                  title: _SettingValue(
-                    label: l10n.language,
-                    inline: inline,
-                    value: Text(
-                      locale.languageCode == 'ru' ? 'Русский' : 'English',
-                      style: valueStyle,
-                      textAlign: TextAlign.end,
+              ),
+              value: isDark,
+              onChanged: (_) => ref.read(themeModeProvider.notifier).toggle(),
+            ),
+            SettingsActionRow(
+              leading: const Icon(Icons.language),
+              title: _SettingValue(
+                label: l10n.language,
+                valueText: languageLabel,
+                valueStyle: valueStyle,
+                value: Text(
+                  languageLabel,
+                  style: valueStyle,
+                  textAlign: TextAlign.end,
+                ),
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => showAppDialog<void>(
+                context: context,
+                builder: (dialogContext) => SimpleDialog(
+                  titlePadding: const EdgeInsets.only(top: AppSpacing.lg),
+                  title: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
                     ),
+                    child: Text(l10n.language),
                   ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => showAppDialog<void>(
-                    context: context,
-                    builder: (dialogContext) => SimpleDialog(
-                      titlePadding: const EdgeInsets.only(top: AppSpacing.lg),
-                      title: Padding(
-                        padding: const EdgeInsets.symmetric(
+                  children: [
+                    for (final language in const [
+                      ('en', 'English'),
+                      ('ru', 'Русский'),
+                    ])
+                      SettingsActionRow(
+                        contentPadding: const EdgeInsets.symmetric(
                           horizontal: AppSpacing.md,
                         ),
-                        child: Text(l10n.language),
+                        leading: Icon(
+                          locale.languageCode == language.$1
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_unchecked,
+                        ),
+                        title: Text(language.$2),
+                        selected: locale.languageCode == language.$1,
+                        onTap: () {
+                          ref
+                              .read(localeProvider.notifier)
+                              .setLocale(language.$1);
+                          Navigator.pop(dialogContext);
+                        },
                       ),
-                      children: [
-                        for (final language in const [
-                          ('en', 'English'),
-                          ('ru', 'Русский'),
-                        ])
-                          SettingsActionRow(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.md,
-                            ),
-                            leading: Icon(
-                              locale.languageCode == language.$1
-                                  ? Icons.radio_button_checked
-                                  : Icons.radio_button_unchecked,
-                            ),
-                            title: Text(language.$2),
-                            selected: locale.languageCode == language.$1,
-                            onTap: () {
-                              ref
-                                  .read(localeProvider.notifier)
-                                  .setLocale(language.$1);
-                              Navigator.pop(dialogContext);
-                            },
+                  ],
+                ),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.text_fields),
+              title: _SettingValue(
+                label: l10n.interfaceFontSize,
+                hint: l10n.interfaceFontSizeHint,
+                valueText: '$interfaceFontScale%',
+                valueStyle: valueStyle,
+                valueExtraWidth: 32,
+                value: Semantics(
+                  label: l10n.interfaceFontSize,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      minWidth: AppLayout.minTouchTarget,
+                      minHeight: AppLayout.minTouchTarget,
+                    ),
+                    child: DropdownButton<int>(
+                      value: interfaceFontScale,
+                      style: valueStyle,
+                      itemHeight: null,
+                      underline: const SizedBox.shrink(),
+                      onChanged: (value) {
+                        if (value != null) {
+                          ref
+                              .read(interfaceFontScaleProvider.notifier)
+                              .setPercent(value);
+                        }
+                      },
+                      items: [
+                        for (final percent in interfaceFontScaleOptions)
+                          DropdownMenuItem(
+                            value: percent,
+                            child: Text('$percent%'),
                           ),
                       ],
                     ),
                   ),
                 ),
-                ListTile(
-                  leading: const Icon(Icons.text_fields),
-                  title: _SettingValue(
-                    label: l10n.interfaceFontSize,
-                    hint: l10n.interfaceFontSizeHint,
-                    inline: inline,
-                    value: Semantics(
-                      label: l10n.interfaceFontSize,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(
-                          minWidth: AppLayout.minTouchTarget,
-                          minHeight: AppLayout.minTouchTarget,
-                        ),
-                        child: DropdownButton<int>(
-                          value: interfaceFontScale,
-                          style: valueStyle,
-                          itemHeight: null,
-                          underline: const SizedBox.shrink(),
-                          onChanged: (value) {
-                            if (value != null) {
-                              ref
-                                  .read(interfaceFontScaleProvider.notifier)
-                                  .setPercent(value);
-                            }
-                          },
-                          items: [
-                            for (final percent in interfaceFontScaleOptions)
-                              DropdownMenuItem(
-                                value: percent,
-                                child: Text('$percent%'),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -361,7 +358,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final credentials = ref.watch(zLibraryCredentialsProvider);
     final theme = Theme.of(context);
     final hintStyle = theme.textTheme.bodySmall;
-    final textScale = MediaQuery.textScalerOf(context).scale(16) / 16;
     final accountAction = credentials == null
         ? FilledButton.tonal(
             style: FilledButton.styleFrom(
@@ -411,7 +407,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             LayoutBuilder(
               builder: (context, constraints) {
-                final inline = constraints.maxWidth >= 360 * textScale;
+                final scaler = MediaQuery.textScalerOf(context);
+                final direction = Directionality.of(context);
+                final actionLabel = credentials == null
+                    ? l10n.signIn
+                    : l10n.zLibraryLogout;
+                final buttonWidth =
+                    _measureTextWidth(
+                      actionLabel,
+                      theme.textTheme.labelLarge,
+                      scaler,
+                      direction,
+                    ) +
+                    AppSpacing.md * 2 +
+                    (credentials == null ? 0.0 : 26.0);
+                final titleWidth = _widestWordWidth(
+                  l10n.zLibrary,
+                  theme.listTileTheme.titleTextStyle ??
+                      theme.textTheme.bodyLarge,
+                  scaler,
+                  direction,
+                );
+                // ListTile leading (24 + 16) + horizontal padding (32) + gap.
+                const chromeWidth = 72.0 + AppSpacing.md;
+                final inline =
+                    constraints.maxWidth >=
+                    chromeWidth + titleWidth + buttonWidth;
                 final account = ListTile(
                   leading: const Icon(Icons.library_books_outlined),
                   title: Text(l10n.zLibrary),
@@ -478,47 +499,103 @@ class _SettingsGroup extends StatelessWidget {
 class _SettingValue extends StatelessWidget {
   const _SettingValue({
     required this.label,
-    required this.inline,
+    required this.valueText,
+    required this.valueStyle,
     required this.value,
+    this.valueExtraWidth = 0,
     this.hint,
   });
 
   final String label;
-  final bool inline;
+  final String valueText;
+  final TextStyle? valueStyle;
   final Widget value;
+  final double valueExtraWidth;
   final String? hint;
 
   @override
   Widget build(BuildContext context) {
-    final title = hint == null
-        ? Text(label)
-        : Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final theme = Theme.of(context);
+    final labelStyle = DefaultTextStyle.of(context).style;
+    final scaler = MediaQuery.textScalerOf(context);
+    final direction = Directionality.of(context);
+    final widestWord = _widestWordWidth(label, labelStyle, scaler, direction);
+    final valueWidth =
+        _measureTextWidth(valueText, valueStyle, scaler, direction) +
+        valueExtraWidth;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final inline =
+            constraints.maxWidth >=
+            widestWord + AppSpacing.compact + valueWidth;
+        if (inline) {
+          final row = Row(
             children: [
-              Text(label),
-              const SizedBox(height: AppSpacing.xs),
-              Text(hint!, style: Theme.of(context).textTheme.bodySmall),
+              Expanded(child: Text(label)),
+              const SizedBox(width: AppSpacing.compact),
+              value,
             ],
           );
+          if (hint == null) return row;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              row,
+              const SizedBox(height: AppSpacing.xs),
+              Text(hint!, style: theme.textTheme.bodySmall),
+            ],
+          );
+        }
 
-    if (inline) {
-      return Row(
-        children: [
-          Expanded(child: title),
-          const SizedBox(width: AppSpacing.compact),
-          value,
-        ],
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        title,
-        Align(alignment: AlignmentDirectional.centerEnd, child: value),
-      ],
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(label),
+            if (hint != null) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Text(hint!, style: theme.textTheme.bodySmall),
+            ],
+            Align(alignment: AlignmentDirectional.centerEnd, child: value),
+          ],
+        );
+      },
     );
   }
+}
+
+double _measureTextWidth(
+  String text,
+  TextStyle? style,
+  TextScaler scaler,
+  TextDirection direction,
+) {
+  final painter = TextPainter(
+    text: TextSpan(text: text, style: style),
+    textDirection: direction,
+    textScaler: scaler,
+    maxLines: 1,
+  )..layout();
+  final width = painter.width.ceilToDouble();
+  painter.dispose();
+  return width;
+}
+
+double _widestWordWidth(
+  String text,
+  TextStyle? style,
+  TextScaler scaler,
+  TextDirection direction,
+) {
+  var widest = 0.0;
+  for (final word in text.split(RegExp(r'\s+'))) {
+    if (word.isEmpty) continue;
+    widest = math.max(
+      widest,
+      _measureTextWidth(word, style, scaler, direction),
+    );
+  }
+  return widest;
 }
 
 class _ZLibraryLoginDialog extends ConsumerStatefulWidget {

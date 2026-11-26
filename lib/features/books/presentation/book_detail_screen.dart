@@ -2,20 +2,26 @@ import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' show DateFormat, NumberFormat;
 
 import '../../../core/formatters.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../progress/domain/providers/manual_read_status_provider.dart';
 import '../../progress/domain/providers/reading_progress_provider.dart';
 import '../domain/models/book_dto.dart';
-import '../domain/providers/book_organization_provider.dart';
+import '../domain/providers/book_organization_provider.dart'
+    show
+        BookOrganization,
+        bookOrganizationProvider,
+        bookOrganizationsProvider,
+        normalizeBookTags;
 import '../domain/providers/books_provider.dart';
+import '../domain/providers/favorite_books_provider.dart';
 import 'book_actions.dart';
 import 'book_export.dart';
 import 'book_labels.dart';
+import 'book_page_progress.dart';
 import 'open_library_dialog.dart';
 import 'widgets/book_cover.dart';
 import 'widgets/inline_book_labels.dart';
@@ -110,6 +116,35 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
     }
   }
 
+  Future<void> _commitInlineLabels(
+    String bookId, {
+    List<String>? genres,
+    List<String>? tags,
+  }) async {
+    final l10n = AppLocalizations.of(context)!;
+    final current = ref.read(bookOrganizationProvider(bookId));
+    final nextGenres = genres ?? current.genres;
+    final nextTags = tags ?? current.tags;
+    if (listEquals(nextGenres, current.genres) &&
+        listEquals(nextTags, current.tags)) {
+      return;
+    }
+    try {
+      await ref
+          .read(bookOrganizationsProvider.notifier)
+          .setLabels(
+            bookId,
+            BookOrganization(genres: nextGenres, tags: nextTags),
+          );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {});
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.bookEditError)));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -121,7 +156,7 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
     final editBook = () => _startEdit(book, organization);
     final padding = EdgeInsets.fromLTRB(
       gutter,
-      AppSpacing.lg,
+      AppSpacing.md,
       gutter,
       AppSpacing.lg,
     );
@@ -146,21 +181,8 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
                       horizontal: gutter,
                       vertical: AppSpacing.sm,
                     ),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final title = Text(
-                          draft == null ? l10n.library : l10n.editBook,
-                          style: draft == null
-                              ? theme.textTheme.headlineMedium
-                              : theme.textTheme.titleMedium,
-                          maxLines: draft == null ? null : 1,
-                          overflow: draft == null
-                              ? null
-                              : TextOverflow.ellipsis,
-                        );
-                        const titleGap = SizedBox(width: AppSpacing.compact);
-                        if (draft != null) {
-                          return Row(
+                    child: draft != null
+                        ? Row(
                             children: [
                               IconButton(
                                 tooltip: l10n.cancel,
@@ -170,123 +192,123 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
                                   semanticLabel: l10n.cancel,
                                 ),
                               ),
-                              titleGap,
-                              Expanded(child: title),
+                              const SizedBox(width: AppSpacing.compact),
+                              Expanded(
+                                child: Text(
+                                  l10n.editBook,
+                                  style: theme.textTheme.titleMedium,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
                               FilledButton(
                                 onPressed: _saving ? null : _save,
                                 child: Text(l10n.save),
                               ),
                             ],
-                          );
-                        }
-
-                        final heading = Row(
-                          children: [
-                            MergeSemantics(
-                              child: Semantics(
-                                label: MaterialLocalizations.of(
-                                  context,
-                                ).backButtonTooltip,
-                                child: BackButton(
-                                  onPressed: () => context.pop(),
-                                ),
-                              ),
-                            ),
-                            titleGap,
-                            Expanded(child: title),
-                          ],
-                        );
-                        final actions = TooltipVisibility(
-                          visible: true,
-                          child: Wrap(
-                            alignment: WrapAlignment.end,
+                          )
+                        : Row(
                             children: [
-                              IconButton(
-                                tooltip: l10n.openLibraryFind,
-                                onPressed: () => showAppDialog<void>(
-                                  context: context,
-                                  builder: (_) => OpenLibraryDialog(
-                                    book: book,
-                                    organization: organization,
+                              MergeSemantics(
+                                child: Semantics(
+                                  label: MaterialLocalizations.of(
+                                    context,
+                                  ).backButtonTooltip,
+                                  child: BackButton(
+                                    onPressed: () => context.pop(),
                                   ),
                                 ),
-                                icon: Icon(
-                                  Icons.manage_search_outlined,
-                                  semanticLabel: l10n.openLibraryFind,
-                                ),
                               ),
-                              IconButton(
-                                tooltip: l10n.editBook,
-                                onPressed: editBook,
-                                icon: Icon(
-                                  Icons.edit_outlined,
-                                  semanticLabel: l10n.editBook,
-                                ),
-                              ),
-                              if (bookFileClipboardAvailable)
-                                PopupMenuButton<_BookExportChoice>(
-                                  tooltip: l10n.bookExportMenu,
-                                  icon: const Icon(Icons.ios_share_outlined),
-                                  onSelected: (choice) => switch (choice) {
-                                    _BookExportChoice.saveCopy => exportBook(
-                                      context,
-                                      book,
-                                    ),
-                                    _BookExportChoice.copyFile =>
-                                      copyBookToClipboard(context, book),
-                                  },
-                                  itemBuilder: (_) => [
-                                    PopupMenuItem(
-                                      value: _BookExportChoice.saveCopy,
-                                      child: Text(l10n.exportBook),
-                                    ),
-                                    PopupMenuItem(
-                                      value: _BookExportChoice.copyFile,
-                                      child: Text(l10n.bookCopyFile),
-                                    ),
-                                  ],
-                                )
-                              else
-                                Builder(
-                                  builder: (buttonContext) => IconButton(
-                                    tooltip: bookExportActionLabel(
-                                      buttonContext,
-                                    ),
-                                    onPressed: () =>
-                                        exportBook(buttonContext, book),
-                                    icon: const Icon(Icons.ios_share_outlined),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: TooltipVisibility(
+                                  visible: true,
+                                  child: Wrap(
+                                    alignment: WrapAlignment.end,
+                                    children: [
+                                      IconButton(
+                                        tooltip: l10n.openLibraryFind,
+                                        onPressed: () => showAppDialog<void>(
+                                          context: context,
+                                          builder: (_) => OpenLibraryDialog(
+                                            book: book,
+                                            organization: organization,
+                                          ),
+                                        ),
+                                        icon: Icon(
+                                          Icons.manage_search_outlined,
+                                          semanticLabel: l10n.openLibraryFind,
+                                        ),
+                                      ),
+                                      IconButton(
+                                        tooltip: l10n.editBook,
+                                        onPressed: editBook,
+                                        icon: Icon(
+                                          Icons.edit_outlined,
+                                          semanticLabel: l10n.editBook,
+                                        ),
+                                      ),
+                                      if (bookFileClipboardAvailable)
+                                        PopupMenuButton<_BookExportChoice>(
+                                          tooltip: l10n.bookExportMenu,
+                                          icon: const Icon(
+                                            Icons.ios_share_outlined,
+                                          ),
+                                          onSelected: (choice) =>
+                                              switch (choice) {
+                                                _BookExportChoice.saveCopy =>
+                                                  exportBook(context, book),
+                                                _BookExportChoice.copyFile =>
+                                                  copyBookToClipboard(
+                                                    context,
+                                                    book,
+                                                  ),
+                                              },
+                                          itemBuilder: (_) => [
+                                            PopupMenuItem(
+                                              value: _BookExportChoice.saveCopy,
+                                              child: Text(l10n.exportBook),
+                                            ),
+                                            PopupMenuItem(
+                                              value: _BookExportChoice.copyFile,
+                                              child: Text(l10n.bookCopyFile),
+                                            ),
+                                          ],
+                                        )
+                                      else
+                                        Builder(
+                                          builder: (buttonContext) =>
+                                              IconButton(
+                                                tooltip: bookExportActionLabel(
+                                                  buttonContext,
+                                                ),
+                                                onPressed: () => exportBook(
+                                                  buttonContext,
+                                                  book,
+                                                ),
+                                                icon: const Icon(
+                                                  Icons.ios_share_outlined,
+                                                ),
+                                              ),
+                                        ),
+                                      IconButton(
+                                        tooltip: l10n.deleteBook,
+                                        style: IconButton.styleFrom(
+                                          foregroundColor:
+                                              theme.colorScheme.error,
+                                        ),
+                                        onPressed: () => _confirmDelete(book),
+                                        icon: Icon(
+                                          Icons.delete_outline,
+                                          semanticLabel: l10n.deleteBook,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
+                              ),
                             ],
                           ),
-                        );
-                        final painter = TextPainter(
-                          text: TextSpan(text: title.data, style: title.style),
-                          textDirection: Directionality.of(context),
-                          textScaler: MediaQuery.textScalerOf(context),
-                          maxLines: 1,
-                        )..layout();
-                        final inlineWidth =
-                            painter.width.ceilToDouble() +
-                            AppSpacing.compact +
-                            AppSpacing.sm +
-                            4 * AppLayout.minTouchTarget;
-                        painter.dispose();
-                        if (constraints.maxWidth < inlineWidth) {
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [heading, actions],
-                          );
-                        }
-                        return Row(
-                          children: [
-                            Expanded(child: heading),
-                            const SizedBox(width: AppSpacing.sm),
-                            actions,
-                          ],
-                        );
-                      },
-                    ),
                   ),
                   Expanded(
                     child: SingleChildScrollView(
@@ -314,72 +336,50 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
                           const SizedBox(height: AppSpacing.lg),
                           _ReadingAction(book: book, enabled: draft == null),
                           const SizedBox(height: AppSpacing.md),
-                          Align(
-                            alignment: AlignmentDirectional.centerStart,
-                            child: TextButton.icon(
-                              onPressed: draft != null
-                                  ? null
-                                  : () => _confirmDelete(book),
-                              style: TextButton.styleFrom(
-                                foregroundColor: theme.colorScheme.error,
-                              ),
-                              icon: const Icon(Icons.delete_outline),
-                              label: Text(l10n.deleteBook),
-                            ),
+                          const Divider(),
+                          const SizedBox(height: AppSpacing.md),
+                          InlineBookLabels(
+                            key: const ValueKey('book-genres'),
+                            title: l10n.bookGenres,
+                            addLabelTooltip: l10n.bookAddGenre,
+                            initialLabels: draft != null
+                                ? draft.originalLabels.genres
+                                : organization.genres,
+                            enabled: !_saving,
+                            readOnlyChips: draft == null,
+                            onChanged: draft == null
+                                ? null
+                                : (genres) => draft.genres = genres,
+                            onCommit: draft == null
+                                ? (genres) => _commitInlineLabels(
+                                    book.id,
+                                    genres: genres,
+                                  )
+                                : null,
+                          ),
+                          const SizedBox(height: AppSpacing.compact),
+                          InlineBookLabels(
+                            key: const ValueKey('book-tags'),
+                            title: l10n.bookTags,
+                            addLabelTooltip: l10n.bookAddTag,
+                            initialLabels: draft != null
+                                ? draft.originalLabels.tags
+                                : organization.tags,
+                            enabled: !_saving,
+                            readOnlyChips: draft == null,
+                            normalizeLabels: normalizeBookTags,
+                            onChanged: draft == null
+                                ? null
+                                : (tags) => draft.tags = tags,
+                            onCommit: draft == null
+                                ? (tags) =>
+                                      _commitInlineLabels(book.id, tags: tags)
+                                : null,
                           ),
                           const SizedBox(height: AppSpacing.md),
-                          _FileMetadata(book: book),
+                          const Divider(),
                           const SizedBox(height: AppSpacing.md),
-                          if (draft != null) ...[
-                            InlineBookLabels(
-                              key: const ValueKey('book-genres'),
-                              title: l10n.bookGenres,
-                              addLabelTooltip: l10n.bookAddGenre,
-                              initialLabels: draft.originalLabels.genres,
-                              enabled: !_saving,
-                              onChanged: (genres) => draft.genres = genres,
-                            ),
-                            const SizedBox(height: AppSpacing.md),
-                            InlineBookLabels(
-                              key: const ValueKey('book-tags'),
-                              title: l10n.bookTags,
-                              addLabelTooltip: l10n.bookAddTag,
-                              initialLabels: draft.originalLabels.tags,
-                              enabled: !_saving,
-                              onChanged: (tags) => draft.tags = tags,
-                            ),
-                          ] else if (organization.genres.isEmpty &&
-                              organization.tags.isEmpty)
-                            TextButton.icon(
-                              onPressed: editBook,
-                              style: TextButton.styleFrom(
-                                alignment: AlignmentDirectional.centerStart,
-                                foregroundColor:
-                                    theme.colorScheme.onSurfaceVariant,
-                              ),
-                              icon: const Icon(Icons.add),
-                              label: Text(l10n.bookAddLabels),
-                            )
-                          else ...[
-                            if (organization.genres.isNotEmpty) ...[
-                              Text(
-                                l10n.bookGenres,
-                                style: theme.textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: AppSpacing.sm),
-                              _BookLabels(labels: organization.genres),
-                            ],
-                            if (organization.tags.isNotEmpty) ...[
-                              if (organization.genres.isNotEmpty)
-                                const SizedBox(height: AppSpacing.md),
-                              Text(
-                                l10n.bookTags,
-                                style: theme.textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: AppSpacing.sm),
-                              _BookLabels(labels: organization.tags),
-                            ],
-                          ],
+                          _FileMetadata(book: book),
                         ],
                       ),
                     ),
@@ -519,17 +519,30 @@ class _ReadingAction extends ConsumerWidget {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final progress = ref.watch(readingProgressControllerProvider(book.id));
-    final marked = ref.watch(isBookManuallyReadProvider(book.id));
-    final savedPercentage = progress.valueOrNull?.percentage ?? 0;
-    final percentage = savedPercentage.isFinite
-        ? savedPercentage.clamp(0.0, 100.0)
+    final isFavorite = ref.watch(isBookFavoriteProvider(book.id));
+    final progressValue = progress.valueOrNull;
+    final savedPercentage = progressValue?.percentage;
+    final percentage = savedPercentage?.isFinite == true
+        ? savedPercentage!.clamp(0.0, 100.0).toDouble()
         : 0.0;
+    final isRead = percentage >= 100;
     final percentLabel = formatReadingPercentage(
       percentage,
       l10n.localeName,
       floor: true,
     );
-    final status = marked || percentage >= 100
+    final pageLabels = bookProgressLabels(
+      l10n: l10n,
+      book: book,
+      readingPercentage: savedPercentage,
+      readingLocation: progressValue?.location,
+    );
+    final progressLabel = savedPercentage?.isFinite == true
+        ? pageLabels.full
+        : pageLabels.full.isEmpty
+        ? percentLabel
+        : '${pageLabels.full} · $percentLabel';
+    final status = isRead
         ? l10n.bookReadStatus
         : percentage > 0
         ? l10n.libraryInProgress
@@ -537,19 +550,51 @@ class _ReadingAction extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        FilledButton.icon(
-          onPressed: enabled
-              ? () => context.push('/reader', extra: book)
-              : null,
-          icon: const Icon(Icons.menu_book_outlined),
-          label: Text(
-            percentage > 0
-                ? l10n.bookContinueReading
-                : book.format == 'epub'
-                ? l10n.readBook
-                : l10n.openBook,
-            textAlign: TextAlign.center,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: enabled
+                    ? () => context.push('/reader', extra: book)
+                    : null,
+                icon: const Icon(Icons.menu_book_outlined),
+                label: Text(
+                  percentage > 0
+                      ? l10n.bookContinueReading
+                      : book.format == 'epub'
+                      ? l10n.readBook
+                      : l10n.openBook,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            TooltipVisibility(
+              visible: true,
+              child: IconButton(
+                tooltip: isFavorite
+                    ? l10n.bookRemoveFavorite
+                    : l10n.bookAddFavorite,
+                style: IconButton.styleFrom(
+                  backgroundColor: isFavorite
+                      ? theme.colorScheme.primaryContainer
+                      : theme.colorScheme.surfaceContainerHigh,
+                  foregroundColor: isFavorite
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+                onPressed: enabled
+                    ? () => setBookFavorite(context, ref, book.id, !isFavorite)
+                    : null,
+                icon: Icon(
+                  isFavorite ? Icons.favorite : Icons.favorite_border,
+                  semanticLabel: isFavorite
+                      ? l10n.bookRemoveFavorite
+                      : l10n.bookAddFavorite,
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: AppSpacing.md),
         if (progress.hasError)
@@ -576,7 +621,15 @@ class _ReadingAction extends ConsumerWidget {
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
-              Text(percentLabel, style: theme.textTheme.bodySmall),
+              Text(
+                progressLabel,
+                key: const ValueKey('book-detail-progress-label'),
+                textDirection: TextDirection.ltr,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -589,50 +642,26 @@ class _ReadingAction extends ConsumerWidget {
             semanticsValue: '${percentage.floor()}',
           ),
         ],
-        if (marked || percentage < 100) ...[
-          const SizedBox(height: AppSpacing.sm),
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: TextButton.icon(
-              onPressed: enabled
-                  ? () => setBookReadMark(context, ref, book.id, !marked)
-                  : null,
-              icon: Icon(
-                marked ? Icons.remove_done : Icons.check_circle_outline,
-              ),
-              label: Text(marked ? l10n.bookUnmarkRead : l10n.bookMarkRead),
+        const SizedBox(height: AppSpacing.compact),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: TextButton.icon(
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(0, 36),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              alignment: AlignmentDirectional.centerStart,
             ),
+            onPressed: enabled
+                ? () => setBookReadMark(context, ref, book, !isRead)
+                : null,
+            icon: Icon(
+              isRead ? Icons.remove_done : Icons.check_circle_outline,
+              size: 18,
+            ),
+            label: Text(isRead ? l10n.bookUnmarkRead : l10n.bookMarkRead),
           ),
-        ],
-      ],
-    );
-  }
-}
-
-class _BookLabels extends StatelessWidget {
-  const _BookLabels({required this.labels});
-
-  final List<String> labels;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Wrap(
-      spacing: AppSpacing.sm,
-      runSpacing: AppSpacing.sm,
-      children: [
-        for (final label in labels)
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.sm,
-              vertical: AppSpacing.xs,
-            ),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-            ),
-            child: Text(label, style: theme.textTheme.bodyMedium),
-          ),
+        ),
       ],
     );
   }

@@ -188,6 +188,18 @@ abstract class AppLocalizations {
   /// **'Clear label filter'**
   String get libraryClearLabelFilter;
 
+  /// No description provided for @libraryFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Format'**
+  String get libraryFormat;
+
+  /// No description provided for @libraryClearFormatFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear format filter'**
+  String get libraryClearFormatFilter;
+
   /// No description provided for @librarySortAdded.
   ///
   /// In en, this message translates to:
@@ -223,6 +235,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'All books'**
   String get libraryAllBooks;
+
+  /// No description provided for @libraryFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorites'**
+  String get libraryFavorites;
+
+  /// No description provided for @libraryNoFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'No favorite books yet'**
+  String get libraryNoFavorites;
 
   /// No description provided for @libraryUnread.
   ///
@@ -299,7 +323,7 @@ abstract class AppLocalizations {
   /// No description provided for @bookPageCountCompact.
   ///
   /// In en, this message translates to:
-  /// **'{count} pp.'**
+  /// **'{count} p.'**
   String bookPageCountCompact(String count);
 
   /// No description provided for @bookLabelsEmpty.
@@ -403,6 +427,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not update the book’s read mark.'**
   String get bookReadMarkError;
+
+  /// No description provided for @bookAddFavorite.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to favorites'**
+  String get bookAddFavorite;
+
+  /// No description provided for @bookRemoveFavorite.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from favorites'**
+  String get bookRemoveFavorite;
+
+  /// No description provided for @bookFavoriteStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite'**
+  String get bookFavoriteStatus;
+
+  /// No description provided for @bookFavoriteError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not update favorites.'**
+  String get bookFavoriteError;
 
   /// No description provided for @bookDeleteError.
   ///

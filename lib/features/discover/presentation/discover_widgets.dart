@@ -225,7 +225,7 @@ class DiscoverItemCard extends StatelessWidget {
     required this.onTap,
   });
 
-  static const _verticalInset = AppSpacing.compact;
+  static const hitInset = 4.0;
 
   static bool _isTextFirst(DiscoverItem item, DiscoverSource source) =>
       source.category == DiscoverCategory.documents || item.imageUrl == null;
@@ -250,7 +250,8 @@ class DiscoverItemCard extends StatelessWidget {
       text.bodyMedium!,
       AppLayout.discoverSummaryLines,
     );
-    final imageHeight = cardWidth / AppLayout.discoverImageAspectRatio;
+    final imageHeight =
+        (cardWidth - hitInset * 2) / AppLayout.discoverImageAspectRatio;
     var tallest = 0.0;
     // The viewport uses the largest caption budget so mixed items share a
     // baseline for the save button.
@@ -270,7 +271,7 @@ class DiscoverItemCard extends StatelessWidget {
     final footerHeight = smallLine > AppLayout.minTouchTarget
         ? smallLine
         : AppLayout.minTouchTarget;
-    return _verticalInset * 2 + tallest + AppSpacing.xs + footerHeight;
+    return hitInset * 2 + tallest + AppSpacing.xs + footerHeight;
   }
 
   final DiscoverItem item;
@@ -290,78 +291,71 @@ class DiscoverItemCard extends StatelessWidget {
             publishedAt,
             monthOnly: item.documentNumber != null,
           );
-    return Material(
-      type: MaterialType.transparency,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: _verticalInset),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (!textFirst) ...[
-                AspectRatio(
-                  aspectRatio: AppLayout.discoverImageAspectRatio,
-                  child: DiscoverImage(item: item, source: source),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-              ],
-              if (item.documentNumber != null) ...[
-                Text(
-                  'RFC ${item.documentNumber}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall,
-                ),
-                const SizedBox(height: AppSpacing.xs),
-              ],
-              Text(
-                item.title,
-                maxLines: AppLayout.discoverTitleLines,
+    return _DiscoverCardInteraction(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (!textFirst) ...[
+            AspectRatio(
+              aspectRatio: AppLayout.discoverImageAspectRatio,
+              child: DiscoverImage(item: item, source: source),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
+          if (item.documentNumber != null) ...[
+            Text(
+              'RFC ${item.documentNumber}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: AppSpacing.xs),
+          ],
+          Text(
+            item.title,
+            maxLines: AppLayout.discoverTitleLines,
+            overflow: TextOverflow.ellipsis,
+            style: _titleStyle(theme.textTheme),
+          ),
+          if (author.isNotEmpty || date != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            _Byline(author: author, date: date),
+          ],
+          if (textFirst && item.summary.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                item.summary,
+                maxLines: AppLayout.discoverSummaryLines,
                 overflow: TextOverflow.ellipsis,
-                style: _titleStyle(theme.textTheme),
+                style: theme.textTheme.bodyMedium,
               ),
-              if (author.isNotEmpty || date != null) ...[
-                const SizedBox(height: AppSpacing.xs),
-                _Byline(author: author, date: date),
-              ],
-              if (textFirst && item.summary.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.sm),
-                Expanded(
-                  child: Text(
-                    item.summary,
-                    maxLines: AppLayout.discoverSummaryLines,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                ),
-              ] else
-                const Spacer(),
-              const SizedBox(height: AppSpacing.xs),
-              Row(
-                children: [
-                  Expanded(
-                    child: item.status == null
-                        ? const SizedBox.shrink()
-                        : Padding(
-                            padding: const EdgeInsetsDirectional.only(
-                              end: AppSpacing.xs,
-                            ),
-                            child: Text(
-                              item.status!,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodySmall,
-                            ),
-                          ),
-                  ),
-                  MaterialSaveButton(item: item),
-                ],
+            ),
+          ] else
+            const Spacer(),
+          const SizedBox(height: AppSpacing.xs),
+          Row(
+            children: [
+              Expanded(
+                child: item.status == null
+                    ? const SizedBox.shrink()
+                    : Padding(
+                        padding: const EdgeInsetsDirectional.only(
+                          end: AppSpacing.xs,
+                        ),
+                        child: Text(
+                          item.status!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
               ),
+              MaterialSaveButton(item: item),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
@@ -463,61 +457,80 @@ class DiscoverItemTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return InkWell(
+    return _DiscoverCardInteraction(
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.compact),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (item.documentNumber != null) ...[
-              Text(
-                'RFC ${item.documentNumber}',
-                style: theme.textTheme.bodySmall,
-              ),
-              const SizedBox(height: AppSpacing.xs),
-            ],
-            Text(item.title, style: theme.textTheme.titleMedium),
-            if (item.author.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.xs),
-              Text(item.author, style: theme.textTheme.bodySmall),
-            ],
-            if (item.summary.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                item.summary,
-                maxLines: AppLayout.discoverSummaryLines,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyMedium,
-              ),
-            ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (item.documentNumber != null) ...[
+            Text(
+              'RFC ${item.documentNumber}',
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: AppSpacing.xs),
+          ],
+          Text(item.title, style: theme.textTheme.titleMedium),
+          if (item.author.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(item.author, style: theme.textTheme.bodySmall),
+          ],
+          if (item.summary.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.sm),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    [
-                      source.name,
-                      if (item.publishedAt != null)
-                        discoverDate(
-                          context,
-                          item.publishedAt!,
-                          monthOnly: item.documentNumber != null,
-                        ),
-                      if (item.status != null) item.status!,
-                    ].join(' · '),
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                MaterialSaveButton(item: item),
-              ],
+            Text(
+              item.summary,
+              maxLines: AppLayout.discoverSummaryLines,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium,
             ),
           ],
-        ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  [
+                    source.name,
+                    if (item.publishedAt != null)
+                      discoverDate(
+                        context,
+                        item.publishedAt!,
+                        monthOnly: item.documentNumber != null,
+                      ),
+                    if (item.status != null) item.status!,
+                  ].join(' · '),
+                  style: theme.textTheme.bodySmall,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              MaterialSaveButton(item: item),
+            ],
+          ),
+        ],
       ),
     );
   }
+}
+
+class _DiscoverCardInteraction extends StatelessWidget {
+  const _DiscoverCardInteraction({required this.onTap, required this.child});
+
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    type: MaterialType.transparency,
+    child: InkWell(
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      hoverColor: Colors.transparent,
+      mouseCursor: SystemMouseCursors.click,
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.all(DiscoverItemCard.hitInset),
+        child: child,
+      ),
+    ),
+  );
 }
 
 class DiscoverFailure extends StatelessWidget {

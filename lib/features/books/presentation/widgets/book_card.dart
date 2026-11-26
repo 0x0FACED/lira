@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' show NumberFormat;
 
-import '../../../../core/formatters.dart';
 import '../../../../core/theme/app_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/models/book_dto.dart';
@@ -15,7 +14,7 @@ class BookCard extends StatelessWidget {
   final ValueChanged<BuildContext> onLongPress;
   final double? readingPercentage;
   final String? readingLocation;
-  final bool isRead;
+  final bool isFavorite;
   final bool compact;
 
   const BookCard({
@@ -25,7 +24,7 @@ class BookCard extends StatelessWidget {
     required this.onLongPress,
     this.readingPercentage,
     this.readingLocation,
-    this.isRead = false,
+    this.isFavorite = false,
     this.compact = false,
   });
 
@@ -72,49 +71,6 @@ class BookCard extends StatelessWidget {
         fontFeatures: const [FontFeature.tabularFigures()],
         color: theme.colorScheme.onSurface,
       );
-
-  static String _progressLabel(String? pages, String? percentage) {
-    if (pages == null) return percentage ?? '';
-    return percentage == null ? pages : '$pages · $percentage';
-  }
-
-  static ({String full, String compact}) _readingProgressLabels(
-    AppLocalizations l10n,
-    NumberFormat countFormat,
-    NumberFormat percentageFormat,
-    BookDto book,
-    double? readingPercentage,
-    String? readingLocation,
-  ) {
-    final percentage = readingPercentage?.isFinite == true
-        ? readingPercentage!.clamp(0.0, 100.0)
-        : null;
-    final displayed = percentage == null
-        ? null
-        : formatReadingPercentage(
-            percentage,
-            l10n.localeName,
-            floor: true,
-            numberFormat: percentageFormat,
-          );
-    final pages = bookPageProgress(
-      book: book,
-      percentage: percentage,
-      location: readingLocation,
-    );
-    final coordinates = pages == null
-        ? null
-        : '${pages.approximate ? '≈' : ''}'
-              '${pages.current == null ? '' : '${countFormat.format(pages.current)}/'}'
-              '${countFormat.format(pages.total)}';
-    return (
-      full: _progressLabel(
-        coordinates == null ? null : l10n.bookPageCountCompact(coordinates),
-        displayed,
-      ),
-      compact: _progressLabel(coordinates, displayed),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -218,7 +174,7 @@ class BookCard extends StatelessWidget {
 
   Widget _buildMetadataRow(
     BuildContext context,
-    ({String full, String compact}) labels,
+    BookProgressLabels labels,
   ) {
     final theme = Theme.of(context);
     final textScaler = MediaQuery.textScalerOf(context);
@@ -249,7 +205,7 @@ class BookCard extends StatelessWidget {
           try {
             final formatWidth =
                 measure(format, formatStyle) +
-                (isRead ? AppSpacing.xs + markerSize : 0);
+                (isFavorite ? AppSpacing.xs + markerSize : 0);
             final gap = label.isEmpty ? 0.0 : AppSpacing.sm;
             width = formatWidth + gap + measure(label, progressStyle);
             if (width > constraints.maxWidth && labels.compact != label) {
@@ -282,16 +238,16 @@ class BookCard extends StatelessWidget {
                         maxLines: 1,
                         softWrap: false,
                       ),
-                      if (isRead) ...[
+                      if (isFavorite) ...[
                         const SizedBox(width: AppSpacing.xs),
                         IgnoreBaseline(
                           child: Icon(
-                            Icons.check,
+                            Icons.favorite,
                             size: markerSize,
-                            color: theme.colorScheme.onSurfaceVariant,
+                            color: theme.colorScheme.primary,
                             semanticLabel: AppLocalizations.of(
                               context,
-                            )!.bookReadStatus,
+                            )!.bookFavoriteStatus,
                           ),
                         ),
                       ],
@@ -332,13 +288,13 @@ class BookCard extends StatelessWidget {
         ? readingPercentage!.clamp(0.0, 100.0)
         : null;
     // Manual completion is independent of both the position and the percentage.
-    final labels = _readingProgressLabels(
-      l10n,
-      NumberFormat.decimalPattern(l10n.localeName),
-      NumberFormat('0.0', l10n.localeName),
-      book,
-      percentage,
-      readingLocation,
+    final labels = bookProgressLabels(
+      l10n: l10n,
+      book: book,
+      readingPercentage: percentage,
+      readingLocation: readingLocation,
+      countFormat: NumberFormat.decimalPattern(l10n.localeName),
+      percentageFormat: NumberFormat('0.0', l10n.localeName),
     );
     final track = SizedBox(
       height: _progressBarHeight,

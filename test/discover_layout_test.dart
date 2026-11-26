@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lira/core/database/app_database.dart';
 import 'package:lira/core/di/injection.dart';
 import 'package:lira/core/theme/app_theme.dart';
+import 'package:lira/core/theme/app_tokens.dart';
 import 'package:lira/core/widgets/app_components.dart';
 import 'package:lira/features/books/data/repositories/books_local_repository.dart';
 import 'package:lira/features/discover/domain/discover_content_providers.dart';
@@ -126,6 +127,28 @@ void main() {
             .hitTestable(),
         findsOneWidget,
       );
+
+      // Press feedback (InkWell) covers the whole article card evenly on all sides.
+      final inkWell = find.descendant(
+        of: card,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is InkWell &&
+              widget.borderRadius == BorderRadius.circular(AppRadius.sm),
+        ),
+      );
+      expect(inkWell, findsOneWidget);
+      expect(tester.getRect(inkWell), bounds);
+      final image = find.descendant(
+        of: card,
+        matching: find.byType(DiscoverImage),
+      );
+      final imageRect = tester.getRect(image);
+      expect(imageRect.left - bounds.left, DiscoverItemCard.hitInset);
+      expect(bounds.right - imageRect.right, DiscoverItemCard.hitInset);
+      expect(imageRect.top - bounds.top, DiscoverItemCard.hitInset);
+      final saveRect = tester.getRect(save);
+      expect(bounds.bottom - saveRect.bottom, DiscoverItemCard.hitInset);
     });
   }
 }
