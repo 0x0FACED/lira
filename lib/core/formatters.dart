@@ -5,8 +5,9 @@ String formatReadingPercentage(
   double value,
   String locale, {
   bool floor = false,
+  NumberFormat? numberFormat,
 }) {
   var percentage = value.clamp(0.0, 100.0).toDouble();
   if (floor) percentage = (percentage * 10).floor() / 10;
-  return '${NumberFormat('0.0', locale).format(percentage)}%';
+  return '${(numberFormat ?? NumberFormat('0.0', locale)).format(percentage)}%';
 }

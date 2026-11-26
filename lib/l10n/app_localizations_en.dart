@@ -129,7 +129,58 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookEditError => 'Could not save book details.';
 
   @override
-  String get bookShareUnavailable => 'Share (not available yet)';
+  String get bookShare => 'Share';
+
+  @override
+  String get exportBook => 'Save a copy';
+
+  @override
+  String get bookExportMenu => 'Export book';
+
+  @override
+  String get bookCopyFile => 'Copy file';
+
+  @override
+  String get bookFileCopied => 'Book file copied to the clipboard';
+
+  @override
+  String get bookCopyFileError =>
+      'Could not copy the book file to the clipboard.';
+
+  @override
+  String bookExportSaved(String path) {
+    return 'Book saved to $path';
+  }
+
+  @override
+  String get bookExportError => 'Could not export the book.';
+
+  @override
+  String get bookExportFileMissing =>
+      'The book file is no longer available on this device.';
+
+  @override
+  String get bookExportUnsupportedFormat =>
+      'Only EPUB and PDF books can be exported.';
+
+  @override
+  String get bookExportSameFile =>
+      'Choose a different location to keep the original book file.';
+
+  @override
+  String get bookMarkRead => 'Mark as read';
+
+  @override
+  String get bookUnmarkRead => 'Remove read mark';
+
+  @override
+  String get bookReadStatus => 'Read';
+
+  @override
+  String get bookReadMarkError => 'Could not update the book’s read mark.';
+
+  @override
+  String get bookDeleteError => 'Could not remove the book from the library.';
 
   @override
   String bookDeleteWarning(String title) {
@@ -279,11 +330,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deleteBook => 'Delete Book';
-
-  @override
-  String deleteBookConfirm(String title) {
-    return 'Are you sure you want to delete $title?';
-  }
 
   @override
   String get cancel => 'Cancel';
@@ -1615,6 +1661,27 @@ class AppLocalizationsEn extends AppLocalizations {
       'The check only contacts Open Library. Saving does not turn the proxy on.';
 
   @override
+  String get proxyUsername => 'Username (optional)';
+
+  @override
+  String get proxyPassword => 'Password (optional)';
+
+  @override
+  String get proxyAuthenticationHint =>
+      'Leave both fields empty for no authentication. SOCKS5 sends the username and password to the proxy without encryption.';
+
+  @override
+  String get proxyCredentialsInvalid =>
+      'Enter both a username and password, each 1–255 UTF-8 bytes, or leave both empty';
+
+  @override
+  String get proxyCredentialsUnavailable =>
+      'Saved proxy credentials could not be read. Enter them again or explicitly choose to use no authentication.';
+
+  @override
+  String get proxyUseWithoutAuthentication => 'Remove saved authentication';
+
+  @override
   String get proxyCheckAction => 'Check connection';
 
   @override
@@ -1633,17 +1700,21 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not open a connection through the SOCKS5 proxy';
 
   @override
+  String get proxyCheckAuthenticationFailed =>
+      'Proxy authentication failed or is required';
+
+  @override
   String get proxyCheckServiceUnavailable =>
       'Proxy reached, but Open Library is unavailable';
 
   @override
-  String get proxySaving => 'Saving endpoint…';
+  String get proxySaving => 'Saving proxy settings…';
 
   @override
-  String get proxySaved => 'Endpoint saved';
+  String get proxySaved => 'Proxy settings saved';
 
   @override
-  String get proxySaveFailed => 'Could not save the endpoint';
+  String get proxySaveFailed => 'Could not save proxy settings';
 
   @override
   String get zLibraryLoginError =>

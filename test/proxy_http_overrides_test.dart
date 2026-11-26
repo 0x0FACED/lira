@@ -165,14 +165,277 @@ void main() {
       },
     );
   }
+
+  for (final authenticated in [false, true]) {
+    for (final tls in [false, true]) {
+      test('strict SOCKS ${authenticated ? 'auth' : 'no-auth'} '
+          '${tls ? 'reaches TLS' : 'carries HTTP'}', () async {
+        final proxy = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+        final sockets = <Socket>[];
+        addTearDown(() async {
+          for (final socket in sockets) {
+            socket.destroy();
+          }
+          await proxy.close();
+        });
+        final client = IOClient(
+          createProxiedHttpClient(
+            config: Socks5Config(
+              enabled: true,
+              host: 'localhost',
+              port: proxy.port,
+              username: authenticated ? 'читатель' : null,
+              password: authenticated ? ' secret ' : null,
+            ),
+          ),
+        );
+        addTearDown(client.close);
+        final serving = proxy.first.then((socket) async {
+          sockets.add(socket);
+          final reader = _SocketReader(socket);
+          expect(
+            await _acceptSocksTunnel(
+              socket,
+              reader,
+              username: authenticated ? 'читатель' : null,
+              password: authenticated ? ' secret ' : null,
+            ),
+            'catalog.invalid',
+          );
+          if (tls) {
+            // A TLS ClientHello proves native TLS starts only after auth and
+            // CONNECT. Closing the fixture must not trigger a direct retry.
+            expect((await reader.read(1)).single, 0x16);
+            socket.destroy();
+            return;
+          }
+          await reader.readHttpHeaders();
+          socket.write(
+            'HTTP/1.1 200 OK\r\nContent-Length: 7\r\nConnection: close\r\n\r\nbookish',
+          );
+          await socket.flush();
+        });
+        final response = client
+            .get(
+              Uri.parse(
+                tls ? 'https://catalog.invalid/' : 'http://catalog.invalid/',
+              ),
+            )
+            .timeout(const Duration(seconds: 5));
+        if (tls) {
+          await expectLater(response, throwsA(isA<Exception>()));
+        } else {
+          expect((await response).body, 'bookish');
+        }
+        await serving;
+      });
+    }
+
+    test(
+      'draft ${authenticated ? 'auth' : 'no-auth'} probe reaches TLS',
+      () async {
+        final proxy = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+        final sockets = <Socket>[];
+        addTearDown(() async {
+          for (final socket in sockets) {
+            socket.destroy();
+          }
+          await proxy.close();
+        });
+        final serving = proxy.first.then((socket) async {
+          sockets.add(socket);
+          final reader = _SocketReader(socket);
+          expect(
+            await _acceptSocksTunnel(
+              socket,
+              reader,
+              username: authenticated ? 'читатель' : null,
+              password: authenticated ? ' secret ' : null,
+            ),
+            'catalog.invalid',
+          );
+          expect((await reader.read(1)).single, 0x16);
+          socket.destroy();
+        });
+        expect(
+          await checkProxyConnection(
+            Socks5Config(
+              host: 'localhost',
+              port: proxy.port,
+              username: authenticated ? 'читатель' : null,
+              password: authenticated ? ' secret ' : null,
+            ),
+            target: Uri.https('catalog.invalid', '/'),
+            timeout: const Duration(seconds: 5),
+          ),
+          ProxyConnectionResult.serviceUnavailable,
+        );
+        await serving;
+      },
+    );
+  }
+
+  test('draft deadline closes a stalled RFC1929 exchange', () async {
+    final proxy = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    Socket? accepted;
+    addTearDown(() async {
+      accepted?.destroy();
+      await proxy.close();
+    });
+    final authenticating = Completer<void>();
+    final closed = proxy.first.then((socket) async {
+      accepted = socket;
+      final reader = _SocketReader(socket);
+      expect(await reader.read(3), [5, 1, 2]);
+      socket.add([5, 2]);
+      await socket.flush();
+      await _readCredentials(reader, 'reader', 'secret');
+      authenticating.complete();
+      expect(await reader.drain(), 0);
+    });
+    final checking = checkProxyConnection(
+      Socks5Config(
+        host: 'localhost',
+        port: proxy.port,
+        username: 'reader',
+        password: 'secret',
+      ),
+      target: Uri.https('catalog.invalid', '/'),
+      timeout: const Duration(seconds: 2),
+    );
+    await authenticating.future.timeout(const Duration(seconds: 5));
+    expect(await checking, ProxyConnectionResult.timedOut);
+    await closed.timeout(const Duration(seconds: 2));
+  });
+
+  for (final probe in [false, true]) {
+    for (final failure in [
+      'rejected',
+      'downgrade',
+      'unsupported method',
+      'no acceptable method',
+      'invalid auth version',
+      'auth required without credentials',
+    ]) {
+      test(
+        '${probe ? 'probe' : 'transport'} refuses $failure before CONNECT',
+        () async {
+          final proxy = await ServerSocket.bind(
+            InternetAddress.loopbackIPv4,
+            0,
+          );
+          Socket? accepted;
+          addTearDown(() async {
+            accepted?.destroy();
+            await proxy.close();
+          });
+          final hasCredentials = failure != 'auth required without credentials';
+          final config = Socks5Config(
+            enabled: true,
+            host: 'localhost',
+            port: proxy.port,
+            username: hasCredentials ? 'reader' : null,
+            password: hasCredentials ? 'wrong-password' : null,
+          );
+          final serving = proxy.first.then((socket) async {
+            accepted = socket;
+            final reader = _SocketReader(socket);
+            expect(await reader.read(3), [5, 1, hasCredentials ? 2 : 0]);
+            final method = switch (failure) {
+              'downgrade' => 0,
+              'unsupported method' => 1,
+              'no acceptable method' => 255,
+              _ => 2,
+            };
+            socket.add([5, method]);
+            await socket.flush();
+            if (failure == 'rejected' || failure == 'invalid auth version') {
+              await _readCredentials(reader, 'reader', 'wrong-password');
+              socket.add(failure == 'rejected' ? [1, 1] : [2, 0]);
+              await socket.flush();
+            }
+            // No CONNECT, target request, or second authentication attempt.
+            expect(await reader.drain(), 0);
+          });
+          if (probe) {
+            expect(
+              await checkProxyConnection(
+                config,
+                target: Uri.https('catalog.invalid', '/'),
+                timeout: const Duration(seconds: 5),
+              ),
+              ProxyConnectionResult.authenticationFailed,
+            );
+          } else {
+            final client = IOClient(createProxiedHttpClient(config: config));
+            addTearDown(client.close);
+            await expectLater(
+              client
+                  .get(Uri.http('catalog.invalid', '/'))
+                  .timeout(const Duration(seconds: 5)),
+              throwsA(isA<Exception>()),
+            );
+          }
+          await serving.timeout(const Duration(seconds: 5));
+        },
+      );
+    }
+  }
+
+  test(
+    'unavailable or incomplete credentials fail before connecting',
+    () async {
+      final proxy = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      var connections = 0;
+      proxy.listen((socket) {
+        connections++;
+        socket.destroy();
+      });
+      addTearDown(proxy.close);
+      for (final config in [
+        Socks5Config(
+          enabled: true,
+          host: 'localhost',
+          port: proxy.port,
+          credentialsUnavailable: true,
+        ),
+        Socks5Config(
+          enabled: true,
+          host: 'localhost',
+          port: proxy.port,
+          username: 'reader',
+        ),
+      ]) {
+        final client = IOClient(createProxiedHttpClient(config: config));
+        addTearDown(client.close);
+        await expectLater(
+          client.get(Uri.http('catalog.invalid', '/')),
+          throwsA(isA<Exception>()),
+        );
+        expect(
+          await checkProxyConnection(config),
+          ProxyConnectionResult.authenticationFailed,
+        );
+      }
+      expect(connections, 0);
+    },
+  );
 }
 
-/// Minimal local-only SOCKS fixture; production negotiation uses socks5_proxy.
-Future<String> _acceptSocksTunnel(Socket socket, _SocketReader reader) async {
-  final greeting = await reader.read(2);
-  expect(greeting.first, 5);
-  await reader.read(greeting[1]);
-  socket.add([5, 0]);
+/// Minimal SOCKS fixture. Every connection and TLS peer stays on loopback.
+Future<String> _acceptSocksTunnel(
+  Socket socket,
+  _SocketReader reader, {
+  String? username,
+  String? password,
+}) async {
+  expect(await reader.read(3), [5, 1, username == null ? 0 : 2]);
+  socket.add([5, username == null ? 0 : 2]);
+  await socket.flush();
+  if (username != null) {
+    await _readCredentials(reader, username, password!);
+    socket.add([1, 0]);
+  }
   await socket.flush();
   final command = await reader.read(4);
   expect(command.sublist(0, 3), [5, 1, 0]);
@@ -199,6 +462,18 @@ Future<String> _acceptSocksTunnel(Socket socket, _SocketReader reader) async {
   socket.add([5, 0, 0, 1, 127, 0, 0, 1, 0, 0]);
   await socket.flush();
   return destination;
+}
+
+Future<void> _readCredentials(
+  _SocketReader reader,
+  String username,
+  String password,
+) async {
+  expect((await reader.read(1)).single, 1);
+  final userLength = (await reader.read(1)).single;
+  expect(utf8.decode(await reader.read(userLength)), username);
+  final passwordLength = (await reader.read(1)).single;
+  expect(utf8.decode(await reader.read(passwordLength)), password);
 }
 
 class _SocketReader {
@@ -234,7 +509,11 @@ class _SocketReader {
     }
   }
 
-  Future<void> drain() async {
-    while (await _chunks.moveNext()) {}
+  Future<int> drain() async {
+    var bytes = _chunk.length - _offset;
+    while (await _chunks.moveNext()) {
+      bytes += _chunks.current.length;
+    }
+    return bytes;
   }
 }

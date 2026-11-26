@@ -130,7 +130,58 @@ class AppLocalizationsRu extends AppLocalizations {
   String get bookEditError => 'Не удалось сохранить информацию о книге.';
 
   @override
-  String get bookShareUnavailable => 'Поделиться (пока недоступно)';
+  String get bookShare => 'Поделиться';
+
+  @override
+  String get exportBook => 'Сохранить копию';
+
+  @override
+  String get bookExportMenu => 'Экспорт книги';
+
+  @override
+  String get bookCopyFile => 'Копировать файл';
+
+  @override
+  String get bookFileCopied => 'Файл книги скопирован в буфер обмена';
+
+  @override
+  String get bookCopyFileError =>
+      'Не удалось скопировать файл книги в буфер обмена.';
+
+  @override
+  String bookExportSaved(String path) {
+    return 'Книга сохранена: $path';
+  }
+
+  @override
+  String get bookExportError => 'Не удалось экспортировать книгу.';
+
+  @override
+  String get bookExportFileMissing =>
+      'Файл книги больше недоступен на этом устройстве.';
+
+  @override
+  String get bookExportUnsupportedFormat =>
+      'Можно экспортировать только книги в EPUB и PDF.';
+
+  @override
+  String get bookExportSameFile =>
+      'Выберите другое место, чтобы не перезаписать исходный файл.';
+
+  @override
+  String get bookMarkRead => 'Отметить прочитанной';
+
+  @override
+  String get bookUnmarkRead => 'Снять отметку «Прочитано»';
+
+  @override
+  String get bookReadStatus => 'Прочитано';
+
+  @override
+  String get bookReadMarkError => 'Не удалось изменить отметку о прочтении.';
+
+  @override
+  String get bookDeleteError => 'Не удалось удалить книгу из библиотеки.';
 
   @override
   String bookDeleteWarning(String title) {
@@ -280,11 +331,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get deleteBook => 'Удалить книгу';
-
-  @override
-  String deleteBookConfirm(String title) {
-    return 'Вы уверены, что хотите удалить $title?';
-  }
 
   @override
   String get cancel => 'Отмена';
@@ -1624,6 +1670,27 @@ class AppLocalizationsRu extends AppLocalizations {
       'Проверка обращается только к Open Library. Сохранение не включает прокси.';
 
   @override
+  String get proxyUsername => 'Имя пользователя (необязательно)';
+
+  @override
+  String get proxyPassword => 'Пароль (необязательно)';
+
+  @override
+  String get proxyAuthenticationHint =>
+      'Оставьте оба поля пустыми для подключения без авторизации. SOCKS5 передаёт имя пользователя и пароль прокси-серверу без шифрования.';
+
+  @override
+  String get proxyCredentialsInvalid =>
+      'Укажите имя пользователя и пароль длиной от 1 до 255 байт UTF-8 каждый или оставьте оба поля пустыми';
+
+  @override
+  String get proxyCredentialsUnavailable =>
+      'Не удалось прочитать сохранённые данные авторизации прокси. Введите их заново или явно выберите подключение без авторизации.';
+
+  @override
+  String get proxyUseWithoutAuthentication => 'Удалить сохранённую авторизацию';
+
+  @override
   String get proxyCheckAction => 'Проверить подключение';
 
   @override
@@ -1641,17 +1708,21 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось открыть соединение через прокси SOCKS5';
 
   @override
+  String get proxyCheckAuthenticationFailed =>
+      'Ошибка авторизации на прокси или требуется имя пользователя и пароль';
+
+  @override
   String get proxyCheckServiceUnavailable =>
       'Прокси доступен, но Open Library недоступна';
 
   @override
-  String get proxySaving => 'Сохраняем адрес…';
+  String get proxySaving => 'Сохраняем настройки прокси…';
 
   @override
-  String get proxySaved => 'Адрес прокси сохранён';
+  String get proxySaved => 'Настройки прокси сохранены';
 
   @override
-  String get proxySaveFailed => 'Не удалось сохранить адрес прокси';
+  String get proxySaveFailed => 'Не удалось сохранить настройки прокси';
 
   @override
   String get zLibraryLoginError =>

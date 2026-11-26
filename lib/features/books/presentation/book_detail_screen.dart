@@ -8,14 +8,19 @@ import '../../../core/formatters.dart';
 import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../progress/domain/providers/manual_read_status_provider.dart';
 import '../../progress/domain/providers/reading_progress_provider.dart';
 import '../domain/models/book_dto.dart';
 import '../domain/providers/book_organization_provider.dart';
 import '../domain/providers/books_provider.dart';
+import 'book_actions.dart';
+import 'book_export.dart';
 import 'book_labels.dart';
 import 'open_library_dialog.dart';
 import 'widgets/book_cover.dart';
 import 'widgets/inline_book_labels.dart';
+
+enum _BookExportChoice { saveCopy, copyFile }
 
 class BookDetailScreen extends ConsumerStatefulWidget {
   final BookDto book;
@@ -218,11 +223,40 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
                                   semanticLabel: l10n.editBook,
                                 ),
                               ),
-                              IconButton(
-                                tooltip: l10n.bookShareUnavailable,
-                                onPressed: null,
-                                icon: const Icon(Icons.ios_share_outlined),
-                              ),
+                              if (bookFileClipboardAvailable)
+                                PopupMenuButton<_BookExportChoice>(
+                                  tooltip: l10n.bookExportMenu,
+                                  icon: const Icon(Icons.ios_share_outlined),
+                                  onSelected: (choice) => switch (choice) {
+                                    _BookExportChoice.saveCopy => exportBook(
+                                      context,
+                                      book,
+                                    ),
+                                    _BookExportChoice.copyFile =>
+                                      copyBookToClipboard(context, book),
+                                  },
+                                  itemBuilder: (_) => [
+                                    PopupMenuItem(
+                                      value: _BookExportChoice.saveCopy,
+                                      child: Text(l10n.exportBook),
+                                    ),
+                                    PopupMenuItem(
+                                      value: _BookExportChoice.copyFile,
+                                      child: Text(l10n.bookCopyFile),
+                                    ),
+                                  ],
+                                )
+                              else
+                                Builder(
+                                  builder: (buttonContext) => IconButton(
+                                    tooltip: bookExportActionLabel(
+                                      buttonContext,
+                                    ),
+                                    onPressed: () =>
+                                        exportBook(buttonContext, book),
+                                    icon: const Icon(Icons.ios_share_outlined),
+                                  ),
+                                ),
                             ],
                           ),
                         );
@@ -285,7 +319,7 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
                             child: TextButton.icon(
                               onPressed: draft != null
                                   ? null
-                                  : () => _confirmDelete(context, ref, book),
+                                  : () => _confirmDelete(book),
                               style: TextButton.styleFrom(
                                 foregroundColor: theme.colorScheme.error,
                               ),
@@ -359,44 +393,19 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
     );
   }
 
-  Future<void> _confirmDelete(
-    BuildContext context,
-    WidgetRef ref,
-    BookDto currentBook,
-  ) async {
+  Future<void> _confirmDelete(BookDto currentBook) async {
     final l10n = AppLocalizations.of(context)!;
-    final confirmed = await showAppDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        scrollable: true,
-        title: Text(l10n.deleteBook),
-        content: Text(l10n.bookDeleteWarning(currentBook.title)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(l10n.cancel),
-          ),
-          TextButton(
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-            ),
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(l10n.delete),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !context.mounted) return;
+    if (!await confirmBookDeletion(context, currentBook) || !mounted) return;
     try {
       await ref
           .read(booksControllerProvider.notifier)
           .removeBook(currentBook.id);
       if (context.mounted) context.pop();
     } catch (_) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(l10n.bookEditError)));
+      ).showSnackBar(SnackBar(content: Text(l10n.bookDeleteError)));
     }
   }
 }
@@ -510,6 +519,7 @@ class _ReadingAction extends ConsumerWidget {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final progress = ref.watch(readingProgressControllerProvider(book.id));
+    final marked = ref.watch(isBookManuallyReadProvider(book.id));
     final savedPercentage = progress.valueOrNull?.percentage ?? 0;
     final percentage = savedPercentage.isFinite
         ? savedPercentage.clamp(0.0, 100.0)
@@ -519,8 +529,8 @@ class _ReadingAction extends ConsumerWidget {
       l10n.localeName,
       floor: true,
     );
-    final status = percentage >= 100
-        ? l10n.libraryFinished
+    final status = marked || percentage >= 100
+        ? l10n.bookReadStatus
         : percentage > 0
         ? l10n.libraryInProgress
         : l10n.libraryUnread;
@@ -577,6 +587,21 @@ class _ReadingAction extends ConsumerWidget {
             backgroundColor: theme.colorScheme.surfaceContainerHighest,
             semanticsLabel: l10n.libraryReadingProgress,
             semanticsValue: '${percentage.floor()}',
+          ),
+        ],
+        if (marked || percentage < 100) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton.icon(
+              onPressed: enabled
+                  ? () => setBookReadMark(context, ref, book.id, !marked)
+                  : null,
+              icon: Icon(
+                marked ? Icons.remove_done : Icons.check_circle_outline,
+              ),
+              label: Text(marked ? l10n.bookUnmarkRead : l10n.bookMarkRead),
+            ),
           ),
         ],
       ],

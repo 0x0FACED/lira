@@ -7,11 +7,14 @@ import '../../../core/theme/app_tokens.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../progress/domain/models/reading_progress_dto.dart';
+import '../../progress/domain/providers/manual_read_status_provider.dart';
 import '../../progress/domain/providers/reading_progress_provider.dart';
 import '../domain/models/book_dto.dart';
 import '../domain/providers/book_organization_provider.dart';
 import '../domain/providers/books_provider.dart';
 import '../domain/providers/library_layout_provider.dart';
+import 'book_actions.dart';
+import 'book_export.dart';
 import 'widgets/book_card.dart';
 import 'widgets/responsive_grid_delegate.dart';
 
@@ -23,6 +26,8 @@ class LibraryScreen extends ConsumerStatefulWidget {
 }
 
 enum _Shelf { all, reading, unread, finished }
+
+enum _BookAction { exportFile, copyFile, toggleReadMark, delete }
 
 typedef _Label = ({bool genre, String key});
 
@@ -44,6 +49,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final colors = Theme.of(context).colorScheme;
     final books = ref.watch(booksControllerProvider);
     final progress = ref.watch(libraryReadingProgressProvider);
+    final manuallyRead = ref.watch(manuallyReadBookIdsProvider);
     final organizations = ref.watch(bookOrganizationsProvider);
     final sort = ref.watch(librarySortProvider);
     final listView = ref.watch(libraryListViewProvider);
@@ -94,6 +100,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     items,
                     organizations,
                     progress,
+                    manuallyRead,
                     sort,
                     gutter: gutter,
                     wide: wide,
@@ -200,6 +207,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     List<BookDto> books,
     Map<String, BookOrganization> organizations,
     AsyncValue<Map<String, ReadingProgressDto>> progress,
+    Set<String> manuallyRead,
     LibrarySort sort, {
     required double gutter,
     required bool wide,
@@ -247,6 +255,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             books,
             organizations,
             savedProgress ?? const {},
+            manuallyRead,
             activeLabel,
             sort,
           );
@@ -294,6 +303,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           context,
           visible,
           savedProgress ?? const {},
+          manuallyRead,
           gutter,
           wide,
           columns,
@@ -324,11 +334,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             onChanged: (value) => setState(() => _query = _fold(value.trim())),
           ),
         ),
-        IconButton.outlined(
+        IconButton(
           tooltip: l10n.librarySortAndFilters,
-          style: IconButton.styleFrom(side: BorderSide(color: colors.outline)),
           onPressed: () => _showSortAndFilters(context, l10n, sort, labels),
-          icon: const Icon(Icons.tune_rounded),
+          icon: const Icon(Icons.filter_alt_outlined),
         ),
       ],
     );
@@ -511,21 +520,112 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     );
   }
 
+  Future<void> _showBookActions(BuildContext cardContext, BookDto book) async {
+    final l10n = AppLocalizations.of(context)!;
+    final exportLabel = bookExportActionLabel(context);
+    final progress = ref
+        .read(libraryReadingProgressProvider)
+        .valueOrNull?[book.id];
+    final marked = ref.read(isBookManuallyReadProvider(book.id));
+    final markLabel = marked ? l10n.bookUnmarkRead : l10n.bookMarkRead;
+    final anchor = cardContext.findRenderObject();
+    final origin = anchor is RenderBox && anchor.hasSize
+        ? anchor.localToGlobal(Offset.zero) & anchor.size
+        : null;
+    final action = await showAppBottomSheet<_BookAction>(
+      context: context,
+      builder: (sheet) => SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            0,
+            AppSpacing.md,
+            AppSpacing.md,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: Text(
+                  book.title,
+                  style: Theme.of(sheet).textTheme.titleLarge,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.ios_share_outlined),
+                title: Text(exportLabel),
+                onTap: () => Navigator.pop(sheet, _BookAction.exportFile),
+              ),
+              if (bookFileClipboardAvailable)
+                ListTile(
+                  leading: const Icon(Icons.copy_outlined),
+                  title: Text(l10n.bookCopyFile),
+                  onTap: () => Navigator.pop(sheet, _BookAction.copyFile),
+                ),
+              if (marked || (progress?.percentage ?? 0) < 100)
+                ListTile(
+                  leading: Icon(
+                    marked ? Icons.remove_done : Icons.check_circle_outline,
+                  ),
+                  title: Text(markLabel),
+                  onTap: () => Navigator.pop(sheet, _BookAction.toggleReadMark),
+                ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline),
+                title: Text(l10n.deleteBook),
+                textColor: Theme.of(sheet).colorScheme.error,
+                iconColor: Theme.of(sheet).colorScheme.error,
+                onTap: () => Navigator.pop(sheet, _BookAction.delete),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted) return;
+    switch (action) {
+      case _BookAction.exportFile:
+        await exportBook(context, book, shareOrigin: origin);
+      case _BookAction.copyFile:
+        await copyBookToClipboard(context, book);
+      case _BookAction.toggleReadMark:
+        await setBookReadMark(context, ref, book.id, !marked);
+      case _BookAction.delete:
+        if (!await confirmBookDeletion(context, book) || !mounted) return;
+        try {
+          await ref.read(booksControllerProvider.notifier).removeBook(book.id);
+        } catch (_) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(l10n.bookDeleteError)));
+        }
+      case null:
+        break;
+    }
+  }
+
   List<BookDto> _visibleBooks(
     List<BookDto> books,
     Map<String, BookOrganization> organizations,
     Map<String, ReadingProgressDto> progress,
+    Set<String> manuallyRead,
     _Label? label,
     LibrarySort sort,
   ) {
     final visible = <BookDto>[];
     for (final book in books) {
       final percentage = progress[book.id]?.percentage ?? 0;
+      final isRead = percentage >= 100 || manuallyRead.contains(book.id);
       if (!switch (_shelf) {
         _Shelf.all => true,
-        _Shelf.reading => percentage > 0 && percentage < 100,
-        _Shelf.unread => percentage <= 0,
-        _Shelf.finished => percentage >= 100,
+        _Shelf.reading => !isRead && percentage > 0,
+        _Shelf.unread => !isRead && percentage <= 0,
+        _Shelf.finished => isRead,
       })
         continue;
       final organization = organizations[book.id];
@@ -576,34 +676,29 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     BuildContext context,
     List<BookDto> books,
     Map<String, ReadingProgressDto> progress,
+    Set<String> manuallyRead,
     double gutter,
     bool wide,
     int? columns,
     bool listView,
   ) {
-    final controller = ref.read(booksControllerProvider.notifier);
-    final indices = <String, int>{};
-    final maxPageCounts = listView ? null : <String, int>{};
-    for (var i = 0; i < books.length; i++) {
-      final book = books[i];
-      indices[book.id] = i;
-      if (maxPageCounts != null) {
-        final previous = maxPageCounts[book.format];
-        if (previous == null || book.pageCount > previous) {
-          maxPageCounts[book.format] = book.pageCount;
-        }
-      }
-    }
+    final indices = <String, int>{
+      for (var i = 0; i < books.length; i++) books[i].id: i,
+    };
     final delegate = SliverChildBuilderDelegate(
       (context, index) {
         final book = books[index];
+        final saved = progress[book.id];
         return BookCard(
           key: ValueKey(book.id),
           book: book,
           compact: listView,
-          readingPercentage: progress[book.id]?.percentage,
+          readingPercentage: saved?.percentage,
+          readingLocation: saved?.location,
+          isRead:
+              (saved?.percentage ?? 0) >= 100 || manuallyRead.contains(book.id),
           onTap: () => context.push('/book-detail', extra: book),
-          onDelete: () => controller.removeBook(book.id),
+          onLongPress: (cardContext) => _showBookActions(cardContext, book),
         );
       },
       childCount: books.length,
@@ -614,9 +709,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     if (listView) {
       sliver = SliverList(delegate: delegate);
     } else {
-      // getLayout also runs while scrolling; only measure after width changes.
-      var measuredWidth = -1.0;
-      var measuredExtent = 0.0;
+      final metadataExtent =
+          BookCard.metadataExtent(context) +
+          extraHit -
+          extraHit / BookCard.coverAspectRatio;
       sliver = SliverGrid(
         gridDelegate: ResponsiveGridDelegate(
           crossAxisCount: columns,
@@ -629,20 +725,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           crossAxisSpacing: (wide ? AppSpacing.lg : AppSpacing.md) - extraHit,
           mainAxisSpacing: (wide ? AppSpacing.xl : AppSpacing.lg) - extraHit,
           childAspectRatio: BookCard.coverAspectRatio,
-          mainAxisExtraExtentForWidth: (width) {
-            if (width != measuredWidth) {
-              measuredExtent =
-                  BookCard.metadataExtent(
-                    context,
-                    maxPageCounts!,
-                    width - extraHit,
-                  ) +
-                  extraHit -
-                  extraHit / BookCard.coverAspectRatio;
-              measuredWidth = width;
-            }
-            return measuredExtent;
-          },
+          mainAxisExtraExtentForWidth: (_) => metadataExtent,
         ),
         delegate: delegate,
       );

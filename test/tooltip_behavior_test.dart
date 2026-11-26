@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:lira/core/database/app_database.dart';
 import 'package:lira/core/di/injection.dart';
 import 'package:lira/core/router/app_router.dart';
@@ -91,8 +92,7 @@ void main() {
                     compact: true,
                     book: book,
                     onTap: () => router.push('/book'),
-                    onDelete: () =>
-                        getIt<BooksLocalRepository>().deleteBook(book.id),
+                    onLongPress: (_) {},
                   ),
                 ),
                 SizedBox(
@@ -158,8 +158,10 @@ void main() {
     (tester) async {
       await mount(tester);
       await hover(tester, find.byType(BookCard));
-      await hover(tester, find.text('1234'));
-      expect(paintedTextContaining('1234'), findsOneWidget);
+      final l10n = AppLocalizations.of(tester.element(find.byType(BookCard)))!;
+      final count = NumberFormat.decimalPattern(l10n.localeName).format(1234);
+      await hover(tester, find.textContaining('≈$count'));
+      expect(paintedTextContaining('≈$count'), findsOneWidget);
       await tester.tap(find.byType(BookCard));
       await tester.pumpAndSettle();
       expect(find.byType(BookDetailScreen), findsOneWidget);
@@ -174,32 +176,6 @@ void main() {
     },
     variant: TargetPlatformVariant.only(TargetPlatform.macOS),
   );
-
-  testWidgets('details share is disabled, named, and explains availability', (
-    tester,
-  ) async {
-    await mount(tester);
-    await tester.tap(find.byType(BookCard));
-    await tester.pumpAndSettle();
-    final context = tester.element(find.byType(BookDetailScreen));
-    final l10n = AppLocalizations.of(context)!;
-    final share = find.byTooltip(l10n.bookShareUnavailable);
-    final semantics = tester.ensureSemantics();
-    expect(
-      tester.getSemantics(share),
-      matchesSemantics(
-        tooltip: l10n.bookShareUnavailable,
-        isButton: true,
-        hasEnabledState: true,
-        isEnabled: false,
-      ),
-    );
-    semantics.dispose();
-    await hover(tester, share);
-    expect(paintedTextContaining(l10n.bookShareUnavailable), findsOneWidget);
-    expect(find.byType(BookDetailScreen), findsOneWidget);
-    await tester.pumpWidget(const SizedBox.shrink());
-  });
 
   testWidgets('discovery save action stays named without a hover popup', (
     tester,

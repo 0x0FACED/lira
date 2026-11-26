@@ -11,6 +11,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:lira/core/database/app_database.dart';
 import 'package:lira/core/di/injection.dart';
+import 'package:lira/core/providers/preferences_provider.dart';
 import 'package:lira/features/books/data/repositories/books_local_repository.dart';
 import 'package:lira/features/books/domain/providers/books_provider.dart';
 import 'package:lira/features/search/domain/models/search_result_item.dart';
@@ -138,7 +139,10 @@ void main() {
     repository = BooksLocalRepository(database);
     getIt.registerSingleton<BooksLocalRepository>(repository);
     container = ProviderContainer(
-      overrides: [zLibraryApiProvider.overrideWithValue(api)],
+      overrides: [
+        zLibraryApiProvider.overrideWithValue(api),
+        initialSocks5ConfigProvider.overrideWithValue(const Socks5Config()),
+      ],
     );
     await container.read(booksControllerProvider.future);
     if (modulePath != null) Pdfrx.pdfiumModulePath = modulePath;

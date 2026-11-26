@@ -8,7 +8,15 @@
 2. **Add a book.** Import an EPUB or PDF, or open **Discover** to search for a title through a supported source.
 3. **Settle in.** Open the book, adjust your EPUB reading settings, and start reading. Your place is saved as you go.
 
-In the library's two- and three-column grids, cards show the file format and page count when available. EPUB page counts are estimates and are marked with **≈**.
+In the library's list and two- and three-column grids, cards show the file format on the left and the reading progress on the right of the same line. When available, the current and total pages appear beside the percentage. PDF positions use the saved page; EPUB page numbers are estimates marked with **≈**. When no progress is saved, only the total page count is shown, if known.
+
+In list view, every title has space for two lines. Longer titles end with an ellipsis; cover sizes stay the same.
+
+Use the funnel next to the library search field to open sorting and filters.
+
+Long-press or click and hold a book in the library to open its action menu. On Android and iOS, **Share** opens the system share sheet. On macOS, Windows, and Linux, **Save a copy** opens the system save dialog, while **Copy file** puts the original EPUB or PDF on the clipboard for pasting into a folder or an app that accepts files. These actions are also available from the book's details and leave the original file unchanged. On Linux, keeping the clipboard after Lira closes depends on the desktop's clipboard manager.
+
+Choose **Mark as read** in the action menu or the book's details to move the book to **Finished** without changing its reading position or percentage. **Remove read mark** gives the book the status implied by its saved progress again.
 
 You can also open **Settings → Customize reader** to try the controls on the bundled Russian/English EPUB without importing a book.
 
@@ -67,7 +75,9 @@ Browser clearance can be bound to the domain, exit IP and User-Agent. Use the sa
 
 SOCKS5 settings in Lira are the explicit application-level routing policy; inherited `HTTP_PROXY`/`HTTPS_PROXY` variables are not layered inside that connection. Normal TLS certificate verification remains enabled.
 
-In **Settings → Network**, enter the SOCKS5 host (DNS name, IPv4 or IPv6) and port. **Check connection** tests those fields with a short HTTPS request to Open Library, even while the proxy is off. It does not save or enable the proxy, and success does not guarantee access to other sources. **Save** applies the address; the switch controls whether Lira uses it. Proxies that require authentication are not supported.
+In **Settings → Network**, enter the SOCKS5 host (DNS name, IPv4 or IPv6) and port. If the proxy requires authentication, enter both the username and password; otherwise leave both fields empty. **Check connection** tests the current fields with a short HTTPS request to Open Library, even while the proxy is off. It does not save or enable the proxy, and success does not guarantee access to other sources. **Save** applies the settings; the switch controls whether Lira uses them.
+
+Lira saves the credentials in the system's secure storage. On Linux, this requires a running Secret Service such as GNOME Keyring or KWallet. SOCKS5 sends the credentials to the proxy without encryption; HTTPS protects the connection to the destination, not the SOCKS5 password. Only use password authentication over a trusted network or an encrypted tunnel.
 
 ## Export quotes and notes
 
@@ -86,7 +96,7 @@ Invitations expire after five minutes; an approved exchange can continue longer.
 
 Files and annotation metadata are authenticated and encrypted with AES-256-GCM, using a fresh secret in each invitation. Treat the QR and copied invitation as a secret, share it only with your intended device, and approve only the request you initiated. File hashes are checked before import. Matching is by SHA-256 of the complete EPUB/PDF file, not title, so different editions do not share incompatible positions. A missing local file can be restored without creating another library entry.
 
-Conflicts use the saved modification timestamp and a stable device-ID tie-break, not the highest reading percentage; keep device clocks correct. Deleted highlights and bookmarks remain deleted after merging. Deleting a book is local: it does not remove the other device's copy and suppresses automatic re-import until you explicitly import/save that book again. Genres, tags, library layout and sort order remain device-local, as do unsaved article previews, source credentials, account state and appearance settings. There is no automatic/background or cloud synchronization. Interrupted exchanges may have saved verified changes on one device; starting a new session safely merges them again.
+Conflicts use the saved modification timestamp and a stable device-ID tie-break, not the highest reading percentage; keep device clocks correct. Deleted highlights and bookmarks remain deleted after merging. Deleting a book is local: it does not remove the other device's copy and suppresses automatic re-import until you explicitly import/save that book again. Genres, tags, manual read marks, library layout and sort order remain device-local, as do unsaved article previews, source credentials, account state and appearance settings. There is no automatic/background or cloud synchronization. Interrupted exchanges may have saved verified changes on one device; starting a new session safely merges them again.
 
 Each protocol message is limited to 16 MiB of serialized metadata (at most 100,000 records per snapshot), and each book file to 2 GiB. A session exceeding these limits fails rather than silently omitting books or annotations.
 

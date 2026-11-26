@@ -18,6 +18,7 @@ import 'package:lira/features/books/domain/models/book_dto.dart';
 import 'package:lira/features/books/domain/providers/book_organization_provider.dart';
 import 'package:lira/features/books/domain/providers/library_layout_provider.dart';
 import 'package:lira/features/books/presentation/book_detail_screen.dart';
+import 'package:lira/features/books/presentation/book_export.dart';
 import 'package:lira/features/books/presentation/library_screen.dart';
 import 'package:lira/features/books/presentation/open_library_dialog.dart';
 import 'package:lira/features/books/presentation/widgets/book_card.dart';
@@ -169,7 +170,7 @@ void main() {
       await mount(tester);
       Finder progressFor(String id, String text) => find.descendant(
         of: find.byKey(ValueKey(id)),
-        matching: find.text(text),
+        matching: find.textContaining(RegExp('${RegExp.escape(text)}\$')),
       );
       expect(progressFor('0', '42,7%'), findsOneWidget);
       expect(progressFor('1', '99,9%'), findsOneWidget);
@@ -246,7 +247,13 @@ void main() {
       final progress = tester.getRect(find.byType(LinearProgressIndicator));
       final lookup = tester.getRect(find.byTooltip(l10n.openLibraryFind));
       final edit = tester.getRect(find.byTooltip(l10n.editBook));
-      final share = tester.getRect(find.byTooltip(l10n.bookShareUnavailable));
+      final share = tester.getRect(
+        find.byTooltip(
+          bookFileClipboardAvailable
+              ? l10n.bookExportMenu
+              : bookExportActionLabel(context),
+        ),
+      );
       final delete = tester.getRect(
         find.widgetWithText(TextButton, l10n.deleteBook),
       );
@@ -557,6 +564,10 @@ void main() {
           await tester.longPressAt(
             tester.getTopLeft(card) + const Offset(2, 24),
           );
+          await tester.pumpAndSettle();
+          final delete = find.widgetWithText(ListTile, l10n.deleteBook);
+          await tester.ensureVisible(delete);
+          await tester.tap(delete);
         }
         await tester.pumpAndSettle();
         final dialog = find.byType(AlertDialog);
@@ -604,7 +615,7 @@ void main() {
 
   for (final width in [320.0, 390.0]) {
     for (final columns in [2, 3]) {
-      for (final textScale in [0.8, 1.0, 2.0]) {
+      for (final textScale in [0.8, 1.0, 2.0, 2.5]) {
         testLibraryWidgets(
           '$columns columns fit width $width at text scale $textScale',
           (tester) async {
@@ -634,7 +645,6 @@ void main() {
             final l10n = AppLocalizations.of(
               tester.element(find.byType(LibraryScreen)),
             )!;
-            final countFormat = NumberFormat.decimalPattern(l10n.localeName);
             final cards = find.byType(BookCard).evaluate().take(3).toList();
             final coverSizes = <Size>[];
             final titleOffsets = <double>[];
@@ -644,16 +654,9 @@ void main() {
               final card = find.byWidget(element.widget);
               final book = (element.widget as BookCard).book;
               final format = book.format.toUpperCase();
-              final count = countFormat.format(book.pageCount);
-              final pages = l10n.bookPageCountCompact(
-                book.format == 'epub' ? '≈$count' : count,
-              );
-              final metadata = find.descendant(
-                of: card,
-                matching: find.text(
-                  book.pageCount > 0 ? '$format · $pages' : format,
-                ),
-              );
+              final metadata = find
+                  .descendant(of: card, matching: find.text(format))
+                  .last;
               expect(metadata, findsOneWidget);
               final metadataRect = tester.getRect(metadata);
               final cardRect = tester.getRect(card);
@@ -666,7 +669,42 @@ void main() {
                     .didExceedMaxLines,
                 isFalse,
               );
-              metadataOffsets.add(metadataRect.top - cardRect.top);
+              final metadataRow = find.descendant(
+                of: card,
+                matching: find.byKey(const ValueKey('book-card-metadata-row')),
+              );
+              final rowRect = tester.getRect(metadataRow);
+              metadataOffsets.add(rowRect.top - cardRect.top);
+              expect(metadataRect.left, closeTo(rowRect.left, 0.01));
+              final progressLabel = find.descendant(
+                of: card,
+                matching: find.byWidgetPredicate(
+                  (widget) =>
+                      widget is Semantics &&
+                      widget.properties.label == l10n.libraryReadingProgress,
+                ),
+              );
+              if (book.pageCount > 0 || book.id == '0' || book.id == '1') {
+                final labelRect = tester.getRect(progressLabel);
+                expect(labelRect.top, closeTo(metadataRect.top, 0.01));
+                expect(labelRect.right, closeTo(rowRect.right, 0.01));
+                expect(labelRect.left, greaterThan(metadataRect.right));
+                expect(
+                  labelRect.bottom,
+                  lessThanOrEqualTo(rowRect.bottom + 0.01),
+                );
+                final label = find.descendant(
+                  of: progressLabel,
+                  matching: find.byKey(
+                    const ValueKey('book-card-progress-label'),
+                  ),
+                );
+                expect(tester.widget<Text>(label).maxLines, 1);
+                expect(
+                  tester.renderObject<RenderParagraph>(label).didExceedMaxLines,
+                  isFalse,
+                );
+              }
               final progress = find.descendant(
                 of: card,
                 matching: find.byType(LinearProgressIndicator),
@@ -674,7 +712,7 @@ void main() {
               if (book.id == '0' || book.id == '1') {
                 expect(progress, findsOneWidget);
                 final progressRect = tester.getRect(progress);
-                expect(metadataRect.bottom, lessThan(progressRect.top));
+                expect(rowRect.bottom, lessThan(progressRect.top));
                 expect(progressRect.bottom, lessThanOrEqualTo(cardRect.bottom));
                 progressOffsets.add(progressRect.bottom - cardRect.bottom);
               } else {
@@ -711,6 +749,65 @@ void main() {
     }
   }
 
+  for (final textScale in [1.0, 2.0]) {
+    testLibraryWidgets(
+      'list titles keep rows aligned and truncate at text scale $textScale',
+      (tester) async {
+        const titles = [
+          'Кот',
+          'Море\nи небо',
+          'Книга с очень длинным названием, которое не помещается в две строки',
+        ];
+        await mount(
+          tester,
+          size: const Size(320, 844),
+          textScale: textScale,
+          home: Scaffold(
+            body: Column(
+              children: [
+                for (final (index, title) in titles.indexed)
+                  BookCard(
+                    key: ValueKey(index),
+                    book: BookDto(
+                      id: '$index',
+                      title: title,
+                      author: 'Автор',
+                      format: 'epub',
+                      createdAt: DateTime(2026),
+                    ),
+                    compact: true,
+                    readingPercentage: 50,
+                    onTap: () {},
+                    onLongPress: (_) {},
+                  ),
+              ],
+            ),
+          ),
+        );
+
+        final heights = <double>[];
+        final authorOffsets = <double>[];
+        for (final (index, title) in titles.indexed) {
+          final row = find.byKey(ValueKey(index));
+          final heading = find
+              .descendant(of: row, matching: find.text(title))
+              .last;
+          final author = find
+              .descendant(of: row, matching: find.text('Автор'))
+              .last;
+          final paragraph = tester.renderObject<RenderParagraph>(heading);
+          heights.add(tester.getSize(row).height);
+          authorOffsets.add(
+            tester.getTopLeft(author).dy - tester.getTopLeft(row).dy,
+          );
+          expect(paragraph.didExceedMaxLines, index == titles.length - 1);
+        }
+        expect(heights, everyElement(closeTo(heights.first, 0.01)));
+        expect(authorOffsets, everyElement(closeTo(authorOffsets.first, 0.01)));
+      },
+    );
+  }
+
   testLibraryWidgets('file metadata fits the list at large text scale', (
     tester,
   ) async {
@@ -731,7 +828,11 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
-    final pages = find.descendant(of: card, matching: find.text('9999'));
+    final count = NumberFormat.decimalPattern(l10n.localeName).format(9999);
+    final pages = find.descendant(
+      of: card,
+      matching: find.textContaining(count),
+    );
     expect(pages, findsOneWidget);
     final countRect = tester.getRect(pages);
     final cardRect = tester.getRect(card);
@@ -745,19 +846,75 @@ void main() {
     tester,
   ) async {
     await mount(tester);
+    final context = tester.element(find.byType(LibraryScreen));
+    final l10n = AppLocalizations.of(context)!;
+    final remove = find.widgetWithText(ListTile, l10n.deleteBook);
     final card = find.byKey(const ValueKey('0'));
     await tester.longPress(card);
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(TextButton, 'Отмена'));
+    expect(
+      find.widgetWithText(ListTile, bookExportActionLabel(context)),
+      findsOneWidget,
+    );
+    expect(find.byType(AlertDialog), findsNothing);
+    await tester.tap(remove);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, l10n.cancel));
     await tester.pumpAndSettle();
     expect(card, findsOneWidget);
 
     await tester.longPress(card);
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(TextButton, 'Удалить'));
+    await tester.tap(remove);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, l10n.delete));
     await tester.pumpAndSettle();
     expect(card, findsNothing);
     expect(tester.takeException(), isNull);
+  });
+
+  testLibraryWidgets('a manual mark changes shelves without moving the book', (
+    tester,
+  ) async {
+    await getIt<ReadingProgressLocalRepository>().saveProgress(
+      ReadingProgressDto(
+        bookId: '0',
+        location: 'saved-position',
+        percentage: 25,
+        updatedAt: DateTime(2026),
+      ),
+    );
+    await mount(tester);
+    final context = tester.element(find.byType(LibraryScreen));
+    final l10n = AppLocalizations.of(context)!;
+    final card = find.byKey(const ValueKey('0'));
+    Future<void> showShelf(String label) async {
+      final chip = find.widgetWithText(ChoiceChip, label);
+      await tester.ensureVisible(chip);
+      await tester.tap(chip);
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> chooseMark(String label) async {
+      await tester.longPress(card);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ListTile, label));
+      await tester.pumpAndSettle();
+    }
+
+    await showShelf(l10n.libraryInProgress);
+    await chooseMark(l10n.bookMarkRead);
+    expect(card, findsNothing);
+    await showShelf(l10n.libraryFinished);
+    expect(card, findsOneWidget);
+    expect(
+      find.descendant(of: card, matching: find.textContaining('25,0%')),
+      findsOneWidget,
+    );
+    await chooseMark(l10n.bookUnmarkRead);
+    expect(card, findsNothing);
+    await showShelf(l10n.libraryInProgress);
+    expect(card, findsOneWidget);
   });
 
   testLibraryWidgets(
@@ -842,6 +999,10 @@ void main() {
     'card hit area includes the left edge for mouse and touch',
     (tester) async {
       await mount(tester);
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(LibraryScreen)),
+      )!;
+      final menuDelete = find.widgetWithText(ListTile, l10n.deleteBook);
       final card = find.byKey(const ValueKey('0'));
       final edge = tester.getTopLeft(card) + const Offset(2, 24);
       final mouse = await tester.startGesture(
@@ -851,12 +1012,12 @@ void main() {
       await tester.pump(const Duration(milliseconds: 600));
       await mouse.up();
       await tester.pumpAndSettle();
-      expect(find.byType(AlertDialog), findsOneWidget);
-      await tester.tap(find.widgetWithText(TextButton, 'Отмена'));
+      expect(menuDelete, findsOneWidget);
+      await tester.tapAt(const Offset(5, 5));
       await tester.pumpAndSettle();
       await tester.longPressAt(edge);
       await tester.pumpAndSettle();
-      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(menuDelete, findsOneWidget);
     },
   );
 

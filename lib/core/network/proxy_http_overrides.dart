@@ -1,8 +1,9 @@
 import 'dart:io';
-
-import 'package:socks5_proxy/socks_client.dart' as socks;
+import 'dart:typed_data';
 
 import '../providers/preferences_provider.dart';
+import 'socks5_handshake.dart';
+import 'socks5_socket.dart';
 
 /// Global proxy state — updated from the UI when user toggles SOCKS5.
 /// This is intentionally global (not Riverpod) because HttpOverrides
@@ -29,10 +30,18 @@ class ProxyHttpOverrides extends HttpOverrides {
     client.findProxy = (_) => 'DIRECT';
     final config = _config ?? _currentConfig;
     if (config.enabled) {
-      client.connectionFactory = (uri, _, __) {
-        final connection = _SocksConnection(config, uri, context);
-        return Future.value(
-          ConnectionTask.fromSocket(connection.open(), connection.cancel),
+      client.connectionFactory = (uri, _, __) async {
+        // Reject invalid configuration before returning a task whose socket
+        // future could fail before HttpClient has subscribed to it.
+        final authentication = socks5AuthenticationRequest(config);
+        final host = socks5ProxyHost(config.host);
+        if (host.isEmpty || config.port < 1 || config.port > 65535) {
+          throw ArgumentError('A proxy host and port 1–65535 are required');
+        }
+        final connection = _SocksConnection(config.port, uri, context);
+        return ConnectionTask.fromSocket(
+          connection.open(host, authentication),
+          connection.cancel,
         );
       };
     }
@@ -47,16 +56,10 @@ HttpClient createProxiedHttpClient({Socks5Config? config}) {
   return ProxyHttpOverrides(config: config).createHttpClient(null);
 }
 
-/// Accepts bare or bracketed IPv6 alongside numeric IPv4 and DNS names.
-String socks5ProxyHost(String host) =>
-    host.startsWith('[') && host.endsWith(']')
-    ? host.substring(1, host.length - 1)
-    : host;
-
 class _SocksConnection {
-  _SocksConnection(this.config, this.uri, this.context);
+  _SocksConnection(this.port, this.uri, this.context);
 
-  final Socks5Config config;
+  final int port;
   final Uri uri;
   final SecurityContext? context;
   ConnectionTask<Socket>? _tcpTask;
@@ -73,40 +76,32 @@ class _SocksConnection {
     if (_cancelled) throw const SocketException('Connection cancelled');
   }
 
-  Future<Socket> open() async {
+  Future<Socket> open(String host, Uint8List? authentication) async {
     try {
-      _checkCancelled();
-      final host = socks5ProxyHost(config.host);
-      if (host.isEmpty || config.port < 1 || config.port > 65535) {
-        throw ArgumentError('A proxy host and port 1–65535 are required');
-      }
       // Let the native connector resolve hostnames lazily and try IPv4/IPv6.
-      _tcpTask = await Socket.startConnect(host, config.port);
+      _tcpTask = await Socket.startConnect(host, port);
       if (_cancelled) _tcpTask!.cancel();
       final socket = await _tcpTask!.socket;
       _socket = socket;
       if (_cancelled) socket.destroy();
       _checkCancelled();
 
-      // The package owns negotiation, but not TCP establishment. Supplying
-      // our already-connected socket keeps stalled SOCKS negotiation
-      // cancellable; the package's normal connect API hides it until done.
-      final tunnel = await IOOverrides.runZoned(
-        () => socks.SocksTCPClient.connect(
-          [socks.ProxySettings(socket.remoteAddress, config.port)],
-          InternetAddress(uri.host, type: InternetAddressType.unix),
-          uri.port,
-        ),
-        socketConnect:
-            (host, port, {sourceAddress, sourcePort = 0, timeout}) async =>
-                socket,
+      final reader = Socks5SocketReader(socket);
+      await openSocks5Tunnel(
+        uri,
+        authenticationRequest: authentication,
+        read: reader.readExactly,
+        write: (bytes) async {
+          socket.add(bytes);
+          await socket.flush();
+        },
       );
       _checkCancelled();
       // Keep native certificate/hostname verification and the caller's
       // SecurityContext. Never accept bad certificates or retry directly.
       final Socket connectedSocket = uri.scheme == 'https'
-          ? await tunnel.secure(uri.host, context: context)
-          : tunnel;
+          ? await SecureSocket.secure(socket, host: uri.host, context: context)
+          : reader.tunnel(socket);
       _socket = connectedSocket;
       if (_cancelled) connectedSocket.destroy();
       _checkCancelled();

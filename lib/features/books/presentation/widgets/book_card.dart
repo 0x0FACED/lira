@@ -1,27 +1,31 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' show NumberFormat;
 
 import '../../../../core/formatters.dart';
 import '../../../../core/theme/app_tokens.dart';
-import '../../../../core/widgets/app_components.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/models/book_dto.dart';
 import '../book_labels.dart';
+import '../book_page_progress.dart';
 import 'book_cover.dart';
 
 class BookCard extends StatelessWidget {
   final BookDto book;
   final VoidCallback onTap;
-  final VoidCallback onDelete;
+  final ValueChanged<BuildContext> onLongPress;
   final double? readingPercentage;
+  final String? readingLocation;
+  final bool isRead;
   final bool compact;
 
   const BookCard({
     super.key,
     required this.book,
     required this.onTap,
-    required this.onDelete,
+    required this.onLongPress,
     this.readingPercentage,
+    this.readingLocation,
+    this.isRead = false,
     this.compact = false,
   });
 
@@ -29,51 +33,19 @@ class BookCard extends StatelessWidget {
   static const hitInset = 4.0;
   static const _titleSize = 14.0;
   static const _authorSize = 12.0;
-  static const _progressSize = 11.0;
   static const _metadataSize = 11.0;
   static const _progressBarHeight = 2.0;
   static const _lineHeight = 1.3;
 
-  /// Reserve the same caption height, including wrapped metadata, for the grid.
-  /// Only the largest count per format needs measuring; digits share a width.
-  /// [width] excludes the card's hit inset.
-  static double metadataExtent(
-    BuildContext context,
-    Map<String, int> maxPageCounts,
-    double width,
-  ) {
+  /// One metadata row keeps grid geometry independent of each book's values.
+  static double metadataExtent(BuildContext context) {
     final textScaler = MediaQuery.textScalerOf(context);
-    final l10n = AppLocalizations.of(context)!;
-    final countFormat = NumberFormat.decimalPattern(l10n.localeName);
-    final painter = TextPainter(
-      textDirection: Directionality.of(context),
-      textScaler: textScaler,
-      locale: Localizations.localeOf(context),
-    );
-    final style = _fileMetadataStyle(Theme.of(context));
-    var fileMetadataExtent = _textLineExtent(textScaler, _metadataSize);
-    try {
-      for (final entry in maxPageCounts.entries) {
-        painter.text = TextSpan(
-          text: _fileMetadataLabel(entry.key, entry.value, l10n, countFormat),
-          style: style,
-        );
-        painter.layout(maxWidth: width);
-        if (painter.height > fileMetadataExtent) {
-          fileMetadataExtent = painter.height.ceilToDouble();
-        }
-      }
-    } finally {
-      painter.dispose();
-    }
     return AppSpacing.compact +
         _textLineExtent(textScaler, _titleSize) * 2 +
         AppSpacing.xs +
         _textLineExtent(textScaler, _authorSize) +
         AppSpacing.xs +
-        fileMetadataExtent +
-        AppSpacing.sm +
-        _textLineExtent(textScaler, _progressSize) +
+        _textLineExtent(textScaler, _metadataSize) +
         AppSpacing.sm +
         _progressBarHeight;
   }
@@ -91,19 +63,57 @@ class BookCard extends StatelessWidget {
         color: theme.colorScheme.onSurfaceVariant,
       );
 
-  static String _fileMetadataLabel(
-    String fileFormat,
-    int pageCount,
+  static TextStyle? _progressStyle(ThemeData theme) =>
+      theme.textTheme.labelSmall?.copyWith(
+        fontSize: _metadataSize,
+        fontWeight: FontWeight.w400,
+        height: _lineHeight,
+        letterSpacing: 0,
+        fontFeatures: const [FontFeature.tabularFigures()],
+        color: theme.colorScheme.onSurface,
+      );
+
+  static String _progressLabel(String? pages, String? percentage) {
+    if (pages == null) return percentage ?? '';
+    return percentage == null ? pages : '$pages · $percentage';
+  }
+
+  static ({String full, String compact}) _readingProgressLabels(
     AppLocalizations l10n,
     NumberFormat countFormat,
+    NumberFormat percentageFormat,
+    BookDto book,
+    double? readingPercentage,
+    String? readingLocation,
   ) {
-    final format = fileFormat.toUpperCase();
-    if (pageCount <= 0) return format;
-    final count = countFormat.format(pageCount);
-    final pages = l10n.bookPageCountCompact(
-      format == 'EPUB' ? '≈$count' : count,
+    final percentage = readingPercentage?.isFinite == true
+        ? readingPercentage!.clamp(0.0, 100.0)
+        : null;
+    final displayed = percentage == null
+        ? null
+        : formatReadingPercentage(
+            percentage,
+            l10n.localeName,
+            floor: true,
+            numberFormat: percentageFormat,
+          );
+    final pages = bookPageProgress(
+      book: book,
+      percentage: percentage,
+      location: readingLocation,
     );
-    return '$format · $pages';
+    final coordinates = pages == null
+        ? null
+        : '${pages.approximate ? '≈' : ''}'
+              '${pages.current == null ? '' : '${countFormat.format(pages.current)}/'}'
+              '${countFormat.format(pages.total)}';
+    return (
+      full: _progressLabel(
+        coordinates == null ? null : l10n.bookPageCountCompact(coordinates),
+        displayed,
+      ),
+      compact: _progressLabel(coordinates, displayed),
+    );
   }
 
   @override
@@ -113,14 +123,14 @@ class BookCard extends StatelessWidget {
     if (compact) {
       return _BookCardInteraction(
         onTap: onTap,
-        onLongPress: () => _confirmDelete(context),
+        onLongPress: () => onLongPress(context),
         child: _buildCompactContent(context),
       );
     }
     final textScaler = MediaQuery.textScalerOf(context);
     return _BookCardInteraction(
       onTap: onTap,
-      onLongPress: () => _confirmDelete(context),
+      onLongPress: () => onLongPress(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -154,16 +164,6 @@ class BookCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
-          Text(
-            _fileMetadataLabel(
-              book.format,
-              book.pageCount,
-              l10n,
-              NumberFormat.decimalPattern(l10n.localeName),
-            ),
-            style: _fileMetadataStyle(theme),
-          ),
-          const SizedBox(height: AppSpacing.sm),
           Expanded(child: _buildFooter(context)),
         ],
       ),
@@ -173,6 +173,7 @@ class BookCard extends StatelessWidget {
   Widget _buildCompactContent(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
+    final textScaler = MediaQuery.textScalerOf(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -183,15 +184,18 @@ class BookCard extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                book.title.trim(),
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontSize: _titleSize,
-                  fontWeight: FontWeight.w500,
-                  height: _lineHeight,
+              SizedBox(
+                height: _textLineExtent(textScaler, _titleSize) * 2,
+                child: Text(
+                  book.title.trim(),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontSize: _titleSize,
+                    fontWeight: FontWeight.w500,
+                    height: _lineHeight,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
@@ -203,7 +207,7 @@ class BookCard extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: AppSpacing.xs),
               _buildFooter(context),
             ],
           ),
@@ -212,30 +216,111 @@ class BookCard extends StatelessWidget {
     );
   }
 
-  Future<void> _confirmDelete(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    return showAppDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        scrollable: true,
-        title: Text(l10n.deleteBook),
-        content: Text(l10n.deleteBookConfirm(book.title)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text(l10n.cancel),
-          ),
-          TextButton(
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
+  Widget _buildMetadataRow(
+    BuildContext context,
+    ({String full, String compact}) labels,
+  ) {
+    final theme = Theme.of(context);
+    final textScaler = MediaQuery.textScalerOf(context);
+    final lineExtent = _textLineExtent(textScaler, _metadataSize);
+    final markerSize = lineExtent - 1;
+    final format = book.format.toUpperCase();
+    final formatStyle = _fileMetadataStyle(theme);
+    final progressStyle = _progressStyle(theme);
+    return SizedBox(
+      key: const ValueKey('book-card-metadata-row'),
+      height: lineExtent,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final painter = TextPainter(
+            textDirection: TextDirection.ltr,
+            textScaler: textScaler,
+            locale: Localizations.localeOf(context),
+            maxLines: 1,
+          );
+          double measure(String text, TextStyle? style) {
+            painter.text = TextSpan(text: text, style: style);
+            painter.layout();
+            return painter.width;
+          }
+
+          late double width;
+          var label = labels.full;
+          try {
+            final formatWidth =
+                measure(format, formatStyle) +
+                (isRead ? AppSpacing.xs + markerSize : 0);
+            final gap = label.isEmpty ? 0.0 : AppSpacing.sm;
+            width = formatWidth + gap + measure(label, progressStyle);
+            if (width > constraints.maxWidth && labels.compact != label) {
+              // Drop only the page unit before shrinking: every coordinate,
+              // approximation marker and percentage remains visible.
+              label = labels.compact;
+              width = formatWidth + gap + measure(label, progressStyle);
+            }
+          } finally {
+            painter.dispose();
+          }
+          return FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: AlignmentDirectional.centerStart,
+            child: SizedBox(
+              width: width > constraints.maxWidth
+                  ? width
+                  : constraints.maxWidth,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        format,
+                        key: const ValueKey('book-card-format'),
+                        style: formatStyle,
+                        maxLines: 1,
+                        softWrap: false,
+                      ),
+                      if (isRead) ...[
+                        const SizedBox(width: AppSpacing.xs),
+                        IgnoreBaseline(
+                          child: Icon(
+                            Icons.check,
+                            size: markerSize,
+                            color: theme.colorScheme.onSurfaceVariant,
+                            semanticLabel: AppLocalizations.of(
+                              context,
+                            )!.bookReadStatus,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const Spacer(),
+                  if (label.isNotEmpty) ...[
+                    const SizedBox(width: AppSpacing.sm),
+                    Semantics(
+                      label: AppLocalizations.of(
+                        context,
+                      )!.libraryReadingProgress,
+                      value: labels.full,
+                      excludeSemantics: true,
+                      child: Text(
+                        label,
+                        key: const ValueKey('book-card-progress-label'),
+                        style: progressStyle,
+                        textDirection: TextDirection.ltr,
+                        maxLines: 1,
+                        softWrap: false,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              onDelete();
-            },
-            child: Text(l10n.delete),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -243,25 +328,18 @@ class BookCard extends StatelessWidget {
   Widget _buildFooter(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
-    final style = theme.textTheme.labelSmall?.copyWith(
-      fontSize: _progressSize,
-      fontWeight: FontWeight.w400,
-      height: _lineHeight,
-      letterSpacing: 0,
+    final percentage = readingPercentage?.isFinite == true
+        ? readingPercentage!.clamp(0.0, 100.0)
+        : null;
+    // Manual completion is independent of both the position and the percentage.
+    final labels = _readingProgressLabels(
+      l10n,
+      NumberFormat.decimalPattern(l10n.localeName),
+      NumberFormat('0.0', l10n.localeName),
+      book,
+      percentage,
+      readingLocation,
     );
-    final percentage = readingPercentage?.clamp(0.0, 100.0);
-    // A rounded display must not claim completion before the real end event.
-    final displayed = percentage == null
-        ? null
-        : formatReadingPercentage(percentage, l10n.localeName, floor: true);
-    final progress = displayed == null
-        ? null
-        : Semantics(
-            label: l10n.libraryReadingProgress,
-            value: displayed,
-            excludeSemantics: true,
-            child: Text(displayed, style: style),
-          );
     final track = SizedBox(
       height: _progressBarHeight,
       child: percentage == null
@@ -277,77 +355,15 @@ class BookCard extends StatelessWidget {
               ),
             ),
     );
-    if (!compact) {
-      if (progress == null) return const SizedBox.shrink();
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            height: _textLineExtent(
-              MediaQuery.textScalerOf(context),
-              _progressSize,
-            ),
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: AlignmentDirectional.centerEnd,
-              child: progress,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          track,
-        ],
-      );
-    }
-
-    final metadata = Wrap(
-      spacing: AppSpacing.xs,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(book.format.toUpperCase(), style: style),
-        if (book.pageCount > 0) ...[
-          ExcludeSemantics(child: Text('·', style: style)),
-          Text(
-            '${book.pageCount}',
-            semanticsLabel: '${l10n.pages}: ${book.pageCount}',
-            style: style,
-          ),
-        ],
+        _buildMetadataRow(context, labels),
+        const SizedBox(height: AppSpacing.sm),
+        track,
       ],
-    );
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final labelWidth =
-            MediaQuery.textScalerOf(context).scale(_progressSize) *
-            (book.format.length +
-                (book.pageCount > 0 ? '${book.pageCount}'.length + 3 : 0) +
-                (displayed?.length ?? 0)) *
-            0.8;
-        final stacked = constraints.maxWidth < labelWidth + AppSpacing.sm;
-        return Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (stacked) ...[
-              metadata,
-              if (progress != null) ...[
-                const SizedBox(height: AppSpacing.xs),
-                Align(alignment: Alignment.centerRight, child: progress),
-              ],
-            ] else
-              Row(
-                children: [
-                  Expanded(child: metadata),
-                  if (progress != null) ...[
-                    const SizedBox(width: AppSpacing.sm),
-                    progress,
-                  ],
-                ],
-              ),
-            const SizedBox(height: AppSpacing.sm),
-            track,
-          ],
-        );
-      },
     );
   }
 }

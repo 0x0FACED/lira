@@ -314,11 +314,101 @@ abstract class AppLocalizations {
   /// **'Could not save book details.'**
   String get bookEditError;
 
-  /// No description provided for @bookShareUnavailable.
+  /// No description provided for @bookShare.
   ///
   /// In en, this message translates to:
-  /// **'Share (not available yet)'**
-  String get bookShareUnavailable;
+  /// **'Share'**
+  String get bookShare;
+
+  /// No description provided for @exportBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Save a copy'**
+  String get exportBook;
+
+  /// No description provided for @bookExportMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Export book'**
+  String get bookExportMenu;
+
+  /// No description provided for @bookCopyFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy file'**
+  String get bookCopyFile;
+
+  /// No description provided for @bookFileCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Book file copied to the clipboard'**
+  String get bookFileCopied;
+
+  /// No description provided for @bookCopyFileError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not copy the book file to the clipboard.'**
+  String get bookCopyFileError;
+
+  /// No description provided for @bookExportSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Book saved to {path}'**
+  String bookExportSaved(String path);
+
+  /// No description provided for @bookExportError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not export the book.'**
+  String get bookExportError;
+
+  /// No description provided for @bookExportFileMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'The book file is no longer available on this device.'**
+  String get bookExportFileMissing;
+
+  /// No description provided for @bookExportUnsupportedFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Only EPUB and PDF books can be exported.'**
+  String get bookExportUnsupportedFormat;
+
+  /// No description provided for @bookExportSameFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a different location to keep the original book file.'**
+  String get bookExportSameFile;
+
+  /// No description provided for @bookMarkRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as read'**
+  String get bookMarkRead;
+
+  /// No description provided for @bookUnmarkRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove read mark'**
+  String get bookUnmarkRead;
+
+  /// No description provided for @bookReadStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Read'**
+  String get bookReadStatus;
+
+  /// No description provided for @bookReadMarkError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not update the book’s read mark.'**
+  String get bookReadMarkError;
+
+  /// No description provided for @bookDeleteError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not remove the book from the library.'**
+  String get bookDeleteError;
 
   /// No description provided for @bookDeleteWarning.
   ///
@@ -595,12 +685,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete Book'**
   String get deleteBook;
-
-  /// No description provided for @deleteBookConfirm.
-  ///
-  /// In en, this message translates to:
-  /// **'Are you sure you want to delete {title}?'**
-  String deleteBookConfirm(String title);
 
   /// No description provided for @cancel.
   ///
@@ -2899,6 +2983,42 @@ abstract class AppLocalizations {
   /// **'The check only contacts Open Library. Saving does not turn the proxy on.'**
   String get proxyDraftHint;
 
+  /// No description provided for @proxyUsername.
+  ///
+  /// In en, this message translates to:
+  /// **'Username (optional)'**
+  String get proxyUsername;
+
+  /// No description provided for @proxyPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Password (optional)'**
+  String get proxyPassword;
+
+  /// No description provided for @proxyAuthenticationHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave both fields empty for no authentication. SOCKS5 sends the username and password to the proxy without encryption.'**
+  String get proxyAuthenticationHint;
+
+  /// No description provided for @proxyCredentialsInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter both a username and password, each 1–255 UTF-8 bytes, or leave both empty'**
+  String get proxyCredentialsInvalid;
+
+  /// No description provided for @proxyCredentialsUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved proxy credentials could not be read. Enter them again or explicitly choose to use no authentication.'**
+  String get proxyCredentialsUnavailable;
+
+  /// No description provided for @proxyUseWithoutAuthentication.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove saved authentication'**
+  String get proxyUseWithoutAuthentication;
+
   /// No description provided for @proxyCheckAction.
   ///
   /// In en, this message translates to:
@@ -2929,6 +3049,12 @@ abstract class AppLocalizations {
   /// **'Could not open a connection through the SOCKS5 proxy'**
   String get proxyCheckProxyUnavailable;
 
+  /// No description provided for @proxyCheckAuthenticationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Proxy authentication failed or is required'**
+  String get proxyCheckAuthenticationFailed;
+
   /// No description provided for @proxyCheckServiceUnavailable.
   ///
   /// In en, this message translates to:
@@ -2938,19 +3064,19 @@ abstract class AppLocalizations {
   /// No description provided for @proxySaving.
   ///
   /// In en, this message translates to:
-  /// **'Saving endpoint…'**
+  /// **'Saving proxy settings…'**
   String get proxySaving;
 
   /// No description provided for @proxySaved.
   ///
   /// In en, this message translates to:
-  /// **'Endpoint saved'**
+  /// **'Proxy settings saved'**
   String get proxySaved;
 
   /// No description provided for @proxySaveFailed.
   ///
   /// In en, this message translates to:
-  /// **'Could not save the endpoint'**
+  /// **'Could not save proxy settings'**
   String get proxySaveFailed;
 
   /// No description provided for @zLibraryLoginError.

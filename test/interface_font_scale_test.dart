@@ -4,6 +4,7 @@ import 'package:epub_engine/epub_engine.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:lira/core/providers/preferences_provider.dart';
@@ -37,6 +38,7 @@ void main() {
   });
 
   setUp(() async {
+    FlutterSecureStorage.setMockInitialValues({});
     await sharedPrefs.clear();
     await sharedPrefs.setString(
       'reader_settings',
@@ -175,16 +177,8 @@ void main() {
     expect(container.read(socks5ConfigProvider).port, 1080);
     await container.read(interfaceFontScaleProvider.notifier).setPercent(120);
     await tester.pumpAndSettle();
-    final editableFields = tester.widgetList<EditableText>(
-      find.descendant(
-        of: find.byType(Form),
-        matching: find.byType(EditableText),
-      ),
-    );
-    expect(editableFields.map((field) => field.controller.text), [
-      '   ',
-      '65536',
-    ]);
+    expect(tester.widget<TextFormField>(host).controller!.text, '   ');
+    expect(tester.widget<TextFormField>(port).controller!.text, '65536');
     for (final invalidPort in ['0', '-1', 'port', '']) {
       await tester.ensureVisible(port);
       await tester.enterText(port, invalidPort);
@@ -198,14 +192,41 @@ void main() {
     await tester.enterText(host, 'new.example');
     await tester.ensureVisible(port);
     await tester.enterText(port, '65535');
+    final username = field(l10n.proxyUsername);
+    final password = field(l10n.proxyPassword);
+    final passwordInput = find.descendant(
+      of: password,
+      matching: find.byType(EditableText),
+    );
+    expect(tester.widget<EditableText>(passwordInput).obscureText, isTrue);
+    await tester.ensureVisible(username);
+    await tester.enterText(username, ' user ');
+    await tester.ensureVisible(save);
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    expect(find.text(l10n.proxyCredentialsInvalid), findsOneWidget);
+    expect(container.read(socks5ConfigProvider).username, isNull);
+    await tester.ensureVisible(password);
+    await tester.enterText(password, List.filled(128, 'я').join());
+    await tester.ensureVisible(save);
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    expect(find.text(l10n.proxyCredentialsInvalid), findsOneWidget);
+    await tester.ensureVisible(password);
+    await tester.enterText(password, ' secret ');
+    await container.read(socks5ConfigProvider.notifier).setEnabled(false);
+    await tester.pumpAndSettle();
     expect(container.read(socks5ConfigProvider).host, 'applied.example');
     await tester.ensureVisible(save);
     await tester.tap(save);
     await tester.pumpAndSettle();
     expect(container.read(socks5ConfigProvider).host, 'new.example');
     expect(container.read(socks5ConfigProvider).port, 65535);
+    expect(container.read(socks5ConfigProvider).username, ' user ');
+    expect(container.read(socks5ConfigProvider).password, ' secret ');
+    expect(container.read(socks5ConfigProvider).enabled, isFalse);
     expect(
-      find.text(l10n.proxyAppliedEndpoint('new.example', 65535)),
+      find.text(l10n.proxySavedEndpoint('new.example', 65535)),
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);

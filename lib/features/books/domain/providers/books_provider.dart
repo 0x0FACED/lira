@@ -17,6 +17,7 @@ import 'package:zlibrary_api/zlibrary_api.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/providers/preferences_provider.dart';
 import '../../../../core/network/proxy_http_overrides.dart';
+import '../../../progress/domain/providers/manual_read_status_provider.dart';
 import '../../../search/domain/providers/book_source_clients.dart';
 import '../../../search/domain/models/search_result_item.dart';
 import '../models/book_dto.dart';
@@ -675,12 +676,14 @@ class BooksController extends AsyncNotifier<List<BookDto>> {
 
   Future<void> removeBook(String id) async {
     final organizations = ref.read(bookOrganizationsProvider.notifier);
+    final manualReadStatus = ref.read(manuallyReadBookIdsProvider.notifier);
     final book = await _repository.getBookById(id);
     await _repository.deleteBook(id);
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() => _repository.getAllBooks());
     await organizations.removeLabels(id);
     await deleteOpenLibraryCover(id, book?.coverUrl);
+    await manualReadStatus.setRead(id, false);
   }
 
   Future<String?> _downloadCoverToPath(

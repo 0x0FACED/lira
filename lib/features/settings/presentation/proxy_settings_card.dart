@@ -20,12 +20,15 @@ class _ProxySettingsCardState extends ConsumerState<ProxySettingsCard> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _hostController;
   late final TextEditingController _portController;
+  late final TextEditingController _usernameController;
+  late final TextEditingController _passwordController;
   static final _invalidHostCharacters = RegExp(r'[\s/@?#\\\[\]]');
   bool _draftEdited = false;
   bool _checking = false;
   bool _saving = false;
   bool _saved = false;
   bool _saveFailed = false;
+  bool _useWithoutAuthentication = false;
   int _draftRevision = 0;
   int? _checkingRevision;
   ProxyConnectionResult? _checkResult;
@@ -36,12 +39,16 @@ class _ProxySettingsCardState extends ConsumerState<ProxySettingsCard> {
     final config = ref.read(socks5ConfigProvider);
     _hostController = TextEditingController(text: config.host);
     _portController = TextEditingController(text: '${config.port}');
+    _usernameController = TextEditingController(text: config.username);
+    _passwordController = TextEditingController(text: config.password);
   }
 
   @override
   void dispose() {
     _hostController.dispose();
     _portController.dispose();
+    _usernameController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -50,6 +57,24 @@ class _ProxySettingsCardState extends ConsumerState<ProxySettingsCard> {
     return host.startsWith('[') && host.endsWith(']')
         ? host.substring(1, host.length - 1)
         : host;
+  }
+
+  String? get _draftUsername =>
+      _usernameController.text.isEmpty ? null : _usernameController.text;
+
+  String? get _draftPassword =>
+      _passwordController.text.isEmpty ? null : _passwordController.text;
+
+  String? _validateCredentials(AppLocalizations l10n) {
+    if (!Socks5Config.validCredentials(_draftUsername, _draftPassword)) {
+      return l10n.proxyCredentialsInvalid;
+    }
+    if (ref.read(socks5ConfigProvider).credentialsUnavailable &&
+        _draftUsername == null &&
+        !_useWithoutAuthentication) {
+      return l10n.proxyCredentialsUnavailable;
+    }
+    return null;
   }
 
   String? _validateHost(AppLocalizations l10n) {
@@ -80,6 +105,8 @@ class _ProxySettingsCardState extends ConsumerState<ProxySettingsCard> {
       enabled: true,
       host: _draftHost,
       port: int.parse(_portController.text.trim()),
+      username: _draftUsername,
+      password: _draftPassword,
     );
     setState(() {
       _checking = true;
@@ -102,16 +129,21 @@ class _ProxySettingsCardState extends ConsumerState<ProxySettingsCard> {
     final revision = _draftRevision;
     final host = _draftHost;
     final port = int.parse(_portController.text.trim());
+    final username = _draftUsername;
+    final password = _draftPassword;
     setState(() {
       _saving = true;
       _saved = false;
       _saveFailed = false;
     });
     try {
-      await ref.read(socks5ConfigProvider.notifier).setEndpoint(host, port);
+      await ref
+          .read(socks5ConfigProvider.notifier)
+          .setEndpoint(host, port, username: username, password: password);
       if (!mounted || revision != _draftRevision) return;
       setState(() {
         _draftEdited = false;
+        _useWithoutAuthentication = false;
         _saved = true;
       });
     } catch (_) {
@@ -133,12 +165,20 @@ class _ProxySettingsCardState extends ConsumerState<ProxySettingsCard> {
     final colors = theme.colorScheme;
     ref.listen(socks5ConfigProvider, (previous, next) {
       if (_draftEdited ||
-          (previous?.host == next.host && previous?.port == next.port)) {
+          (previous?.host == next.host &&
+              previous?.port == next.port &&
+              previous?.username == next.username &&
+              previous?.password == next.password &&
+              previous?.credentialsUnavailable ==
+                  next.credentialsUnavailable)) {
         return;
       }
       _hostController.text = next.host;
       _portController.text = '${next.port}';
+      _usernameController.text = next.username ?? '';
+      _passwordController.text = next.password ?? '';
       setState(() {
+        _useWithoutAuthentication = false;
         _draftRevision++;
         _checkResult = null;
         _saved = false;
@@ -164,7 +204,7 @@ class _ProxySettingsCardState extends ConsumerState<ProxySettingsCard> {
     final port = TextFormField(
       controller: _portController,
       keyboardType: TextInputType.number,
-      textInputAction: TextInputAction.done,
+      textInputAction: TextInputAction.next,
       decoration: InputDecoration(
         labelText: l10n.proxyPort,
         filled: true,
@@ -178,6 +218,36 @@ class _ProxySettingsCardState extends ConsumerState<ProxySettingsCard> {
             : null;
       },
       onChanged: _draftChanged,
+    );
+    final username = TextFormField(
+      controller: _usernameController,
+      enabled: !(config.credentialsUnavailable && _useWithoutAuthentication),
+      autocorrect: false,
+      enableSuggestions: false,
+      textInputAction: TextInputAction.next,
+      decoration: InputDecoration(
+        labelText: l10n.proxyUsername,
+        filled: true,
+        fillColor: colors.surface,
+      ),
+      onChanged: _draftChanged,
+    );
+    final password = TextFormField(
+      controller: _passwordController,
+      enabled: !(config.credentialsUnavailable && _useWithoutAuthentication),
+      obscureText: true,
+      autocorrect: false,
+      enableSuggestions: false,
+      enableIMEPersonalizedLearning: false,
+      textInputAction: TextInputAction.done,
+      decoration: InputDecoration(
+        labelText: l10n.proxyPassword,
+        filled: true,
+        fillColor: colors.surface,
+        errorMaxLines: 4,
+      ),
+      validator: (_) => _validateCredentials(l10n),
+      onChanged: _draftChanged,
       onFieldSubmitted: (_) => _save(),
     );
     final checkingCurrentDraft =
@@ -186,6 +256,8 @@ class _ProxySettingsCardState extends ConsumerState<ProxySettingsCard> {
       ProxyConnectionResult.connected => l10n.proxyCheckConnected,
       ProxyConnectionResult.timedOut => l10n.proxyCheckTimedOut,
       ProxyConnectionResult.proxyUnavailable => l10n.proxyCheckProxyUnavailable,
+      ProxyConnectionResult.authenticationFailed =>
+        l10n.proxyCheckAuthenticationFailed,
       ProxyConnectionResult.serviceUnavailable =>
         l10n.proxyCheckServiceUnavailable,
       null => null,
@@ -202,8 +274,16 @@ class _ProxySettingsCardState extends ConsumerState<ProxySettingsCard> {
                 : l10n.proxySavedEndpoint(displayHost, config.port),
           ),
           value: config.enabled,
-          onChanged: (value) =>
-              ref.read(socks5ConfigProvider.notifier).setEnabled(value),
+          onChanged: (value) async {
+            try {
+              await ref.read(socks5ConfigProvider.notifier).setEnabled(value);
+            } catch (_) {
+              if (!mounted) return;
+              ScaffoldMessenger.of(
+                this.context,
+              ).showSnackBar(SnackBar(content: Text(l10n.proxySaveFailed)));
+            }
+          },
         ),
         Padding(
           key: const ValueKey('proxy-fields'),
@@ -233,19 +313,67 @@ class _ProxySettingsCardState extends ConsumerState<ProxySettingsCard> {
                           host,
                           const SizedBox(height: AppSpacing.compact),
                           port,
+                          const SizedBox(height: AppSpacing.compact),
+                          username,
+                          const SizedBox(height: AppSpacing.compact),
+                          password,
                         ],
                       );
                     }
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Expanded(child: host),
-                        const SizedBox(width: AppSpacing.compact),
-                        SizedBox(width: 128, child: port),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: host),
+                            const SizedBox(width: AppSpacing.compact),
+                            SizedBox(width: 128, child: port),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.compact),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: username),
+                            const SizedBox(width: AppSpacing.compact),
+                            Expanded(child: password),
+                          ],
+                        ),
                       ],
                     );
                   },
                 ),
+                const SizedBox(height: AppSpacing.compact),
+                Text(
+                  l10n.proxyAuthenticationHint,
+                  style: theme.textTheme.bodySmall,
+                ),
+                if (config.credentialsUnavailable) ...[
+                  const SizedBox(height: AppSpacing.compact),
+                  Text(
+                    l10n.proxyCredentialsUnavailable,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colors.error,
+                    ),
+                  ),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    title: Text(l10n.proxyUseWithoutAuthentication),
+                    value: _useWithoutAuthentication,
+                    onChanged: (value) {
+                      setState(() {
+                        _useWithoutAuthentication = value ?? false;
+                        if (_useWithoutAuthentication) {
+                          _usernameController.clear();
+                          _passwordController.clear();
+                        }
+                      });
+                      _draftChanged('');
+                    },
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.compact),
                 Wrap(
                   alignment: WrapAlignment.end,

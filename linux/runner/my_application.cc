@@ -7,6 +7,102 @@
 
 #include "flutter/generated_plugin_registrant.h"
 
+#include <cstring>
+
+namespace {
+
+const GtkTargetEntry kFileClipboardTargets[] = {
+    {const_cast<gchar*>("text/uri-list"), 0, 0},
+    {const_cast<gchar*>("x-special/gnome-copied-files"), 0, 1},
+    {const_cast<gchar*>("application/x-kde-cutselection"), 0, 2},
+};
+
+void file_clipboard_get(GtkClipboard* clipboard, GtkSelectionData* selection,
+                        guint info, gpointer user_data) {
+  auto* copied_files = static_cast<gchar*>(user_data);
+  if (info == 0) {
+    // The payload is "copy\nURI"; GTK serializes the URI list with CRLF.
+    gchar* uris[] = {copied_files + 5, nullptr};
+    gtk_selection_data_set_uris(selection, uris);
+  } else if (info == 1) {
+    gtk_selection_data_set(
+        selection, gtk_selection_data_get_target(selection), 8,
+        reinterpret_cast<const guchar*>(copied_files),
+        static_cast<gint>(std::strlen(copied_files)));
+  } else if (info == 2) {
+    // Dolphin/KDE: explicitly mark this as a copy, never a cut.
+    const guchar copy = '0';
+    gtk_selection_data_set(selection, gtk_selection_data_get_target(selection),
+                           8, &copy, 1);
+  }
+}
+
+void file_clipboard_clear(GtkClipboard* clipboard, gpointer user_data) {
+  g_free(user_data);
+}
+
+FlMethodResponse* copy_file_to_clipboard(GtkClipboard* clipboard,
+                                       FlValue* arguments) {
+  if (!arguments || fl_value_get_type(arguments) != FL_VALUE_TYPE_STRING) {
+    return FL_METHOD_RESPONSE(fl_method_error_response_new(
+        "invalid_arguments", "Expected an absolute local file path.", nullptr));
+  }
+  const gchar* path = fl_value_get_string(arguments);
+  if (!g_path_is_absolute(path)) {
+    return FL_METHOD_RESPONSE(fl_method_error_response_new(
+        "invalid_arguments", "Expected an absolute local file path.", nullptr));
+  }
+  g_autoptr(GError) error = nullptr;
+  g_autofree gchar* filename =
+      g_filename_from_utf8(path, -1, nullptr, nullptr, &error);
+  if (!filename) {
+    return FL_METHOD_RESPONSE(fl_method_error_response_new(
+        "invalid_arguments", error->message, nullptr));
+  }
+  if (!g_file_test(filename, G_FILE_TEST_EXISTS)) {
+    return FL_METHOD_RESPONSE(fl_method_error_response_new(
+        "file_not_found", "The file no longer exists or is inaccessible.", nullptr));
+  }
+  // Percent-encode the original path without resolving symlinks or duplicating it.
+  g_autofree gchar* uri = g_filename_to_uri(filename, nullptr, &error);
+  if (!uri) {
+    return FL_METHOD_RESPONSE(fl_method_error_response_new(
+        "invalid_arguments", error->message, nullptr));
+  }
+  gchar* copied_files = g_strconcat("copy\n", uri, nullptr);
+  if (!gtk_clipboard_set_with_data(
+          clipboard, kFileClipboardTargets, G_N_ELEMENTS(kFileClipboardTargets),
+          file_clipboard_get, file_clipboard_clear, copied_files)) {
+    // GTK only invokes clear_func after successful ownership transfer.
+    g_free(copied_files);
+    return FL_METHOD_RESPONSE(fl_method_error_response_new(
+        "clipboard_error", "Could not copy the file to the clipboard.", nullptr));
+  }
+  gtk_clipboard_set_can_store(clipboard, kFileClipboardTargets,
+                              G_N_ELEMENTS(kFileClipboardTargets));
+  // Persistence requires a clipboard manager/compositor that supports it;
+  // in particular, Wayland does not guarantee clipboard survival after exit.
+  gtk_clipboard_store(clipboard);
+  return FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
+}
+
+void file_clipboard_method_call(FlMethodChannel* channel,
+                                FlMethodCall* method_call, gpointer user_data) {
+  g_autoptr(FlMethodResponse) response = nullptr;
+  if (std::strcmp(fl_method_call_get_name(method_call), "copyFile") == 0) {
+    response = copy_file_to_clipboard(
+        GTK_CLIPBOARD(user_data), fl_method_call_get_args(method_call));
+  } else {
+    response = FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
+  }
+  g_autoptr(GError) error = nullptr;
+  if (!fl_method_call_respond(method_call, response, &error)) {
+    g_warning("Failed to respond to file clipboard call: %s", error->message);
+  }
+}
+
+}  // namespace
+
 struct _MyApplication {
   GtkApplication parent_instance;
   char** dart_entrypoint_arguments;
@@ -72,6 +168,17 @@ static void my_application_activate(GApplication* application) {
   gtk_widget_realize(GTK_WIDGET(view));
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
+
+  g_autoptr(FlStandardMethodCodec) file_clipboard_codec =
+      fl_standard_method_codec_new();
+  g_autoptr(FlMethodChannel) file_clipboard_channel = fl_method_channel_new(
+      fl_engine_get_binary_messenger(fl_view_get_engine(view)),
+      "dev.0xfaced.lira/file_clipboard",
+      FL_METHOD_CODEC(file_clipboard_codec));
+  GtkClipboard* clipboard = gtk_clipboard_get_for_display(
+      gtk_widget_get_display(GTK_WIDGET(view)), GDK_SELECTION_CLIPBOARD);
+  fl_method_channel_set_method_call_handler(
+      file_clipboard_channel, file_clipboard_method_call, clipboard, nullptr);
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }

@@ -16,12 +16,15 @@ import 'features/settings/data/reader_font_catalog.dart';
 import 'features/settings/data/settings_provider.dart' show sharedPrefs;
 
 void main() async {
-  HttpOverrides.global = ProxyHttpOverrides();
   WidgetsFlutterBinding.ensureInitialized();
 
   // Load SharedPreferences before runApp so all providers
   // can read persisted state synchronously (no async race conditions).
   sharedPrefs = await SharedPreferences.getInstance();
+  final proxyStore = Socks5PreferencesStore(sharedPrefs);
+  final proxyConfig = await proxyStore.load();
+  updateGlobalProxyConfig(proxyConfig);
+  HttpOverrides.global = ProxyHttpOverrides();
 
   for (final font in bundledReaderFonts) {
     LicenseRegistry.addLicense(() async* {
@@ -37,7 +40,15 @@ void main() async {
   });
 
   configureDependencies();
-  runApp(const ProviderScope(child: LiraApp()));
+  runApp(
+    ProviderScope(
+      overrides: [
+        socks5PreferencesStoreProvider.overrideWith((ref) async => proxyStore),
+        initialSocks5ConfigProvider.overrideWithValue(proxyConfig),
+      ],
+      child: const LiraApp(),
+    ),
+  );
 }
 
 class LiraApp extends ConsumerWidget {
@@ -45,13 +56,14 @@ class LiraApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Update synchronously on provider changes, not on the next widget frame.
+    ref.listen<Socks5Config>(socks5ConfigProvider, (_, config) {
+      updateGlobalProxyConfig(config);
+    });
+    updateGlobalProxyConfig(ref.read(socks5ConfigProvider));
     final router = ref.watch(appRouterProvider);
     final themeMode = ref.watch(themeModeProvider);
     final locale = ref.watch(localeProvider);
-
-    // Keep global proxy config in sync with provider state
-    final proxyConfig = ref.watch(socks5ConfigProvider);
-    updateGlobalProxyConfig(proxyConfig);
 
     return MaterialApp.router(
       title: 'Lira',

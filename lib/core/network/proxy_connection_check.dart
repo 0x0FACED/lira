@@ -4,12 +4,13 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import '../providers/preferences_provider.dart';
-import 'proxy_http_overrides.dart' show socks5ProxyHost;
+import 'socks5_handshake.dart';
 
 enum ProxyConnectionResult {
   connected,
   timedOut,
   proxyUnavailable,
+  authenticationFailed,
   serviceUnavailable,
 }
 
@@ -37,6 +38,7 @@ Future<ProxyConnectionResult> checkProxyConnection(
 
   Future<ProxyConnectionResult> request() async {
     try {
+      final authentication = socks5AuthenticationRequest(config);
       // Retain the raw socket across TLS negotiation: SecureSocket.secure on a
       // Socket detaches it, leaving no way to close it during handshake.
       final task = connecting = await RawSocket.startConnect(
@@ -50,7 +52,12 @@ Future<ProxyConnectionResult> checkProxyConnection(
         return ProxyConnectionResult.timedOut;
       }
       final proxy = _ProbeSocket(raw);
-      await _openTunnel(proxy, uri);
+      await openSocks5Tunnel(
+        uri,
+        authenticationRequest: authentication,
+        read: proxy.readExactly,
+        write: proxy.write,
+      );
       tunnelEstablished = true;
       final secure = await RawSecureSocket.secure(
         raw,
@@ -70,6 +77,8 @@ Future<ProxyConnectionResult> checkProxyConnection(
       return status >= 200 && status < 400
           ? ProxyConnectionResult.connected
           : ProxyConnectionResult.serviceUnavailable;
+    } on Socks5AuthenticationException {
+      return ProxyConnectionResult.authenticationFailed;
     } catch (_) {
       return tunnelEstablished
           ? ProxyConnectionResult.serviceUnavailable
@@ -90,43 +99,6 @@ Future<ProxyConnectionResult> checkProxyConnection(
     final raw = socket;
     if (raw != null) unawaited(raw.close());
   }
-}
-
-// This probe owns its RawSocket, so it negotiates the same unauthenticated
-// SOCKS5 CONNECT without the package adapter that requires a Socket.
-Future<void> _openTunnel(_ProbeSocket proxy, Uri target) async {
-  await proxy.write(const [5, 1, 0]);
-  final method = await proxy.readExactly(2);
-  if (method[0] != 5 || method[1] != 0) {
-    throw const SocketException('Proxy did not accept unauthenticated SOCKS5');
-  }
-
-  final ip = InternetAddress.tryParse(target.host);
-  final address = ip?.rawAddress ?? utf8.encode(target.host);
-  if (address.length > 255)
-    throw const FormatException('SOCKS5 target too long');
-  final type = ip == null ? 3 : (ip.type == InternetAddressType.IPv4 ? 1 : 4);
-  await proxy.write([
-    5,
-    1,
-    0,
-    type,
-    if (type == 3) address.length,
-    ...address,
-    target.port >> 8,
-    target.port & 0xff,
-  ]);
-  final reply = await proxy.readExactly(4);
-  if (reply[0] != 5 || reply[1] != 0 || reply[2] != 0) {
-    throw const SocketException('Proxy did not open the SOCKS5 tunnel');
-  }
-  final addressLength = switch (reply[3]) {
-    1 => 4,
-    3 => (await proxy.readExactly(1)).single,
-    4 => 16,
-    _ => throw const FormatException('Invalid SOCKS5 reply address'),
-  };
-  await proxy.readExactly(addressLength + 2);
 }
 
 final _statusLine = RegExp(r'^HTTP/1\.[01] ([0-9]{3})(?: |\r?$)');
